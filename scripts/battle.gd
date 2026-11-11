@@ -499,6 +499,8 @@ func _spawn(entry: Dictionary, side: int) -> void:
 		road = lane_tick % maxi(lane_ys.size(), 1)
 		lane_tick += 1
 	road = clampi(road, 0, maxi(lane_ys.size() - 1, 0))
+	if str(entry.get("id", "")) == "berserker":
+		road = lane_ys.size() / 2
 	unit.lane = road
 	var y := lane_y(road)
 	unit.position = Vector2(player_front + 20.0, y) if side == 0 else Vector2(enemy_front - 20.0, y)

@@ -33,7 +33,7 @@ There are 11 soldiers. Each battle uses 6.
 | Shield-Bearer | 10 | 5s | 200 | 15 damage every second, short reach, one target |
 | Saber | 25 | 10s | 150 | 50 damage every second, short reach, one target |
 | Lancer | 20 | 5s | 100 | 20 damage every second, mid reach, one target |
-| Berserker | 50 | 20s | 300 | 80 damage every 3 seconds to everyone in short range |
+| Berserker | 50 | 20s | 600 | Stands across all three roads. 80 damage every 3 seconds to everyone in short range |
 | Horse Rider | 20 | 10s | 100 | Fast. 30 damage every second, one target |
 | Suicide Squad | 20 | 10s | 40 | Blasts everyone in short range for 100, and loses 40 blood |
 | Assassin | 15 | 8s | 100 | Blinks behind the first enemy who could hit her, once, then cuts for 50 |

@@ -3,6 +3,9 @@ extends Node2D
 const Buff = preload("res://scripts/level_buff.gd")
 const Painter = preload("res://scripts/painter.gd")
 
+const BERSERK_TOP := -22.0
+const BERSERK_BOTTOM := 20.0
+
 var data: Dictionary = {}
 var look: Dictionary = {}
 var side: int = 0
@@ -116,7 +119,10 @@ func _process(delta: float) -> void:
 		_support(delta)
 	else:
 		_fight(delta)
-	z_index = int(position.y)
+	if _is_berserker() and battle.lane_ys.size() > 0:
+		z_index = int(battle.lane_ys[battle.lane_ys.size() - 1]) + 24
+	else:
+		z_index = int(position.y)
 	queue_redraw()
 
 
@@ -354,25 +360,56 @@ func _pose() -> Dictionary:
 	return {"phase": phase, "t": t, "clock": bob_time, "flash": flash}
 
 
+func _road_span() -> float:
+	if battle == null or battle.lane_ys.size() < 2:
+		return 0.0
+	return float(battle.lane_ys[battle.lane_ys.size() - 1]) - float(battle.lane_ys[0])
+
+
+func _body_scale() -> float:
+	var sc := float(data.get("scale", 1.2))
+	if not _is_berserker():
+		return sc
+	var span := _road_span()
+	if span <= 1.0:
+		return sc
+	return span / (BERSERK_BOTTOM - BERSERK_TOP)
+
+
+func _body_shift(sc: float) -> float:
+	if not _is_berserker():
+		return 0.0
+	return -0.5 * (BERSERK_TOP + BERSERK_BOTTOM) * sc
+
+
 func _draw() -> void:
-	var sc: float = float(data.get("scale", 1.2))
+	var sc := _body_scale()
+	var shift := _body_shift(sc)
 	var bob := 0.0
 	if moving and alive and debut <= 0.0:
 		bob = sin(bob_time * 8.0) * 1.5
-	draw_set_transform(Vector2(0, bob), 0, Vector2(facing * sc, sc))
+	draw_set_transform(Vector2(0, bob + shift), 0, Vector2(facing * sc, sc))
 	Painter.paint_local(self, look, _pose())
 	draw_set_transform(Vector2.ZERO, 0, Vector2.ONE)
 	if debut > 0.0 and alive:
 		var ring := clampf(debut / 0.46, 0.0, 1.0)
-		draw_arc(Vector2(0, 10), 16.0 + (1.0 - ring) * 14.0, 0, TAU, 24, Color(1, 0.9, 0.62, ring), 2.2)
+		var radius := 16.0 + (1.0 - ring) * 14.0
+		var at := Vector2(0, 10)
+		if _is_berserker():
+			radius = _road_span() * 0.48
+			at = Vector2.ZERO
+		draw_arc(at, radius, 0, TAU, 24, Color(1, 0.9, 0.62, ring), 2.2)
 	if not alive:
 		return
 	var ratio := clampf(hp / maxf(1.0, max_hp), 0.0, 1.0)
 	var bar_y := -58.0 * sc
+	if _is_berserker():
+		bar_y = shift + BERSERK_TOP * sc - 14.0
 	var bar_w := 36.0 * sc
-	draw_rect(Rect2(-bar_w * 0.5, bar_y, bar_w, 5), Color(0, 0, 0, 0.65))
+	var bar_h := 8.0 if _is_berserker() else 5.0
+	draw_rect(Rect2(-bar_w * 0.5, bar_y, bar_w, bar_h), Color(0, 0, 0, 0.65))
 	var fill := Color("7dce6a") if ratio > 0.35 else Color("e24b3b")
-	draw_rect(Rect2(-bar_w * 0.5, bar_y, bar_w * ratio, 5), fill)
+	draw_rect(Rect2(-bar_w * 0.5, bar_y, bar_w * ratio, bar_h), fill)
 	if role == "assassin" and not data.get("blink_used", false):
 		draw_circle(Vector2(-bar_w * 0.5 - 6.0, bar_y + 2.0), 3.2, Color("c084fc"))
 	if level_stacks > 0:
