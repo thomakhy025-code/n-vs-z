@@ -1,0 +1,12 @@
+.godot/
+*.translation
+*.tmp
+.DS_Store
+Thumbs.db
+shot.png
+menu_shot.png
+battle_shot.png
+export/
+*.exe
+*.pck
+*.zip
