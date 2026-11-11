@@ -18,7 +18,6 @@ const ENEMY_START := 22.0
 const ENEMY_INCOME_BASE := 7.2
 const ENEMY_GROWTH := 0.065
 const MAX_SIDE := 24
-const LANE := [-34.0, -12.0, 12.0, 34.0, -22.0, 22.0]
 
 var mode: String = ""
 var loadout: Array = []
@@ -32,6 +31,7 @@ var damage_events: int = 0
 var spawned_player: int = 0
 var vp: Vector2 = Vector2(1280, 720)
 var ground_y: float = 400.0
+var lane_ys: Array[float] = []
 var player_front: float = 176.0
 var enemy_front: float = 1100.0
 var units: Array = []
@@ -108,6 +108,10 @@ func _build_world() -> void:
 	var metrics: Dictionary = scenery.metrics()
 	vp = metrics["size"]
 	ground_y = float(metrics["ground_y"])
+	lane_ys.clear()
+	var lanes: Array = metrics["lane_ys"]
+	for raw_y in lanes:
+		lane_ys.append(float(raw_y))
 	player_front = 176.0
 	enemy_front = vp.x - 176.0
 	player_gate = GateScript.new()
@@ -124,7 +128,7 @@ func _build_world() -> void:
 	hero = HeroScript.new()
 	hero.setup(self)
 	add_child(hero)
-	hero.set_bounds(player_front - 40.0, enemy_front - 12.0, ground_y - 54.0, ground_y + 10.0)
+	hero.set_bounds(player_front - 40.0, enemy_front - 12.0, lane_y(0), lane_y(lane_ys.size() - 1))
 
 
 func _build_hud() -> void:
@@ -152,7 +156,7 @@ func _build_hud() -> void:
 	value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	income_label = _plain("+3.6 each second", 16, Color("f3e6c8"))
 	income_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	hint = _plain("Drag the road to move. WASD works too. Call soldiers on the left. Sword and Shoot are on the right. J and K match those buttons. Keys 1-6 call the six you chose.", 16, Color("f3e6c8"))
+	hint = _plain("Drag between the three roads to move. WASD works too. Soldiers you call join the hero's road. Sword and Shoot are on the right. J and K match those buttons. Keys 1-6 call the six you chose.", 16, Color("f3e6c8"))
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	down_label = _plain("", 20, Color("ffb4a8"))
@@ -405,9 +409,12 @@ func _drive_hero() -> void:
 		var dir := 0.0
 		if absf(desired - hero.position.x) >= 12.0:
 			dir = signf(desired - hero.position.x)
-		hero.bot_axis = Vector2(dir, 0)
-		hero.bot_sword = best < 96.0
-		hero.bot_shoot = best < 420.0
+		var ydir := 0.0
+		if absf(foe.position.y - hero.position.y) >= 18.0:
+			ydir = signf(foe.position.y - hero.position.y)
+		hero.bot_axis = Vector2(dir, ydir)
+		hero.bot_sword = best < 96.0 and int(foe.lane) == hero.lane
+		hero.bot_shoot = best < 420.0 and int(foe.lane) == hero.lane
 	else:
 		var goal: float = enemy_front - 80.0
 		var dir2 := 0.0
@@ -437,8 +444,16 @@ func summon_player(id: String) -> void:
 func _spawn(entry: Dictionary, side: int) -> void:
 	var unit = UnitScript.new()
 	unit.setup(self, entry, side)
-	var y: float = ground_y + float(LANE[lane_tick % LANE.size()])
-	lane_tick += 1
+	var road := 1
+	if side == 0:
+		if hero != null and is_instance_valid(hero) and hero.alive:
+			road = hero.lane
+	else:
+		road = lane_tick % maxi(lane_ys.size(), 1)
+		lane_tick += 1
+	road = clampi(road, 0, maxi(lane_ys.size() - 1, 0))
+	unit.lane = road
+	var y := lane_y(road)
 	unit.position = Vector2(player_front + 20.0, y) if side == 0 else Vector2(enemy_front - 20.0, y)
 	world.add_child(unit)
 	units.append(unit)
@@ -486,10 +501,36 @@ func damage_gate(defender_side: int, amount: float) -> void:
 		gate.take_damage(amount)
 
 
-func fire_arrow(from: Vector2, aim_x: float, amount: float, side: int, color: Color, reach: float) -> void:
+func fire_arrow(from: Vector2, aim: Vector2, amount: float, side: int, color: Color, reach: float, road: int, bold: bool = false, hits_gate: bool = true, homing: bool = false) -> void:
 	var arrow = ArrowScript.new()
-	arrow.setup(from, aim_x, amount, side, color, reach, self)
+	arrow.setup(from, aim, amount, side, color, reach, road, self, bold, hits_gate, homing)
 	world.add_child(arrow)
+
+
+func lane_y(index: int) -> float:
+	if lane_ys.is_empty():
+		return ground_y
+	return lane_ys[clampi(index, 0, lane_ys.size() - 1)]
+
+
+func lane_index(y: float) -> int:
+	var best := 0
+	var best_d := 100000.0
+	for i in lane_ys.size():
+		var dist := absf(lane_ys[i] - y)
+		if dist < best_d:
+			best_d = dist
+			best = i
+	return best
+
+
+func is_berserker(unit) -> bool:
+	if unit == null or not is_instance_valid(unit):
+		return false
+	if not ("data" in unit):
+		return false
+	var info = unit.data
+	return info is Dictionary and str(info.get("id", "")) == "berserker"
 
 
 func float_text(at: Vector2, text: String, color: Color) -> void:

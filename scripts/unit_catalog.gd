@@ -18,7 +18,7 @@ static func player_roster() -> Array:
 		_u("shield", "Shield-Bearer", "Shield", 10, 5.0, 200, 15, 1.0, SHORT, SHORT, "melee", 56, 1.25, "A thick gate of armor. 200 blood, 15 damage, short reach, one target."),
 		_u("saber", "Saber", "Saber", 25, 10.0, 150, 50, 1.0, SHORT, SHORT, "melee", 72, 1.22, "Slow to call. Cuts one enemy for 50 every second."),
 		_u("lancer", "Lancer", "Lancer", 20, 5.0, 100, 20, 1.0, SHORT, MID, "melee", 74, 1.2, "The spear reaches mid range and hits one enemy for 20 every second."),
-		_u("berserker", "Berserker", "Berserk", 50, 20.0, 300, 80, 3.0, MID, SHORT, "aoe", 62, 1.48, "Rushes in from mid distance. Every 3 seconds, everyone in short range takes 80."),
+		_u("berserker", "Berserker", "Berserk", 50, 20.0, 300, 80, 3.0, MID, SHORT, "aoe", 62, 1.48, "Rushes in from mid distance. Every 3 seconds, every enemy in short range on every road takes 80. Enemies on every road can strike back."),
 		_u("horse", "Horse Rider", "Rider", 20, 10.0, 100, 30, 1.0, SHORT, SHORT, "melee", 128, 1.35, "Fast. Hits one enemy for 30 every second."),
 		_u("suicide", "Suicide Squad", "Bomb", 20, 10.0, 40, 100, 1.0, MID, SHORT, "suicide", 108, 1.15, "Rushes from mid distance. The blast hits everyone in short range for 100, and 40 of that blood is their own."),
 		_u("assassin", "Assassin", "Assassin", 15, 8.0, 100, 50, 1.0, SHORT, SHORT, "assassin", 116, 1.12, "The first time an enemy could hit her, she blinks behind that enemy. The trick happens once. Then she cuts for 50."),

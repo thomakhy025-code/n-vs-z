@@ -25,6 +25,9 @@ var heal_flash: float = 0.0
 var battle = null
 var role: String = "melee"
 var attack_reach: float = 70.0
+var lane: int = 1
+var strike_to: Vector2 = Vector2.ZERO
+var show_strike: bool = false
 
 
 func setup(field, entry: Dictionary, which_side: int) -> void:
@@ -87,6 +90,8 @@ func _report_down() -> void:
 func _process(delta: float) -> void:
 	flash = maxf(0.0, flash - delta)
 	lunge = maxf(0.0, lunge - delta * 3.2)
+	if lunge <= 0.0:
+		show_strike = false
 	if not alive:
 		modulate.a = maxf(0.0, modulate.a - delta * 2.4)
 		position.y -= delta * 16.0
@@ -157,7 +162,7 @@ func _try_blink() -> void:
 	if data.get("blink_used", false):
 		return
 	for foe in battle.hostile_targets(side):
-		if not foe.alive:
+		if not foe.alive or int(foe.lane) != lane:
 			continue
 		var foe_facing: float = foe.facing
 		var forward_gap: float = (position.x - foe.position.x) * foe_facing
@@ -184,14 +189,27 @@ func _try_strike(foe, gate) -> void:
 	lunge = 1.0
 	var amount := float(data["damage"]) * damage_multiplier
 	if role == "ranged":
-		var aim_x: float = gate.front_x if foe == null else foe.position.x
+		var cross := foe != null and int(foe.lane) != lane
+		var aim_x: float = gate.front_x if foe == null else float(foe.position.x)
+		var aim_y := position.y
+		if cross:
+			aim_y = float(foe.position.y)
 		var tint: Color = Color("b6e36a") if side == 1 else Color("f2d38a")
-		battle.fire_arrow(position + Vector2(0, -16), aim_x, amount, side, tint, float(data["reach"]) + 40.0)
+		battle.fire_arrow(position + Vector2(0, -16), Vector2(aim_x, aim_y - 16.0), amount, side, tint, float(data["reach"]) + 40.0, lane, false, true, cross)
 		Sfx.play("arrow", randf_range(0.94, 1.06), -6.0)
 		return
 	Sfx.play("hit", randf_range(0.9, 1.05), -8.0)
+	if _is_berserker():
+		for other in battle.hostile_targets(side):
+			if abs(other.position.x - position.x) <= float(data["reach"]):
+				other.take_damage(amount, true)
+		if gate != null and abs(position.x - gate.front_x) <= float(data["reach"]) + 8.0:
+			gate.take_damage(amount)
+		return
 	if role == "aoe" or role == "suicide":
 		for other in battle.hostile_targets(side):
+			if int(other.lane) != lane:
+				continue
 			if abs(other.position.x - position.x) <= float(data["reach"]):
 				other.take_damage(amount, true)
 		if gate != null and abs(position.x - gate.front_x) <= float(data["reach"]) + 8.0:
@@ -201,15 +219,29 @@ func _try_strike(foe, gate) -> void:
 			take_damage(float(data.get("self_damage", 40)), true)
 		return
 	if foe != null:
+		if int(foe.lane) != lane:
+			strike_to = foe.position
+			show_strike = true
 		foe.take_damage(amount, true)
 	elif gate != null:
 		gate.take_damage(amount)
 
 
 func _nearest_foe():
+	if _is_berserker():
+		return _closest_ahead(false)
+	var same = _closest_ahead(true)
+	if same != null:
+		return same
+	return _berserker_in_reach()
+
+
+func _closest_ahead(same_road: bool):
 	var best = null
 	var best_d := 100000.0
 	for foe in battle.hostile_targets(side):
+		if same_road and int(foe.lane) != lane:
+			continue
 		var along := _along(foe)
 		if along < -8.0:
 			continue
@@ -217,6 +249,26 @@ func _nearest_foe():
 			best_d = along
 			best = foe
 	return best
+
+
+func _berserker_in_reach():
+	var reach := float(data["reach"])
+	var best = null
+	var best_d := reach
+	for foe in battle.hostile_targets(side):
+		if not battle.is_berserker(foe) or int(foe.lane) == lane:
+			continue
+		var along := _along(foe)
+		if along < -8.0 or along > reach:
+			continue
+		if along <= best_d:
+			best_d = along
+			best = foe
+	return best
+
+
+func _is_berserker() -> bool:
+	return str(data.get("id", "")) == "berserker"
 
 
 func _along(other) -> float:
@@ -227,7 +279,7 @@ func _support_target():
 	var best = null
 	var best_score := -1.0
 	for ally in battle.support_candidates(side):
-		if ally == self or not ally.alive:
+		if ally == self or not ally.alive or int(ally.lane) != lane:
 			continue
 		var along: float = float(ally.position.x - position.x) * facing
 		if along < -4.0 or along > float(data["reach"]):
@@ -247,7 +299,7 @@ func _support_target():
 
 func _any_ally_ahead() -> bool:
 	for ally in battle.support_candidates(side):
-		if ally == self or not ally.alive:
+		if ally == self or not ally.alive or int(ally.lane) != lane:
 			continue
 		if (ally.position.x - position.x) * facing > 8.0:
 			return true
@@ -281,6 +333,14 @@ func _draw() -> void:
 		draw_circle(Vector2(-bar_w * 0.5 - 6.0, bar_y + 2.0), 3.2, Color("c084fc"))
 	if level_stacks > 0:
 		draw_circle(Vector2(bar_w * 0.5 + 6.0, bar_y + 2.0), 3.4, Color("e6c36a"))
+	if _is_berserker() and lunge > 0.12:
+		var reach := float(data["reach"])
+		var alpha := clampf(lunge, 0.0, 1.0)
+		for road_y in battle.lane_ys:
+			var local_y := float(road_y) - position.y
+			draw_line(Vector2(0, -12), Vector2(facing * reach, local_y), Color(1, 0.72, 0.28, alpha * 0.9), 5.0)
+	if show_strike and lunge > 0.05:
+		draw_line(Vector2(0, -16), to_local(strike_to), Color(1, 0.86, 0.45, clampf(lunge, 0.0, 1.0)), 4.0)
 	if support_target != null and is_instance_valid(support_target) and support_target.alive:
 		var to: Vector2 = to_local(support_target.global_position)
 		var line := Color("8ee0a2") if role == "heal" else Color("e6c36a")

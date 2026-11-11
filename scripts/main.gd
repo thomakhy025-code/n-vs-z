@@ -10,7 +10,7 @@ const HOW_TO := "This is a side-view gate battle. Your clan gate is on the left.
 
 Choose 6 of the 11 soldiers. Value builds by itself. The buttons at the bottom left spend it. Each soldier has a cost and a call time before that soldier can be called again.
 
-Soldiers only march forward. They stop to fight whatever is in front of them, and they do not turn around. You move the hero. Drag the road, or use WASD. Sword and Shoot are the two large buttons at the bottom right. J and K do the same. Number keys 1 through 6 call the six you brought, in the order you chose them.
+There are three roads. Soldiers only march forward on the road where you called them, and they fight only that road. The Berserker hits every road at once, and enemies on every road can hit the Berserker. You move the hero onto any road. Drag, or use WASD. Sword and Shoot are the two large buttons at the bottom right. J and K do the same. Number keys 1 through 6 call the six you brought onto the hero's road.
 
 If a runner slips past the line, you are the one who runs back. If your gate breaks, you lose. Break the cursed gate to win.
 
@@ -120,7 +120,7 @@ func _show_menu() -> void:
 	var title := UiSkin.label("N-vs-Z", 40, Color("1c140e"))
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(title)
-	var sub := UiSkin.label("Two gates. One road. Choose six.", 18, Color("6b3a32"))
+	var sub := UiSkin.label("Two gates. Three roads. Choose six.", 18, Color("6b3a32"))
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(sub)
 	box.add_child(_menu_button("Choose your six", Color("c44536"), _show_select))
@@ -251,6 +251,8 @@ func _reach_line(entry: Dictionary) -> String:
 		"ranged":
 			return "Long reach · one target"
 		"aoe":
+			if str(entry["id"]) == "berserker":
+				return "Hits every road · every road hits back"
 			return "Short blast · hits everyone there"
 		"suicide":
 			return "Rushes, then blasts short range"

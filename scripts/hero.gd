@@ -27,6 +27,9 @@ var dragging: bool = false
 var target: Vector2 = Vector2.ZERO
 var flash: float = 0.0
 var lunge: float = 0.0
+var slash: float = 0.0
+var muzzle: float = 0.0
+var lane: int = 1
 var bob_time: float = 0.0
 var down_timer: float = 0.0
 var invuln: float = 0.0
@@ -45,7 +48,11 @@ const RESPAWN: float = 6.0
 func setup(field) -> void:
 	battle = field
 	look = Painter.look("hero")
-	position = Vector2(field.player_front + 10.0, field.ground_y - 8.0)
+	var start_y: float = field.ground_y
+	if field.lane_ys.size() > 1:
+		start_y = float(field.lane_ys[1])
+		lane = 1
+	position = Vector2(field.player_front + 10.0, start_y)
 	z_index = 80
 
 
@@ -105,6 +112,8 @@ func _go_down() -> void:
 func _process(delta: float) -> void:
 	flash = maxf(0.0, flash - delta)
 	lunge = maxf(0.0, lunge - delta * 3.4)
+	slash = maxf(0.0, slash - delta)
+	muzzle = maxf(0.0, muzzle - delta)
 	invuln = maxf(0.0, invuln - delta)
 	if not alive:
 		down_timer -= delta
@@ -142,6 +151,7 @@ func _move(delta: float) -> void:
 			bob_time += delta
 	position.x = clampf(position.x, min_x, max_x)
 	position.y = clampf(position.y, min_y, max_y)
+	lane = battle.lane_index(position.y)
 
 
 func _combat(delta: float) -> void:
@@ -155,26 +165,28 @@ func _combat(delta: float) -> void:
 	var want_sword := pointer_sword or bot_sword or (not bot and Input.is_action_pressed("sword"))
 	var want_shoot := pointer_shoot or bot_shoot or (not bot and Input.is_action_pressed("shoot"))
 	if want_sword and sword_cd <= 0.0:
+		sword_cd = sword_interval
+		lunge = 1.0
+		slash = 0.28
+		Sfx.play("sword", randf_range(0.96, 1.06), -4.0)
 		var melee = _nearest(sword_reach())
 		if melee != null:
 			melee.take_damage(sword_damage * damage_multiplier, true)
-			sword_cd = sword_interval
-			lunge = 1.0
-			Sfx.play("sword", randf_range(0.96, 1.06), -4.0)
 		elif _gate_in(sword_reach()):
 			battle.damage_gate(1, sword_damage * damage_multiplier)
-			sword_cd = sword_interval
-			lunge = 1.0
-			Sfx.play("sword", 0.94, -4.0)
 	if want_shoot and shoot_cd <= 0.0:
+		shoot_cd = shoot_interval
+		muzzle = 0.2
+		Sfx.play("arrow", 1.08, -4.0)
+		var road := lane
+		var road_y: float = battle.lane_y(road) - 10.0
 		var ranged = _nearest(shoot_reach)
-		var aim_x: float = battle.enemy_front
+		var aim_x := position.x + facing * shoot_reach
 		if ranged != null:
-			aim_x = ranged.position.x
-		if ranged != null or _gate_in(shoot_reach):
-			battle.fire_arrow(position + Vector2(0, -18), aim_x, shoot_damage * damage_multiplier, 0, Color("fff4d2"), shoot_reach)
-			shoot_cd = shoot_interval
-			Sfx.play("arrow", 1.08, -4.0)
+			aim_x = float(ranged.position.x)
+		elif _gate_in(shoot_reach):
+			aim_x = battle.enemy_front
+		battle.fire_arrow(Vector2(position.x, road_y), Vector2(aim_x, road_y), shoot_damage * damage_multiplier, 0, Color("fff6c8"), shoot_reach, road, true, _gate_in(shoot_reach), false)
 
 
 func sword_reach() -> float:
@@ -184,7 +196,10 @@ func sword_reach() -> float:
 func _nearest(reach: float):
 	var best = null
 	var best_d := reach
+	var mine := lane
 	for foe in battle.hostile_targets(0):
+		if int(foe.lane) != mine:
+			continue
 		var dist: float = absf(float(foe.position.x) - position.x)
 		if dist <= best_d:
 			best_d = dist
@@ -201,15 +216,21 @@ func _revive() -> void:
 	hp = max_hp
 	invuln = 1.1
 	visible = true
-	position = Vector2(battle.player_front + 8.0, battle.ground_y - 8.0)
+	var revive_y: float = battle.lane_y(1)
+	lane = 1
+	position = Vector2(battle.player_front + 8.0, revive_y)
 	battle.float_text(position + Vector2(-16, -40), "RETURN", Color("f3e6c8"))
 
 
 func _draw() -> void:
 	var bob := sin(bob_time * 10.0) * 2.0
 	draw_set_transform(Vector2(0, bob), 0, Vector2(facing * 1.42, 1.42))
-	Painter.paint_local(self, look, lunge > 0.35, flash)
+	Painter.paint_local(self, look, slash > 0.0, flash)
 	draw_set_transform(Vector2.ZERO, 0, Vector2.ONE)
+	if slash > 0.0:
+		_draw_slash()
+	if muzzle > 0.0:
+		_draw_muzzle()
 	draw_line(Vector2(-8, -78), Vector2(8, -78), Color("c44536"), 3.0)
 	if not alive:
 		return
@@ -218,3 +239,22 @@ func _draw() -> void:
 	draw_rect(Rect2(-26, -88, 52.0 * ratio, 6), Color("f2d38a") if ratio > 0.35 else Color("e24b3b"))
 	if level_stacks > 0:
 		draw_circle(Vector2(32, -85), 3.5, Color("e6c36a"))
+
+
+func _draw_slash() -> void:
+	var alpha := clampf(slash / 0.28, 0.0, 1.0)
+	var center := Vector2(facing * 22.0, -22.0)
+	var start := -1.2
+	var finish := 1.15
+	if facing < 0.0:
+		start = PI - 1.15
+		finish = PI + 1.2
+	draw_arc(center, 58.0, start, finish, 18, Color(1, 0.94, 0.72, alpha), 10.0)
+	draw_arc(center, 42.0, start, finish, 14, Color(0.86, 0.22, 0.16, alpha), 5.0)
+
+
+func _draw_muzzle() -> void:
+	var alpha := clampf(muzzle / 0.2, 0.0, 1.0)
+	var at := Vector2(facing * 34.0, -16.0)
+	draw_circle(at, 8.0 + alpha * 14.0, Color(1, 0.95, 0.7, alpha * 0.9))
+	draw_circle(at, 4.0, Color("fff6c8"))
