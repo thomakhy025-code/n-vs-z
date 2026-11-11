@@ -115,7 +115,8 @@ func _process(delta: float) -> void:
 		hurt = maxf(hurt, 0.45)
 	elif winding and not strike_sent:
 		var weapon := str(look.get("weapon", "katana"))
-		if _act_beat() >= Painter.contact_beat(weapon):
+		var clock := _act_clock()
+		if Painter.strike_due(weapon, int(clock.x), clock.y):
 			strike_sent = true
 			_resolve_strike()
 	if act <= 0.0:
@@ -233,9 +234,11 @@ func _try_strike(foe, gate) -> void:
 	pending_gate = gate
 
 
-func _act_beat() -> int:
+func _act_clock() -> Vector2:
 	var u := 1.0 - clampf(act, 0.0, 1.0)
-	return mini(3, int(u * 4.0))
+	var beat := mini(3, int(u * 4.0))
+	var along := clampf(u * 4.0 - float(beat), 0.0, 1.0)
+	return Vector2(float(beat), along)
 
 
 func _resolve_strike() -> void:

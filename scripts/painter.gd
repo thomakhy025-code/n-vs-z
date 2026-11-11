@@ -4,6 +4,12 @@ static var _tilt: float = 0.0
 
 
 static func look(kind: String) -> Dictionary:
+	var row := _painted(kind)
+	row["paint"] = kind
+	return row
+
+
+static func _painted(kind: String) -> Dictionary:
 	match kind:
 		"sword":
 			return _look(Color("f0c9a0"), Color("1a1e28"), Color("c5ccd6"), "katana", false, "ninja")
@@ -95,6 +101,19 @@ static func contact_beat(weapon: String) -> int:
 			return 2
 
 
+# The picture eases into the contact pose. Ranged shots leave as the string
+# opens. Every other hit lands once the weapon has arrived.
+static func strike_due(weapon: String, beat: int, along: float) -> bool:
+	var contact := contact_beat(weapon)
+	if beat > contact:
+		return true
+	if beat < contact:
+		return false
+	if weapon == "bow" or weapon == "crossbow":
+		return along >= 0.08
+	return along >= 0.55
+
+
 static func cycle_time(paint: String) -> float:
 	if paint == "runner":
 		return 0.62
@@ -146,114 +165,198 @@ static func paint_local(ci: CanvasItem, look: Dictionary, pose: Dictionary) -> v
 		cloth = cloth.lerp(Color.WHITE, wash)
 		trim = trim.lerp(Color.WHITE, wash)
 	var weapon := str(pose.get("tool", look["weapon"]))
+	var paint := str(look.get("paint", ""))
 	var faction := str(look.get("faction", "ninja"))
-	var motion := _motion(phase, t, clock, weapon, beat)
+	var cycle := _cycle_id(paint, weapon)
+	var motion := _motion(phase, t, clock, cycle, beat)
 	var lean := float(motion["lean"])
 	var squat := float(motion["squat"])
-	var arm := float(motion["arm"])
 	var step := float(motion["step"])
 	var breath := float(motion["breath"])
 	var rise := float(motion["rise"])
+	var rear_off: Vector2 = motion["rear"]
+	var front_off: Vector2 = motion["front"]
+	var tip_off: Vector2 = motion["tip"]
 	var mount: bool = look["mount"]
 	var lift := -18.0 if mount else -2.0
 	var drop := squat + rise
 	var ground := 18.0 + rise * 0.35
 	var chest := Vector2(lean + 1.0, lift + drop - breath)
+	var rear := chest + rear_off
+	var front := chest + front_off
+	var tip := chest + tip_off
 	_tilt = 0.0
-	_ellipse(ci, Vector2(lean * 0.2, 22.0), 16.0 + abs(step) * 3.0, 4.2, Color(0, 0, 0, 0.32))
-	if phase == "act" and beat == contact_beat(weapon):
-		_ellipse(ci, Vector2(8.0 + t * 10.0, 21.0), 7.0, 2.2, Color(1, 0.94, 0.82, 0.28 * (1.0 - t)))
+	_ellipse(ci, Vector2(lean * 0.2, 22.0), 16.0 + absf(step) * 3.0, 4.2, Color(0, 0, 0, 0.32))
+	if phase == "act" and beat == contact_beat(weapon) and t > 0.4:
+		_ellipse(ci, Vector2(10.0 + t * 12.0, 21.0), 8.0, 2.4, Color(1, 0.94, 0.82, 0.32 * (1.0 - t)))
 	_tilt = float(motion["tilt"])
 	if mount:
 		_horse(ci, cloth, trim, step, drop)
-	_back(ci, chest, faction, weapon, cloth, trim, bool(look.get("pack", true)), arm)
+	var snap := 0.0
+	if phase == "act":
+		snap = tip.x - chest.x
+	_back(ci, chest, faction, weapon, cloth, trim, bool(look.get("pack", true)), snap)
 	if not mount:
 		_leg(ci, chest + Vector2(-3.5, 12.0), Vector2(-5.0 - step * 11.0, ground), cloth.darkened(0.34), 3.2)
 	_torso(ci, chest, cloth, trim, faction)
 	if not mount:
 		_leg(ci, chest + Vector2(3.0, 12.0), Vector2(6.0 + step * 12.0, ground), cloth.darkened(0.08), 3.5)
 	_head(ci, chest + Vector2(1.6, -16.0), skin, cloth, trim, faction, weapon, phase)
-	var grip := _grip(chest, arm)
-	if weapon == "bow" or weapon == "crossbow":
-		var bow_hand := chest + Vector2(14.0, -2.0)
-		var rear := _arrow_hand(chest, bow_hand, beat, t)
-		_arm(ci, chest + Vector2(-4.0, -1.0), rear, skin, cloth.darkened(0.22), 2.5)
-		_arm(ci, chest + Vector2(5.0, -4.0), bow_hand, skin, cloth, 2.9)
-		_ranged(ci, weapon, bow_hand, rear, beat, trim, cloth)
-	else:
-		_arm(ci, chest + Vector2(-4.0, -1.0), grip + Vector2(-8.0, 6.0), skin, cloth.darkened(0.22), 2.5)
-		_arm(ci, chest + Vector2(5.0, -4.0), grip, skin, cloth, 2.9)
-		_weapon_at(ci, weapon, grip, trim, cloth, arm, phase, beat)
-	if phase == "act" and beat == contact_beat(weapon) and weapon != "staff" and weapon != "scroll":
-		var alpha := (1.0 - t) * 0.85
-		_arc(ci, grip, 18.0 + t * 16.0, -1.35, 1.05, 16, Color(trim.r, trim.g, trim.b, alpha), 3.2)
+	var sleeve := cloth.darkened(0.12)
+	var rear_tone := skin if faction == "soldier" else cloth.darkened(0.05)
+	_arm(ci, chest + Vector2(-4.0, -1.0), rear, rear_tone, sleeve, 2.6)
+	_arm(ci, chest + Vector2(5.0, -4.0), front, skin, sleeve, 2.9)
+	_dot(ci, front, 2.2, skin)
+	_tool(ci, cycle, phase, beat, t, chest, rear, front, tip, ground, trim, cloth)
+	if phase == "act" and beat == contact_beat(weapon) and t > 0.35 and not _is_quiet(cycle):
+		var alpha := (1.0 - t) * 0.8
+		_arc(ci, front, 16.0 + t * 12.0, -1.15, 0.95, 14, Color(trim.r, trim.g, trim.b, alpha), 3.0)
 	_tilt = 0.0
 
 
-static func _motion(phase: String, t: float, clock: float, weapon: String, beat: int) -> Dictionary:
-	var keys := _keys(weapon)
-	var rest: Dictionary = keys[0]
-	var lean := float(rest["lean"])
-	var squat := float(rest["squat"])
-	var arm := float(rest["arm"])
-	var step := sin(clock * 1.7) * 0.15
+static func _is_quiet(cycle: String) -> bool:
+	return cycle == "bow" or cycle == "crossbow" or cycle == "staff" or cycle == "scroll" or cycle == "bomb_dive" or cycle == "bomb_throw"
+
+
+static func _cycle_id(paint: String, weapon: String) -> String:
+	if weapon == "bow" or weapon == "crossbow":
+		return weapon
+	match paint:
+		"horse":
+			return "horse"
+		"assassin":
+			return "assassin"
+		"runner":
+			return "runner"
+		"suicide":
+			return "bomb_dive"
+		"bomber":
+			return "bomb_throw"
+		_:
+			return weapon
+
+
+static func _motion(phase: String, t: float, clock: float, cycle: String, beat: int) -> Dictionary:
+	var pose := _sample(cycle, 0, 0.0)
+	var lean := _num(pose, "lean")
+	var squat := _num(pose, "squat")
+	var step := sin(clock * 1.7) * 0.12
 	var breath := sin(clock * 2.1) * 0.8
-	var rise := float(rest["rise"])
-	var tilt := float(rest["tilt"]) + sin(clock * 1.7) * 0.03
+	var rise := _num(pose, "rise")
+	var tilt := _num(pose, "tilt")
+	var rear := _vec(pose, "rear")
+	var front := _vec(pose, "front")
+	var tip := _vec(pose, "tip")
 	match phase:
 		"debut":
 			rise = (1.0 - t) * 22.0
 			squat = (1.0 - t) * 8.0
-			arm = lerpf(-0.55, arm, t)
 			step = lerpf(0.7, 0.0, t)
 			tilt = lerpf(0.35, tilt, t)
 			breath = 0.0
+			rear = Vector2(-8.0, 12.0).lerp(rear, t)
+			front = Vector2(4.0, 12.0).lerp(front, t)
+			tip = Vector2(6.0, 16.0).lerp(tip, t)
 		"march":
 			step = sin(clock * 8.0)
-			lean = 4.0
-			squat = absf(step) * 2.2
-			arm = arm + step * 0.1
-			breath = 0.25
-			tilt = 0.18 + step * 0.04
+			if cycle == "runner":
+				step = sin(clock * 11.0) * 1.2
+			lean += 3.5
+			squat += absf(step) * 2.0
+			breath = 0.2
+			tilt += 0.12 + step * 0.04
+			var bob := Vector2(step * 1.6, absf(step) * 1.1)
+			rear += bob
+			front += bob
+			tip += bob
 		"act":
-			var a: Dictionary = keys[clampi(beat, 0, 3)]
-			var b: Dictionary = keys[clampi(beat + 1, 0, 4)]
-			lean = lerpf(float(a["lean"]), float(b["lean"]), t)
-			squat = lerpf(float(a["squat"]), float(b["squat"]), t)
-			arm = lerpf(float(a["arm"]), float(b["arm"]), t)
-			step = lerpf(float(a["step"]), float(b["step"]), t)
-			tilt = lerpf(float(a["tilt"]), float(b["tilt"]), t)
-			rise = lerpf(float(a["rise"]), float(b["rise"]), t)
+			pose = _sample(cycle, beat, t)
+			lean = _num(pose, "lean")
+			squat = _num(pose, "squat")
+			step = _num(pose, "step")
+			tilt = _num(pose, "tilt")
+			rise = _num(pose, "rise")
 			breath = 0.0
+			rear = _vec(pose, "rear")
+			front = _vec(pose, "front")
+			tip = _vec(pose, "tip")
+			if cycle == "runner":
+				step = sin(clock * 11.0) * 1.15
+			elif cycle == "horse":
+				step = sin(clock * 8.0)
 		"hurt":
-			lean = lerpf(-2.0, 0.0, t)
-			squat = lerpf(5.0, 0.0, t)
-			arm = lerpf(-0.15, arm, t)
+			lean = lerpf(-2.0, lean, t)
+			squat = lerpf(5.0, squat, t)
 			step = lerpf(-0.7, 0.0, t)
-			tilt = lerpf(-0.62, 0.0, t)
+			tilt = lerpf(-0.62, tilt, t)
 			breath = 0.0
-		"cast":
-			lean = -1.0
-			arm = 0.85 + sin(clock * 4.5) * 0.22
-			rise = sin(clock * 3.0) * 2.0
-			step = sin(clock * 2.0) * 0.2
-			tilt = -0.22 + sin(clock * 2.4) * 0.06
+			rear = Vector2(-8.0, 8.0).lerp(rear, t)
+			front = Vector2(2.0, 8.0).lerp(front, t)
+			tip = Vector2(4.0, 12.0).lerp(tip, t)
 		"fall":
 			squat = lerpf(2.0, 18.0, t)
 			lean = lerpf(0.0, 10.0, t)
-			arm = lerpf(arm, 1.15, t)
 			step = lerpf(0.0, 1.1, t)
 			tilt = lerpf(0.0, 1.25, t)
 			breath = 0.0
 			rise = 0.0
+			rear = rear.lerp(Vector2(-4.0, 14.0), t)
+			front = front.lerp(Vector2(10.0, 12.0), t)
+			tip = tip.lerp(Vector2(16.0, 14.0), t)
 	return {
 		"lean": lean,
 		"squat": squat,
-		"arm": arm,
 		"step": step,
 		"breath": breath,
 		"rise": rise,
 		"tilt": tilt,
+		"rear": rear,
+		"front": front,
+		"tip": tip,
+	}
+
+
+static func _num(row: Dictionary, key: String) -> float:
+	return float(row[key])
+
+
+static func _vec(row: Dictionary, key: String) -> Vector2:
+	return row[key] as Vector2
+
+
+static func _sample(cycle: String, beat: int, along: float) -> Dictionary:
+	var frames := _frames(cycle)
+	var i := clampi(beat, 0, 3)
+	var a := frames[i] as Dictionary
+	var b := frames[i + 1] as Dictionary
+	var stay := clampf(along, 0.0, 1.0)
+	var eased := 1.0 - (1.0 - stay) * (1.0 - stay)
+	return _mix(a, b, eased)
+
+
+static func _mix(a: Dictionary, b: Dictionary, amount: float) -> Dictionary:
+	return {
+		"rear": _vec(a, "rear").lerp(_vec(b, "rear"), amount),
+		"front": _vec(a, "front").lerp(_vec(b, "front"), amount),
+		"tip": _vec(a, "tip").lerp(_vec(b, "tip"), amount),
+		"lean": lerpf(_num(a, "lean"), _num(b, "lean"), amount),
+		"squat": lerpf(_num(a, "squat"), _num(b, "squat"), amount),
+		"step": lerpf(_num(a, "step"), _num(b, "step"), amount),
+		"tilt": lerpf(_num(a, "tilt"), _num(b, "tilt"), amount),
+		"rise": lerpf(_num(a, "rise"), _num(b, "rise"), amount),
+	}
+
+
+static func _f(rx: float, ry: float, fx: float, fy: float, tx: float, ty: float, lean: float, squat: float, step: float, tilt: float, rise: float = 0.0) -> Dictionary:
+	return {
+		"rear": Vector2(rx, ry),
+		"front": Vector2(fx, fy),
+		"tip": Vector2(tx, ty),
+		"lean": lean,
+		"squat": squat,
+		"step": step,
+		"tilt": tilt,
+		"rise": rise,
 	}
 
 
@@ -261,65 +364,183 @@ static func _k(arm: float, tilt: float, squat: float, step: float, lean: float, 
 	return {"arm": arm, "tilt": tilt, "squat": squat, "step": step, "lean": lean, "rise": rise}
 
 
-static func _keys(weapon: String) -> Array:
-	match weapon:
-		"nodachi":
-			return [_k(-0.1, 0.05, 0.0, 0.1, 1.0), _k(-0.45, -0.1, 1.0, -0.2, -2.0), _k(-0.95, -0.62, 3.0, -0.7, -6.0), _k(1.45, 0.7, 0.4, 1.25, 9.0), _k(0.35, 0.12, 1.0, 0.2, 2.0)]
-		"dagger":
-			return [_k(0.15, 0.08, 1.0, 0.3, 2.0), _k(-0.35, 0.05, 4.0, -0.2, -1.0), _k(-0.15, -0.05, 3.0, 0.1, 0.0), _k(1.15, 0.38, 1.0, 0.9, 6.0), _k(0.2, 0.08, 1.2, 0.4, 2.0)]
-		"shortsword":
-			return [_k(-0.15, 0.05, 0.0, 0.15, 1.0), _k(-0.4, -0.05, 1.0, -0.2, -1.0), _k(-0.15, -0.28, 1.5, -0.3, -3.0), _k(1.15, 0.4, 0.3, 0.9, 6.0), _k(-0.1, 0.05, 0.0, 0.1, 1.0)]
+# Frame 0 is the carry. Beat i eases from frame i to frame i + 1.
+# Hands and the weapon tip are offsets from the chest: +x is forward, +y is down.
+static func _frames(cycle: String) -> Array:
+	match cycle:
 		"bow":
-			return [_k(0.25, 0.06, 0.0, 0.1, 1.0), _k(-0.9, -0.18, 1.5, -0.35, -3.0), _k(0.45, 0.08, 0.4, 0.25, 2.0), _k(-0.7, -0.42, 1.6, -0.45, -5.0), _k(1.2, 0.28, 0.0, 0.7, 7.0)]
+			return [
+				_f(8, 6, 14, -2, 14, -2, 1, 0, 0.1, 0.04),
+				_f(-16, 8, 14, -2, -16, 2, -1, 0.4, -0.2, -0.08),
+				_f(10, -1, 16, -4, 12, -2, 1, 0.2, 0.1, 0.04),
+				_f(1, -13, 20, -6, 2, -12, -2, 0.6, -0.15, -0.16),
+				_f(8, 5, 14, -1, 32, -2, 2, 0, 0.2, 0.08),
+			]
 		"crossbow":
-			return [_k(0.15, 0.05, 0.0, 0.1, 1.0), _k(-0.45, 0.02, 2.0, -0.2, -1.0), _k(0.35, 0.04, 0.4, 0.15, 1.0), _k(0.6, -0.12, 0.6, 0.1, -1.0), _k(1.1, 0.22, 0.0, 0.45, 4.0)]
+			return [
+				_f(2, 6, 12, 8, 20, 6, 1, 0, 0.1, 0.04),
+				_f(-12, 14, 10, 8, -4, 12, 0, 1.2, -0.15, 0.02),
+				_f(4, 6, 14, 5, 22, 4, 1, 0.3, 0.1, 0.02),
+				_f(0, -8, 16, -10, 24, -10, -1, 0.4, 0.05, -0.1),
+				_f(4, 4, 12, 4, 36, 2, 2, 0, 0.2, 0.1),
+			]
+		"nodachi":
+			return [
+				_f(-2, -4, 6, -10, 8, -32, 1, 0, 0.1, 0.06),
+				_f(0, 8, 8, 4, 16, 16, 0, 0.4, 0.05, 0.02),
+				_f(-14, -8, -6, -18, -24, -4, -5, 1, -0.5, -0.42),
+				_f(6, 6, 14, 0, 38, 18, 8, 0.3, 1.1, 0.4),
+				_f(0, -2, 6, -8, 10, -26, 1, 0.2, 0.1, 0.08),
+			]
 		"shield":
-			return [_k(0.45, 0.04, 0.2, 0.1, 1.0), _k(0.15, -0.28, 1.5, -0.1, -2.0), _k(0.05, -0.12, 4.0, -0.3, -1.0), _k(1.3, 0.48, 0.4, 1.05, 7.0), _k(0.45, 0.05, 0.3, 0.1, 1.0)]
+			return [
+				_f(0, 6, 11, 1, 11, 1, 1, 0.2, 0.1, 0.04),
+				_f(-2, 2, 7, -16, 7, -16, -1, 1, -0.1, -0.2),
+				_f(-4, 6, 6, -14, 6, -14, -2, 6.5, -0.25, -0.08),
+				_f(-10, 4, 24, -1, 24, -1, 6, 0.4, 1.1, 0.32),
+				_f(0, 6, 11, 1, 11, 1, 1, 0.2, 0.1, 0.04),
+			]
 		"spear":
-			return [_k(0.55, 0.06, 0.0, 0.2, 2.0), _k(-0.35, -0.16, 0.8, -0.85, -3.0), _k(0.7, 0.04, 0.2, 0.3, 2.0), _k(1.5, 0.36, 0.2, 1.3, 8.0), _k(0.6, 0.06, 0.0, 0.2, 2.0)]
+			return [
+				_f(-4, 3, 12, 0, 26, -2, 2, 0, 0.15, 0.05),
+				_f(-18, 7, 8, 1, 22, -1, -2, 0.4, -0.7, -0.12),
+				_f(-10, 3, 14, -1, 32, -2, 1, 0.2, 0.15, 0.02),
+				_f(4, 2, 22, -2, 48, -2, 7, 0.2, 1.25, 0.22),
+				_f(-4, 3, 12, 0, 26, -2, 2, 0, 0.15, 0.05),
+			]
 		"polearm":
-			return [_k(0.5, 0.08, 0.0, 0.15, 1.0), _k(-0.4, -0.38, 1.0, -0.7, -4.0), _k(0.65, 0.02, 0.3, 0.2, 1.0), _k(1.5, 0.4, 0.2, 1.25, 8.0), _k(0.45, 0.1, 0.0, 0.1, 1.0)]
+			return [
+				_f(1, 12, 3, -2, 4, -40, 1, 0, 0.1, 0.06),
+				_f(-6, -8, 0, -18, -18, -30, -3, 0.6, -0.4, -0.28),
+				_f(-14, 8, 10, -2, 28, -8, 1, 0.2, 0.1, 0.02),
+				_f(2, 4, 20, -4, 50, -6, 7, 0.2, 1.15, 0.24),
+				_f(1, 12, 3, -2, 4, -40, 1, 0, 0.1, 0.06),
+			]
 		"axe":
-			return [_k(0.3, 0.08, 0.4, 0.1, 1.0), _k(-0.95, 0.12, 3.2, -0.5, -2.0), _k(-0.2, -0.68, 2.0, -0.2, -5.0), _k(1.4, 0.72, 5.0, 1.2, 8.0), _k(0.35, 0.1, 0.6, 0.15, 1.0)]
+			return [
+				_f(-2, 0, 6, -10, 12, -28, 1, 0.3, 0.1, 0.06),
+				_f(-6, 12, 2, 8, -18, 20, -1, 1.6, -0.3, 0.1),
+				_f(-2, -16, 4, -24, 2, -42, -4, 1.2, -0.15, -0.45),
+				_f(4, 6, 14, 10, 26, 18, 6, 6, 0.9, 0.48),
+				_f(0, -4, 6, -12, 10, -24, 1, 0.4, 0.1, 0.08),
+			]
 		"hammer":
-			return [_k(0.2, 0.06, 0.6, 0.05, 1.0), _k(-0.3, 0.02, 1.2, -0.2, 0.0), _k(-0.15, -0.45, 3.5, -0.4, -3.0), _k(1.25, 0.55, 2.0, 1.0, 6.0), _k(0.25, 0.08, 0.8, 0.1, 1.0)]
-		"bomb":
-			return [_k(-0.1, 0.04, 0.2, 0.1, 1.0), _k(-0.55, 0.05, 1.4, -0.2, -1.0), _k(0.25, -0.08, 1.0, 0.2, 1.0), _k(1.25, 0.62, 2.2, 1.25, 8.0), _k(0.8, 0.2, 1.0, 0.4, 3.0)]
+			return [
+				_f(-2, 10, 6, 8, 10, 4, 1, 0.5, 0.05, 0.04),
+				_f(0, 9, 6, 7, 9, 3, 0, 0.8, -0.1, 0.02),
+				_f(-2, -6, 5, -14, 12, -28, -2, 4.5, -0.3, -0.28),
+				_f(6, 8, 14, 12, 22, 20, 5, 1.4, 1.0, 0.4),
+				_f(2, 2, 8, -2, 12, -10, 1, 0.6, 0.1, 0.06),
+			]
+		"shortsword":
+			return [
+				_f(2, 12, 8, 5, 11, 22, 1, 0, 0.1, 0.04),
+				_f(6, 2, 8, 3, 8, -8, 0, 0.4, -0.15, -0.04),
+				_f(-3, -13, 5, 1, 1, -30, -2, 1, -0.2, -0.18),
+				_f(12, 4, 8, 3, 14, 20, 4, 0.2, 0.75, 0.38),
+				_f(2, 12, 8, 5, 11, 22, 1, 0, 0.1, 0.04),
+			]
+		"runner":
+			return [
+				_f(-6, 6, 16, 1, 28, 0, 2, 0.2, 0.4, 0.08),
+				_f(-4, 8, 14, 7, 26, 6, 1, 2.6, 0.5, 0.18),
+				_f(-4, 6, 18, 5, 30, 3, 2, 1.4, 0.6, 0.1),
+				_f(-2, 4, 28, 0, 42, -1, 3, 0.4, 0.7, 0.08),
+				_f(-6, 5, 12, 1, 22, 0, 2, 0.2, 0.5, 0.06),
+			]
+		"assassin":
+			return [
+				_f(-4, 10, 8, 8, -2, 18, 1, 3.2, 0.25, 0.06),
+				_f(-2, 12, 6, 12, -4, 20, 0, 7.5, -0.1, 0.08),
+				_f(-2, 10, 5, 11, 2, 16, 1, 6.5, 0.1, 0.04),
+				_f(2, 2, 20, -4, 34, -8, 6, 0.8, 0.6, 0.3),
+				_f(-4, 10, 8, 8, -2, 18, 1, 3.2, 0.3, 0.06),
+			]
+		"horse":
+			return [
+				_f(10, 4, 4, 10, 8, 18, 0, 0, 0.2, 0.02),
+				_f(8, 2, 2, -6, 2, -28, 1, 0, 0.3, -0.06),
+				_f(6, 4, 14, 2, 30, 8, 11, 0, 0.4, 0.12),
+				_f(4, 6, 20, 6, 40, 12, 13, 0, 0.5, 0.16),
+				_f(8, 3, 4, 2, 14, -6, 1, 0, 0.2, 0.02),
+			]
+		"bomb_dive":
+			return [
+				_f(-4, 8, 3, 12, 4, 14, 1, 0.2, 0.1, 0.04),
+				_f(0, 6, 6, 4, 6, 2, 0, 0.6, 0, 0.02),
+				_f(1, 3, 9, 1, 5, -1, 1, 0.8, 0.15, -0.04),
+				_f(6, 10, 14, 12, 20, 14, 10, 5, 1.0, 0.7),
+				_f(8, 12, 16, 14, 26, 16, 12, 6, 0.8, 0.85),
+			]
+		"bomb_throw":
+			return [
+				_f(-6, 8, 2, 12, 0, 14, 1, 0.2, 0.1, 0.04),
+				_f(-2, 4, 8, 2, 10, 0, 0, 0.4, 0, 0.02),
+				_f(-4, 4, -14, -10, -18, -14, -1, 0.6, -0.2, -0.25),
+				_f(2, 2, 22, -12, 38, -18, 5, 0.2, 0.4, 0.28),
+				_f(0, 4, 14, -2, 22, -6, 2, 0.2, 0.15, 0.08),
+			]
 		"staff":
-			return [_k(0.5, -0.05, 0.0, 0.05, 0.0, 0.0), _k(0.2, 0.02, 1.2, 0.0, 0.0, 0.0), _k(0.9, -0.22, 0.2, 0.05, -1.0, 3.0), _k(0.7, -0.1, 0.0, 0.1, 0.0, 1.0), _k(0.5, -0.05, 0.0, 0.05, 0.0, 0.0)]
+			return [
+				_f(1, 8, 6, 4, 5, -30, 0, 0, 0.05, -0.04),
+				_f(0, 10, 4, 8, 3, -28, 0, 0.8, 0, 0.02),
+				_f(-2, -14, 4, 6, 3, -32, -1, 0.2, 0.05, -0.12, -2),
+				_f(2, -4, 6, 2, 4, -30, 0, 0, 0.1, -0.06, -1),
+				_f(1, 8, 6, 4, 5, -30, 0, 0, 0.05, -0.04),
+			]
 		"scroll":
-			return [_k(-0.2, 0.04, 0.2, 0.05, 0.0), _k(0.15, -0.05, 0.4, 0.0, 0.0, 0.5), _k(0.45, -0.12, 0.2, 0.05, -1.0, 1.5), _k(0.7, -0.08, 0.0, 0.1, 0.0, 2.0), _k(-0.15, 0.04, 0.2, 0.05, 0.0)]
+			return [
+				_f(2, 12, 6, 12, 4, 12, 0, 0.2, 0.05, 0.02),
+				_f(4, 2, 8, 2, 6, 2, 0, 0.3, 0, -0.04, 0.4),
+				_f(-6, 0, 16, -2, 5, -1, -1, 0.2, 0.05, -0.1, -1),
+				_f(-5, 2, 15, 1, 5, 1, 0, 0, 0.05, -0.06, -1.5),
+				_f(2, 12, 6, 12, 4, 12, 0, 0.2, 0.05, 0.02),
+			]
+		"katana", "dagger":
+			return [
+				_f(3, 12, 10, 5, 12, 22, 1, 0, 0.1, 0.04),
+				_f(4, 2, 8, 3, 2, -12, 0, 0.4, -0.2, -0.06),
+				_f(-2, -16, 6, 0, -4, -38, -5, 1.2, -0.75, -0.4),
+				_f(16, -1, 18, 3, 42, 1, 8, 0.2, 1.15, 0.28),
+				_f(3, 11, 9, 5, 13, 21, 1, 0, 0.15, 0.05),
+			]
 		_:
-			return [_k(-0.2, 0.05, 0.0, 0.1, 1.0), _k(-0.55, -0.08, 1.0, -0.3, -2.0), _k(-0.2, -0.48, 2.0, -0.6, -5.0), _k(1.35, 0.55, 0.2, 1.1, 8.0), _k(0.15, 0.06, 0.0, 0.1, 1.0)]
+			return [
+				_f(3, 12, 10, 5, 12, 22, 1, 0, 0.1, 0.04),
+				_f(4, 2, 8, 3, 2, -12, 0, 0.4, -0.2, -0.06),
+				_f(-2, -16, 6, 0, -4, -38, -5, 1.2, -0.75, -0.4),
+				_f(16, -1, 18, 3, 42, 1, 8, 0.2, 1.15, 0.28),
+				_f(3, 11, 9, 5, 13, 21, 1, 0, 0.15, 0.05),
+			]
 
 
-static func _arrow_hand(chest: Vector2, bow_hand: Vector2, beat: int, t: float) -> Vector2:
-	var behind := chest + Vector2(-16.0, 6.0)
-	var nock := bow_hand + Vector2(-4.0, 1.0)
-	var draw := bow_hand + Vector2(-16.0, 1.0)
-	var released := bow_hand + Vector2(-3.0, 2.0)
-	var points: Array[Vector2] = [behind, nock, draw, released, bow_hand + Vector2(2.0, 4.0)]
-	var a: Vector2 = points[clampi(beat, 0, 3)]
-	var b: Vector2 = points[clampi(beat + 1, 0, 4)]
-	return a.lerp(b, t)
-
-
-static func _back(ci: CanvasItem, chest: Vector2, faction: String, weapon: String, cloth: Color, trim: Color, pack: bool, arm: float) -> void:
+static func _back(ci: CanvasItem, chest: Vector2, faction: String, weapon: String, cloth: Color, trim: Color, pack: bool, snap: float) -> void:
 	if faction == "soldier":
 		if pack:
 			_box(ci, Rect2(chest.x - 16.0, chest.y - 2.0, 10.0, 14.0), cloth.darkened(0.35))
 			_line(ci, chest + Vector2(-14.0, -2.0), chest + Vector2(-6.0, -8.0), cloth.darkened(0.2), 2.0)
 		return
-	var trail := 12.0 + maxf(0.0, arm) * 8.0 + maxf(0.0, _tilt) * 14.0
-	var hem := chest + Vector2(-18.0 - trail * 0.35, 24.0)
-	_poly(ci, PackedVector2Array([
-		chest + Vector2(-4.0, -8.0),
-		chest + Vector2(-10.0, 2.0),
-		hem,
-		chest + Vector2(2.0, 8.0),
-	]), trim.darkened(0.15))
-	if weapon == "bow" or weapon == "crossbow":
-		_box(ci, Rect2(chest.x - 12.0, chest.y - 6.0, 6.0, 12.0), cloth.lightened(0.08))
+	var hem := chest + Vector2(-18.0, 24.0)
+	if snap > 10.0:
+		hem = chest + Vector2(8.0 + snap * 0.42, 8.0)
+		_poly(ci, PackedVector2Array([
+			chest + Vector2(-2.0, -8.0),
+			chest + Vector2(5.0, -1.0),
+			hem,
+			chest + Vector2(-8.0, 6.0),
+		]), trim.darkened(0.1))
+	else:
+		var trail := 14.0 + maxf(0.0, -snap) * 0.2
+		hem = chest + Vector2(-16.0 - trail * 0.28, 22.0)
+		_poly(ci, PackedVector2Array([
+			chest + Vector2(-4.0, -8.0),
+			chest + Vector2(-10.0, 2.0),
+			hem,
+			chest + Vector2(2.0, 8.0),
+		]), trim.darkened(0.15))
+	if weapon == "bow":
+		_box(ci, Rect2(chest.x - 13.0, chest.y - 4.0, 7.0, 13.0), cloth.lightened(0.08))
+		_line(ci, chest + Vector2(-11.0, -6.0), chest + Vector2(-9.0, -1.0), trim, 1.3)
 
 
 static func _torso(ci: CanvasItem, chest: Vector2, cloth: Color, trim: Color, faction: String) -> void:
@@ -352,84 +573,190 @@ static func _head(ci: CanvasItem, at: Vector2, skin: Color, cloth: Color, trim: 
 		_ellipse(ci, at + Vector2(1.0, -16.0), 3.2, 2.2, trim)
 
 
-static func _ranged(ci: CanvasItem, weapon: String, bow_hand: Vector2, rear: Vector2, beat: int, trim: Color, cloth: Color) -> void:
-	if weapon == "crossbow":
-		_line(ci, bow_hand + Vector2(-2, 3), bow_hand + Vector2(16, -1), Color("6b4a32"), 3.4)
-		_line(ci, bow_hand + Vector2(10, -6), bow_hand + Vector2(10, 6), trim, 2.2)
-		if beat < 3:
-			_line(ci, rear, bow_hand + Vector2(8, 0), trim.lightened(0.2), 1.6)
-		else:
-			_line(ci, bow_hand + Vector2(12, 0), bow_hand + Vector2(28, -1), Color(1, 0.96, 0.86, 0.7), 1.6)
-		return
-	_arc(ci, bow_hand, 13.0, -1.25, 1.25, 14, trim, 2.4)
-	var pull := bow_hand.x - rear.x
-	if beat >= 3:
-		pull = 0.0
-	_line(ci, bow_hand + Vector2(2, -13), bow_hand + Vector2(2 - pull, 0), Color("f3e6c8"), 1.2)
-	_line(ci, bow_hand + Vector2(2 - pull, 0), bow_hand + Vector2(2, 13), Color("f3e6c8"), 1.2)
-	if beat < 3:
-		_line(ci, rear + Vector2(-6, 0), rear + Vector2(4, 0), cloth.lightened(0.3), 1.5)
-		draw_tip(ci, rear + Vector2(6, 0), trim)
-	else:
-		_line(ci, bow_hand + Vector2(8, -1), bow_hand + Vector2(26, -2), Color(1, 0.97, 0.88, 0.75), 1.6)
-
-
-static func _weapon_at(ci: CanvasItem, weapon: String, hand: Vector2, trim: Color, cloth: Color, arm: float, phase: String, beat: int) -> void:
-	var steel := trim.lightened(0.22)
-	match weapon:
-		"katana", "shortsword", "dagger":
-			var length := 26.0
-			if weapon == "dagger":
-				length = 14.0
-			elif weapon == "shortsword":
-				length = 18.0
-			if beat == 0:
-				_line(ci, hand + Vector2(-2, 8), hand + Vector2(6, 2), steel, 2.2)
-			else:
-				var tip := hand + Vector2(length, lerpf(-16.0, 4.0, clampf((arm + 0.4) / 1.8, 0.0, 1.0)))
-				_blade(ci, hand, tip, steel, phase, beat, 2.4)
-				_line(ci, hand + Vector2(-3, 1), hand + Vector2(3, 1), cloth.darkened(0.4), 2.2)
-		"nodachi":
-			var tip := hand + Vector2(34.0, lerpf(-20.0, 8.0, clampf((arm + 0.4) / 1.8, 0.0, 1.0)))
-			_blade(ci, hand, tip, steel, phase, beat, 3.2)
+static func _tool(ci: CanvasItem, cycle: String, phase: String, beat: int, t: float, chest: Vector2, rear: Vector2, front: Vector2, tip: Vector2, ground: float, trim: Color, cloth: Color) -> void:
+	var steel := trim.lightened(0.28)
+	match cycle:
+		"bow":
+			_bow(ci, beat, t, front, rear, trim, cloth)
+		"crossbow":
+			_crossbow(ci, beat, t, chest, front, rear, trim)
 		"shield":
-			var face := hand + Vector2(4.0, -2.0)
-			_box(ci, Rect2(face.x, face.y - 13.0, 16.0, 26.0), trim)
-			_box(ci, Rect2(face.x + 3.0, face.y - 8.0, 10.0, 16.0), cloth.lightened(0.08))
+			_buckler(ci, front, trim, cloth)
 		"spear", "polearm":
-			var reach := 18.0 if beat < 2 else 36.0
-			var tip := hand + Vector2(reach, -8.0 if weapon == "polearm" else -4.0)
-			_blade(ci, hand, tip, Color("c8b48a"), phase, beat, 2.4)
-			draw_tip(ci, tip, trim)
+			_shaft(ci, rear, tip, trim)
 		"axe":
-			var tip := hand + Vector2(10.0 + maxf(arm, 0.0) * 8.0, -18.0)
-			_blade(ci, hand, tip, Color("c8b48a"), phase, beat, 3.2)
-			_poly(ci, PackedVector2Array([
-				tip + Vector2(-3, 3),
-				tip + Vector2(11, -7),
-				tip + Vector2(7, 2),
-				tip + Vector2(-2, 9),
-			]), trim)
+			_haft(ci, rear, tip, Color("c8b48a"), 3.2)
+			_axe_head(ci, rear, tip, trim)
 		"hammer":
-			var tip := hand + Vector2(8.0, -16.0)
-			_blade(ci, hand, tip, Color("6b4a32"), phase, beat, 4.0)
-			_box(ci, Rect2(tip.x - 4.0, tip.y - 8.0, 14.0, 12.0), trim.darkened(0.1))
-		"bomb":
-			var hold := hand + Vector2(4, -4)
-			if beat >= 2:
-				hold = hand + Vector2(10, -8)
-			_ellipse(ci, hold, 6.5, 6.5, Color(0.12, 0.1, 0.1))
-			_dot(ci, hold, 2.4, trim)
+			_haft(ci, rear, tip, Color("6b4a32"), 4.0)
+			_box(ci, Rect2(tip.x - 8.0, tip.y - 6.0, 16.0, 12.0), trim.darkened(0.08))
+		"bomb_dive", "bomb_throw":
+			_ellipse(ci, tip, 6.6, 6.6, Color(0.1, 0.08, 0.08))
+			_dot(ci, tip + Vector2(1.0, -2.0), 2.2, trim)
+			_line(ci, tip + Vector2(2.0, -5.0), tip + Vector2(5.0, -10.0), Color("e7c07a"), 1.4)
 		"staff":
-			_line(ci, hand + Vector2(0, 14), hand + Vector2(-1, -26), Color("c8b48a"), 2.6)
-			_dot(ci, hand + Vector2(-1, -28), 4.2, trim)
+			_staff(ci, beat, t, front, tip, ground, trim)
 		"scroll":
-			var wide := 16.0 if beat == 2 or beat == 3 else 8.0
-			_box(ci, Rect2(hand.x, hand.y - 8.0, wide, 16.0), trim)
-			if beat == 2 or beat == 3:
-				_line(ci, hand + Vector2(3, -2), hand + Vector2(wide - 3.0, -2), cloth.darkened(0.35), 1.2)
+			_scroll(ci, beat, rear, front, trim, cloth)
+		"nodachi":
+			_line(ci, rear, front, cloth.darkened(0.35), 3.6)
+			_blade_to(ci, front, tip, steel, phase, beat, 3.4)
+		"runner", "assassin", "horse":
+			_blade_to(ci, front, tip, steel, phase, beat, 2.4 if cycle != "horse" else 3.0)
+			if cycle == "horse" or cycle == "assassin":
+				_line(ci, chest + Vector2(2.0, 10.0), chest + Vector2(12.0, 20.0), cloth.darkened(0.45), 2.6)
+		"katana", "shortsword", "dagger":
+			_line(ci, chest + Vector2(2.0, 10.0), chest + Vector2(12.0, 22.0), cloth.darkened(0.45), 3.0)
+			_blade_to(ci, rear, tip, steel, phase, beat, 3.0 if cycle != "shortsword" else 2.5)
+			_guard(ci, rear, tip, cloth.darkened(0.3))
 		_:
-			_line(ci, hand, hand + Vector2(16, -10), steel, 2.4)
+			_blade_to(ci, rear, tip, steel, phase, beat, 3.0)
+
+
+static func _bow(ci: CanvasItem, beat: int, t: float, front: Vector2, rear: Vector2, trim: Color, cloth: Color) -> void:
+	_arc(ci, front, 14.0, -1.2, 1.2, 14, trim, 2.6)
+	var top := front + Vector2(1.0, -14.0)
+	var bot := front + Vector2(1.0, 14.0)
+	var released := beat >= 3
+	var string_at := front + Vector2(-2.0, 0.0)
+	if beat >= 1 and not released:
+		string_at = rear
+	_line(ci, top, string_at, Color("f3e6c8"), 1.3)
+	_line(ci, string_at, bot, Color("f3e6c8"), 1.3)
+	if released:
+		var fly := front + Vector2(lerpf(8.0, 32.0, t), -1.0)
+		_line(ci, front + Vector2(6.0, -1.0), fly, Color(1, 0.97, 0.88, 0.85), 1.8)
+		_point(ci, fly, front, trim)
+		return
+	var dir := Vector2(-8.0, -9.0)
+	if beat == 1:
+		dir = front - rear
+	elif beat >= 2:
+		dir = front - rear
+	if dir.length() < 1.0:
+		dir = Vector2(10.0, 0.0)
+	dir = dir.normalized() * (12.0 if beat >= 1 else 9.0)
+	_line(ci, rear - dir.normalized() * 3.0, rear + dir, cloth.lightened(0.35), 1.6)
+	_point(ci, rear + dir, rear, trim)
+
+
+static func _crossbow(ci: CanvasItem, beat: int, t: float, chest: Vector2, front: Vector2, rear: Vector2, trim: Color) -> void:
+	_box(ci, Rect2(chest.x - 8.0, chest.y + 8.0, 8.0, 10.0), trim.darkened(0.35))
+	var stock_back := front + Vector2(-16.0, 3.0)
+	var stock_fore := front + Vector2(14.0, -2.0)
+	_line(ci, stock_back, stock_fore, Color("6b4a32"), 4.2)
+	var along := stock_fore - stock_back
+	if along.length() < 1.0:
+		along = Vector2(1.0, 0.0)
+	var prod := Vector2(-along.normalized().y, along.normalized().x)
+	_line(ci, stock_fore + prod * 7.0, stock_fore - prod * 7.0, trim, 2.4)
+	if beat >= 3:
+		var fly := stock_fore + Vector2(lerpf(6.0, 28.0, t), -1.0)
+		_line(ci, stock_fore, fly, Color(1, 0.97, 0.88, 0.85), 1.8)
+		_point(ci, fly, stock_fore, trim)
+		return
+	var bolt := Vector2(11.0, -1.0)
+	if beat >= 1:
+		bolt = stock_fore - rear
+		if bolt.length() > 14.0:
+			bolt = bolt.normalized() * 14.0
+		if bolt.length() < 1.0:
+			bolt = Vector2(11.0, 0.0)
+	_line(ci, rear, rear + bolt, trim.lightened(0.25), 1.7)
+	_point(ci, rear + bolt, rear, trim)
+
+
+static func _buckler(ci: CanvasItem, hand: Vector2, trim: Color, cloth: Color) -> void:
+	_box(ci, Rect2(hand.x - 1.0, hand.y - 14.0, 18.0, 28.0), trim)
+	_box(ci, Rect2(hand.x + 3.0, hand.y - 8.0, 10.0, 16.0), cloth.lightened(0.08))
+	_dot(ci, hand + Vector2(8.0, 0.0), 2.0, trim.lightened(0.35))
+
+
+static func _shaft(ci: CanvasItem, rear: Vector2, tip: Vector2, trim: Color) -> void:
+	var dir := tip - rear
+	if dir.length() < 1.0:
+		return
+	var n := dir.normalized()
+	_line(ci, rear - n * 12.0, tip, Color("c8b48a"), 2.8)
+	_point(ci, tip, rear, trim)
+
+
+static func _haft(ci: CanvasItem, rear: Vector2, tip: Vector2, color: Color, width: float) -> void:
+	_line(ci, rear, tip, color, width)
+
+
+static func _axe_head(ci: CanvasItem, rear: Vector2, tip: Vector2, trim: Color) -> void:
+	var dir := tip - rear
+	if dir.length() < 1.0:
+		dir = Vector2(0.0, -1.0)
+	dir = dir.normalized()
+	var side := Vector2(-dir.y, dir.x)
+	_poly(ci, PackedVector2Array([
+		tip - dir * 3.0,
+		tip + side * 12.0,
+		tip + dir * 8.0 + side * 3.0,
+		tip + dir * 2.0 - side * 2.0,
+	]), trim)
+
+
+static func _staff(ci: CanvasItem, beat: int, t: float, front: Vector2, tip: Vector2, ground: float, trim: Color) -> void:
+	var foot := Vector2(front.x, ground)
+	_line(ci, foot, tip, Color("c8b48a"), 2.8)
+	_dot(ci, tip, 4.4, trim)
+	if beat == 1:
+		_arc(ci, tip, lerpf(2.5, 6.5, t), 0.0, TAU, 16, trim, 1.6)
+	elif beat == 2:
+		var fly := tip.lerp(tip + Vector2(34.0, 6.0), t)
+		_arc(ci, fly, 6.5, 0.0, TAU, 18, trim, 2.1)
+		_dot(ci, fly, 2.2, Color(1, 1, 1, 0.85))
+	elif beat >= 3:
+		_arc(ci, tip + Vector2(10.0, 2.0), 3.2, 0.0, TAU, 12, Color(trim.r, trim.g, trim.b, 0.45), 1.4)
+
+
+static func _scroll(ci: CanvasItem, beat: int, rear: Vector2, front: Vector2, trim: Color, cloth: Color) -> void:
+	var mid := (front + rear) * 0.5
+	var span := front.distance_to(rear)
+	if span < 11.0:
+		_box(ci, Rect2(mid.x - 4.0, mid.y - 8.0, 8.0, 16.0), trim)
+		return
+	var left := minf(front.x, rear.x)
+	_box(ci, Rect2(left, mid.y - 8.0, span, 16.0), trim.lightened(0.12))
+	_line(ci, Vector2(left + 3.0, mid.y - 2.0), Vector2(left + span - 3.0, mid.y - 2.0), cloth.darkened(0.35), 1.2)
+	if beat == 2:
+		_dot(ci, mid + Vector2(0.0, -12.0), 2.6, Color("f2d38a"))
+
+
+static func _blade_to(ci: CanvasItem, hand: Vector2, tip: Vector2, color: Color, phase: String, beat: int, width: float) -> void:
+	var dir := tip - hand
+	if dir.length() < 1.0:
+		return
+	if phase == "act" and beat >= 2:
+		var ghost := Color(color.r, color.g, color.b, 0.28)
+		_line(ci, hand, hand + dir * 0.65 + Vector2(-6.0, -4.0), ghost, width * 0.7)
+	var n := dir.normalized()
+	var side := Vector2(-n.y, n.x) * width
+	_poly(ci, PackedVector2Array([hand + side, hand - side, tip]), color)
+	_line(ci, hand, tip, color.lightened(0.35), 1.1)
+
+
+static func _guard(ci: CanvasItem, hand: Vector2, tip: Vector2, color: Color) -> void:
+	var dir := tip - hand
+	if dir.length() < 1.0:
+		return
+	var n := dir.normalized()
+	var side := Vector2(-n.y, n.x) * 5.0
+	var at := hand + n * 4.0
+	_line(ci, at + side, at - side, color, 2.2)
+
+
+static func _point(ci: CanvasItem, tip: Vector2, origin: Vector2, color: Color) -> void:
+	var dir := tip - origin
+	if dir.length() < 1.0:
+		return
+	dir = dir.normalized()
+	var side := Vector2(-dir.y, dir.x) * 3.6
+	var base := tip - dir * 8.0
+	_poly(ci, PackedVector2Array([base + side, tip + dir * 2.0, base - side]), color)
 
 
 static func _blade(ci: CanvasItem, hand: Vector2, tip: Vector2, color: Color, phase: String, beat: int, width: float) -> void:
@@ -472,7 +799,16 @@ static func _leg(ci: CanvasItem, hip: Vector2, foot: Vector2, color: Color, widt
 
 
 static func _arm(ci: CanvasItem, shoulder: Vector2, hand: Vector2, skin: Color, cloth: Color, width: float) -> void:
-	var elbow := (shoulder + hand) * 0.5 + Vector2(-1.0, 4.0)
+	var delta := hand - shoulder
+	var mid := (shoulder + hand) * 0.5
+	var elbow := mid + Vector2(-3.0, 4.0)
+	if delta.length() > 3.0:
+		var perp := Vector2(-delta.y, delta.x).normalized()
+		if perp.y < 0.0:
+			perp = -perp
+		if perp.x > 0.15:
+			perp = -perp
+		elbow = mid + perp * clampf(delta.length() * 0.18, 3.0, 7.0)
 	_line(ci, shoulder, elbow, cloth, width)
 	_line(ci, elbow, hand, skin.darkened(0.06), width * 0.78)
 

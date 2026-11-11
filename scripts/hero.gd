@@ -121,13 +121,13 @@ func _process(delta: float) -> void:
 	flash = maxf(0.0, flash - delta)
 	lunge = maxf(0.0, lunge - delta * 3.4)
 	act = maxf(0.0, act - delta / 0.92)
-	if act <= 0.0:
-		winding = false
 	hurt = maxf(0.0, hurt - delta / 0.34)
 	slash = maxf(0.0, slash - delta)
 	muzzle = maxf(0.0, muzzle - delta)
 	invuln = maxf(0.0, invuln - delta)
 	if not alive:
+		winding = false
+		act = 0.0
 		down_timer -= delta
 		if down_timer <= 0.0:
 			_revive()
@@ -137,6 +137,8 @@ func _process(delta: float) -> void:
 		return
 	_move(delta)
 	_combat(delta)
+	if act <= 0.0:
+		winding = false
 	if invuln > 0.0:
 		modulate.a = 0.45 if int(invuln * 14.0) % 2 == 0 else 1.0
 	else:
@@ -199,7 +201,8 @@ func _combat(delta: float) -> void:
 func _land_hero() -> void:
 	if not winding or strike_sent:
 		return
-	if _act_beat() < Painter.contact_beat(act_tool):
+	var clock := _act_clock()
+	if not Painter.strike_due(act_tool, int(clock.x), clock.y):
 		return
 	strike_sent = true
 	lunge = 1.0
@@ -225,9 +228,11 @@ func _land_hero() -> void:
 		battle.fire_arrow(Vector2(position.x, road_y), Vector2(aim_x, road_y), shoot_damage * damage_multiplier, 0, Color("fff6c8"), shoot_reach, road, true, _gate_in(shoot_reach), false)
 
 
-func _act_beat() -> int:
+func _act_clock() -> Vector2:
 	var u := 1.0 - clampf(act, 0.0, 1.0)
-	return mini(3, int(u * 4.0))
+	var beat := mini(3, int(u * 4.0))
+	var along := clampf(u * 4.0 - float(beat), 0.0, 1.0)
+	return Vector2(float(beat), along)
 
 
 func shove_back(at_x: float) -> void:
