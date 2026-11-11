@@ -225,6 +225,74 @@ static func paint_local(ci: CanvasItem, look: Dictionary, pose: Dictionary) -> v
 	_tilt = 0.0
 
 
+static func paint_saber_front(ci: CanvasItem) -> void:
+	_tilt = 0.0
+	var navy := Color("1e3f8f")
+	var navy_dark := Color("142c68")
+	var gold := Color("e2b034")
+	var red := Color("c73636")
+	var wrap := Color("d2c2a4")
+	var eye := Color("f0c14a")
+	_ellipse(ci, Vector2(0.0, 32.0), 20.0, 4.4, Color(0, 0, 0, 0.28))
+	_line(ci, Vector2(-7.0, 12.0), Vector2(-8.0, 28.0), navy_dark, 6.4)
+	_line(ci, Vector2(7.0, 12.0), Vector2(8.0, 28.0), navy, 6.4)
+	_line(ci, Vector2(-13.0, 27.0), Vector2(-3.0, 29.0), gold, 2.8)
+	_line(ci, Vector2(3.0, 27.0), Vector2(13.0, 29.0), gold, 2.8)
+	_poly(ci, PackedVector2Array([
+		Vector2(-14.0, -8.0),
+		Vector2(14.0, -8.0),
+		Vector2(12.0, 16.0),
+		Vector2(-12.0, 16.0),
+	]), navy)
+	_line(ci, Vector2(-12.0, 15.0), Vector2(12.0, 15.0), gold, 2.2)
+	_line(ci, Vector2(-13.0, -6.0), Vector2(-11.0, 14.0), gold, 1.6)
+	_line(ci, Vector2(13.0, -6.0), Vector2(11.0, 14.0), gold, 1.6)
+	_line(ci, Vector2(0.0, -4.0), Vector2(0.0, 8.0), gold, 1.5)
+	_box(ci, Rect2(-12.0, 5.0, 24.0, 5.2), red)
+	_poly(ci, PackedVector2Array([
+		Vector2(-2.4, 10.0),
+		Vector2(2.4, 10.0),
+		Vector2(0.0, 18.0),
+	]), red.darkened(0.08))
+	_poly(ci, PackedVector2Array([
+		Vector2(-6.0, -6.0),
+		Vector2(-18.0, 4.0),
+		Vector2(-12.0, 16.0),
+	]), red)
+	_poly(ci, PackedVector2Array([
+		Vector2(6.0, -6.0),
+		Vector2(18.0, 6.0),
+		Vector2(12.0, 18.0),
+	]), red.darkened(0.08))
+	_box(ci, Rect2(-10.0, -8.0, 20.0, 4.0), red)
+	_line(ci, Vector2(-12.0, -4.0), Vector2(-20.0, 8.0), navy_dark, 5.2)
+	_line(ci, Vector2(-20.0, 8.0), Vector2(-18.0, 16.0), wrap, 4.6)
+	_dot(ci, Vector2(-18.0, 17.0), 2.6, wrap)
+	_saber_sword(ci, Vector2(16.0, 2.0), Vector2(18.0, -2.0), Vector2(24.0, -34.0))
+	_line(ci, Vector2(12.0, -4.0), Vector2(18.0, 4.0), navy, 5.2)
+	_line(ci, Vector2(18.0, 4.0), Vector2(17.0, 10.0), wrap, 4.4)
+	_dot(ci, Vector2(17.2, 11.0), 2.5, wrap)
+	_ellipse(ci, Vector2(0.0, -22.0), 13.5, 14.0, navy_dark)
+	_ellipse(ci, Vector2(0.0, -21.0), 12.0, 12.6, navy)
+	_poly(ci, PackedVector2Array([
+		Vector2(-5.0, -30.0),
+		Vector2(0.0, -38.0),
+		Vector2(5.0, -30.0),
+	]), navy)
+	_poly(ci, PackedVector2Array([
+		Vector2(0.0, -33.0),
+		Vector2(2.2, -30.6),
+		Vector2(0.0, -28.2),
+		Vector2(-2.2, -30.6),
+	]), gold)
+	_ellipse(ci, Vector2(0.0, -20.0), 7.2, 7.6, Color("0c1a3a"))
+	_dot(ci, Vector2(-3.1, -20.4), 2.35, eye)
+	_dot(ci, Vector2(3.1, -20.4), 2.35, eye)
+	_dot(ci, Vector2(-3.1, -20.4), 1.0, Color("1a1408"))
+	_dot(ci, Vector2(3.1, -20.4), 1.0, Color("1a1408"))
+	_tilt = 0.0
+
+
 static func _paint_saber(ci: CanvasItem, chest: Vector2, rear: Vector2, front: Vector2, tip: Vector2, step: float, ground: float, phase: String, snap: float) -> void:
 	var navy := Color("1e3f8f")
 	var navy_dark := Color("142c68")

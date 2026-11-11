@@ -205,7 +205,7 @@ func _show_store() -> void:
 	pay.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(pay)
 	var stage := SaberPreview.new()
-	stage.custom_minimum_size = Vector2(0, 190)
+	stage.custom_minimum_size = Vector2(0, 280)
 	stage.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	stage.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(stage)
@@ -801,10 +801,7 @@ class SaberPreview:
 		resized.connect(queue_redraw)
 
 	func _draw() -> void:
-		var origin := Vector2(size.x * 0.5, size.y * 0.72)
-		var held: bool = Painter.saber_navy
-		Painter.saber_navy = true
-		draw_set_transform(origin, 0.0, Vector2(2.8, 2.8))
-		Painter.paint_local(self, Painter.look("saber"), {"phase": "march", "t": 0.0, "clock": 0.4, "flash": 0.0, "beat": 0})
+		var origin := Vector2(size.x * 0.5, size.y * 0.58)
+		draw_set_transform(origin, 0.0, Vector2(3.7, 3.7))
+		Painter.paint_saber_front(self)
 		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
-		Painter.saber_navy = held
