@@ -21,7 +21,7 @@ The cursed gate calls its own dead: walkers, runners, brutes, spitters, bombers,
 
 Play lists ten roads. The first is open. Winning a road opens the next one. Your purse stays the same on every road. Theirs gets heavier.
 
-Each road you open pays 100 diamonds. The store on the title is where you choose the saber's skin. Nothing keeps the black wrap. The navy skin costs 200 diamonds.
+Each road you open pays 100 diamonds. Home is the night gate: Shop, Skin, the roads, and How to play are there, and the diamond count hangs by the lantern. During a fight, Home at the top returns you there.
 
 Escape or Back returns to the title."
 
@@ -123,7 +123,7 @@ func _clear_screens() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if not event.is_action_pressed("pause"):
 		return
-	if screen == "how" or screen == "levels" or screen == "store":
+	if screen == "how" or screen == "levels" or screen == "shop" or screen == "skin":
 		_show_menu()
 		get_viewport().set_input_as_handled()
 	elif screen == "select":
@@ -140,39 +140,70 @@ func _show_menu() -> void:
 	add_child(root)
 	root.add_child(SceneryScript.new())
 	var dim := ColorRect.new()
-	dim.color = Color(0.04, 0.05, 0.09, 0.35)
+	dim.color = Color(0.02, 0.03, 0.08, 0.22)
 	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
 	dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(dim)
+	var yard := HomeYard.new()
+	yard.diamonds = diamonds
+	root.add_child(yard)
 	var panel := PanelContainer.new()
 	panel.set_anchors_preset(Control.PRESET_CENTER)
-	panel.offset_left = -310
-	panel.offset_right = 310
-	panel.offset_top = -270
-	panel.offset_bottom = 270
-	panel.add_theme_stylebox_override("panel", UiSkin.panel(Color("f3e6c8"), Color("e6c36a"), 20, 4))
+	panel.offset_left = 70
+	panel.offset_right = 560
+	panel.offset_top = -210
+	panel.offset_bottom = 300
+	panel.add_theme_stylebox_override("panel", UiSkin.panel(Color("1a1614"), Color("e6c36a"), 22, 4))
 	root.add_child(panel)
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 12)
+	box.add_theme_constant_override("separation", 10)
 	panel.add_child(box)
-	var title := UiSkin.label("N-vs-Z", 40, Color("1c140e"))
+	var title := UiSkin.label("Home", 40, Color("f3e6c8"))
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(title)
-	var sub := UiSkin.label("Two gates. Three roads. Choose six.", 18, Color("6b3a32"))
-	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	sub.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	box.add_child(sub)
+	var night := UiSkin.label("The clan gate, after dark.", 16, Color("e7c07a"))
+	night.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	night.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(night)
+	var purse := UiSkin.label("◆  %d" % diamonds, 34, Color("f4e2b0"))
+	purse.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	purse.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(purse)
+	var diamonds_name := UiSkin.label("diamonds", 14, Color("c4a574"))
+	diamonds_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	diamonds_name.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(diamonds_name)
 	var nxt := _next_index()
 	if nxt >= 1:
 		var road: Dictionary = Levels.level(nxt)
-		box.add_child(_menu_button("Next level · %s" % str(road["name"]), Color("c44536"), next_level))
-		box.add_child(_menu_button("Choose a road", Color("e6c36a"), _show_levels))
+		box.add_child(_menu_button("Next level · %s" % str(road["name"]), Color("c44536"), next_level, 420))
 	else:
-		box.add_child(_menu_button("Play", Color("c44536"), _show_levels))
-	box.add_child(_menu_button("How to play", Color("e6c36a"), _show_how))
-	box.add_child(_menu_button("Store · %d diamonds" % diamonds, Color("7ec8b3"), _show_store))
-	box.add_child(_menu_button("Quit", Color("6b3a32"), func() -> void: get_tree().quit()))
+		box.add_child(_menu_button("Play", Color("c44536"), _show_levels, 420))
+	box.add_child(_home_pair(
+		"Choose a road", Color("e6c36a"), _show_levels,
+		"How to play", Color("f3e6c8"), _show_how
+	))
+	box.add_child(_home_pair(
+		"Shop", Color("7ec8b3"), _show_shop,
+		"Skin", Color("1e3f8f"), _show_skin
+	))
+	var quit := _menu_button("Quit", Color("6b3a32"), func() -> void: get_tree().quit(), 180, 18)
+	quit.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	box.add_child(quit)
+
+
+func _home_pair(left_text: String, left_color: Color, left_call: Callable, right_text: String, right_color: Color, right_call: Callable) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 12)
+	var left := _menu_button(left_text, left_color, left_call, 204, 18)
+	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var right := _menu_button(right_text, right_color, right_call, 204, 18)
+	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(left)
+	row.add_child(right)
+	return row
 
 
 func _show_how() -> void:
@@ -194,14 +225,64 @@ func _show_how() -> void:
 	box.add_child(back)
 
 
-func _show_store() -> void:
-	screen = "store"
-	var box := _open_page("Store")
-	var purse := UiSkin.label("Diamonds  %d" % diamonds, 22, Color("1c140e"))
+func _show_shop() -> void:
+	screen = "shop"
+	var box := _open_page("Shop")
+	var purse := UiSkin.label("◆  %d diamonds" % diamonds, 22, Color("1c140e"))
 	purse.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	purse.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(purse)
-	var pay := UiSkin.label("Choose what the saber wears. A new road pays %d diamonds." % ROAD_DIAMONDS, 16, Color("6b3a32"))
+	var pay := UiSkin.label("A new road pays %d diamonds. Skins are worn from the home porch." % ROAD_DIAMONDS, 16, Color("6b3a32"))
+	pay.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	pay.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	pay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(pay)
+	var stage := SaberPreview.new()
+	stage.navy = true
+	stage.custom_minimum_size = Vector2(0, 220)
+	stage.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	stage.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(stage)
+	var name := UiSkin.label("Navy saber skin", 26, Color("1c140e"))
+	name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	name.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(name)
+	var blurb := UiSkin.label("Navy hood, gold trim, red scarf, and the long grey sword.", 16, Color("2c2118"))
+	blurb.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	blurb.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	blurb.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(blurb)
+	var caption := "Owned"
+	var color := Color("e6c36a")
+	if not saber_skin:
+		caption = "Unlock for %d diamonds" % SABER_SKIN_COST
+		color = Color("1e3f8f")
+	var buy := _menu_button(caption, color, _buy_saber_skin)
+	buy.disabled = saber_skin or diamonds < SABER_SKIN_COST
+	buy.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	box.add_child(buy)
+	var back := _menu_button("Back", Color("e6c36a"), _show_menu)
+	back.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	box.add_child(back)
+
+
+func _buy_saber_skin() -> void:
+	if saber_skin or diamonds < SABER_SKIN_COST:
+		return
+	diamonds -= SABER_SKIN_COST
+	saber_skin = true
+	_save_progress()
+	_show_shop()
+
+
+func _show_skin() -> void:
+	screen = "skin"
+	var box := _open_page("Skin")
+	var purse := UiSkin.label("◆  %d diamonds" % diamonds, 22, Color("1c140e"))
+	purse.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	purse.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(purse)
+	var pay := UiSkin.label("Choose what the saber wears.", 16, Color("6b3a32"))
 	pay.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	pay.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(pay)
@@ -240,14 +321,14 @@ func _saber_choice(navy: bool) -> VBoxContainer:
 	var caption := "Wearing this"
 	var color := Color("e6c36a")
 	if navy and not saber_skin:
-		caption = "Unlock for %d diamonds" % SABER_SKIN_COST
+		caption = "In the shop"
 		color = Color("1e3f8f")
 		wearing = false
 	elif not wearing:
 		caption = "Wear this"
 		color = Color("1e3f8f") if navy else Color("1a1216")
 	var button := _menu_button(caption, color, _wear_saber.bind(navy))
-	button.disabled = wearing or (navy and not saber_skin and diamonds < SABER_SKIN_COST)
+	button.disabled = wearing or (navy and not saber_skin)
 	button.custom_minimum_size = Vector2(280, 52)
 	column.add_child(button)
 	return column
@@ -256,16 +337,13 @@ func _saber_choice(navy: bool) -> VBoxContainer:
 func _wear_saber(navy: bool) -> void:
 	if navy:
 		if not saber_skin:
-			if diamonds < SABER_SKIN_COST:
-				return
-			diamonds -= SABER_SKIN_COST
-			saber_skin = true
+			return
 		saber_worn = "navy"
 	else:
 		saber_worn = "none"
 	Painter.saber_navy = saber_worn == "navy"
 	_save_progress()
-	_show_store()
+	_show_skin()
 
 
 func _show_levels() -> void:
@@ -812,17 +890,60 @@ func _collect_buttons(node: Node) -> Array:
 	return found
 
 
-func _menu_button(text: String, color: Color, action: Callable) -> Button:
+func _menu_button(text: String, color: Color, action: Callable, wide: float = 280.0, font_px: int = 22) -> Button:
 	var button := Button.new()
 	button.text = text
-	button.custom_minimum_size = Vector2(280, 52)
+	button.custom_minimum_size = Vector2(wide, 52)
 	var lum := color.r * 0.3 + color.g * 0.59 + color.b * 0.11
-	UiSkin.apply(button, color, 22, Color("1c140e") if lum > 0.62 else Color("f3e6c8"))
+	UiSkin.apply(button, color, font_px, Color("1c140e") if lum > 0.62 else Color("f3e6c8"))
 	button.pressed.connect(func() -> void:
 		Sfx.play("click", 1.0, -6.0)
 		action.call()
 	)
 	return button
+
+
+class HomeYard:
+	extends Node2D
+
+	var diamonds: int = 0
+
+	func _draw() -> void:
+		var size := get_viewport_rect().size
+		var foot := Vector2(250.0, size.y * 0.64)
+		draw_circle(foot + Vector2(8.0, -70.0), 120.0, Color(1.0, 0.62, 0.28, 0.16))
+		draw_ellipse(foot + Vector2(10.0, 18.0), 130.0, 18.0, Color(0, 0, 0, 0.35))
+		var wall := Rect2(foot.x - 92.0, foot.y - 150.0, 184.0, 150.0)
+		draw_rect(wall, Color("3a2c24"))
+		draw_rect(Rect2(wall.position.x, wall.position.y, 16.0, wall.size.y), Color("2a1e18"))
+		draw_rect(Rect2(wall.end.x - 16.0, wall.position.y, 16.0, wall.size.y), Color("2a1e18"))
+		draw_colored_polygon(PackedVector2Array([
+			Vector2(foot.x - 118.0, foot.y - 142.0),
+			Vector2(foot.x, foot.y - 214.0),
+			Vector2(foot.x + 118.0, foot.y - 142.0),
+		]), Color("1a1218"))
+		draw_line(Vector2(foot.x - 118.0, foot.y - 142.0), Vector2(foot.x, foot.y - 214.0), Color("c44536"), 6.0)
+		draw_line(Vector2(foot.x, foot.y - 214.0), Vector2(foot.x + 118.0, foot.y - 142.0), Color("c44536"), 6.0)
+		_window(foot + Vector2(-48.0, -96.0))
+		_window(foot + Vector2(48.0, -96.0))
+		draw_rect(Rect2(foot.x - 22.0, foot.y - 78.0, 44.0, 78.0), Color("4a3024"))
+		draw_circle(foot + Vector2(12.0, -40.0), 3.0, Color("e6c36a"))
+		var lamp := foot + Vector2(108.0, -118.0)
+		draw_line(Vector2(foot.x + 70.0, foot.y - 150.0), lamp, Color("2a1e18"), 3.0)
+		draw_circle(lamp, 16.0, Color("f0b429"))
+		draw_circle(lamp, 7.0, Color("fff1c9"))
+		draw_circle(lamp, 28.0, Color(1.0, 0.75, 0.35, 0.18))
+		var plaque := Rect2(foot.x - 54.0, foot.y - 28.0, 108.0, 36.0)
+		draw_rect(plaque, Color("1a1614"))
+		draw_rect(Rect2(plaque.position.x, plaque.position.y, plaque.size.x, 3.0), Color("e6c36a"))
+		var font := ThemeDB.fallback_font
+		draw_string(font, plaque.position + Vector2(10.0, 25.0), "◆  %d" % diamonds, HORIZONTAL_ALIGNMENT_LEFT, 90.0, 18, Color("f4e2b0"))
+
+	func _window(at: Vector2) -> void:
+		draw_rect(Rect2(at.x - 16.0, at.y - 18.0, 32.0, 36.0), Color("2a1e18"))
+		draw_rect(Rect2(at.x - 12.0, at.y - 14.0, 24.0, 28.0), Color("f0b429"))
+		draw_rect(Rect2(at.x - 8.0, at.y - 10.0, 16.0, 12.0), Color("fff1c9"))
+		draw_line(at + Vector2(0.0, -14.0), at + Vector2(0.0, 14.0), Color("2a1e18"), 2.0)
 
 
 class SaberPreview:

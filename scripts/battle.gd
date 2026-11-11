@@ -62,6 +62,7 @@ var enemy_bar_fill: ColorRect
 var sword_btn: Button
 var shoot_btn: Button
 var pause_btn: Button
+var home_btn: Button
 var player_track: ColorRect
 var enemy_track: ColorRect
 var hint: Label
@@ -194,6 +195,12 @@ func _build_hud() -> void:
 	UiSkin.apply(pause_btn, Color("f3e6c8"), 16)
 	pause_btn.pressed.connect(_toggle_pause)
 	hud.add_child(pause_btn)
+	home_btn = Button.new()
+	home_btn.text = "Home"
+	home_btn.focus_mode = Control.FOCUS_NONE
+	UiSkin.apply(home_btn, Color("e6c36a"), 16)
+	home_btn.pressed.connect(_go_home)
+	hud.add_child(home_btn)
 	sword_btn = Button.new()
 	sword_btn.text = "SWORD"
 	shoot_btn = Button.new()
@@ -292,8 +299,11 @@ func _layout_hud() -> void:
 		player_track.position = Vector2(24, 48)
 		enemy_track.position = Vector2(size.x - 244, 48)
 	if pause_btn != null:
-		pause_btn.position = Vector2(size.x * 0.5 - 46, 66)
+		pause_btn.position = Vector2(size.x * 0.5 + 6.0, 66)
 		pause_btn.size = Vector2(92, 36)
+	if home_btn != null:
+		home_btn.position = Vector2(size.x * 0.5 - 98.0, 66)
+		home_btn.size = Vector2(92, 36)
 
 
 func _process(delta: float) -> void:
@@ -703,7 +713,7 @@ func on_gate_fallen(defender_side: int) -> void:
 		actions.append({"text": "Next level", "color": Color("c44536"), "call": Callable(get_parent(), "next_level")})
 	actions.append({"text": "Rematch", "color": Color("e6c36a"), "call": Callable(get_parent(), "rematch")})
 	actions.append({"text": "Change the six", "color": Color("d7c4a3"), "call": Callable(get_parent(), "change_squad")})
-	actions.append({"text": "Title", "color": Color("f7f1df"), "call": Callable(get_parent(), "show_title")})
+	actions.append({"text": "Home", "color": Color("f7f1df"), "call": Callable(get_parent(), "show_title")})
 	end_layer = _overlay(title, body, actions)
 	layer.add_child(end_layer)
 
@@ -717,10 +727,17 @@ func _toggle_pause() -> void:
 	paused = true
 	pause_layer = _overlay("Paused", "The road waits. Your soldiers hold still until you return.", [
 		{"text": "Resume", "color": Color("7dce6a"), "call": Callable(self, "_close_pause")},
+		{"text": "Home", "color": Color("e6c36a"), "call": Callable(self, "_go_home")},
 		{"text": "Rematch", "color": Color("c44536"), "call": Callable(get_parent(), "rematch")},
-		{"text": "Change the six", "color": Color("e6c36a"), "call": Callable(get_parent(), "change_squad")},
+		{"text": "Change the six", "color": Color("d7c4a3"), "call": Callable(get_parent(), "change_squad")},
 	])
 	layer.add_child(pause_layer)
+
+
+func _go_home() -> void:
+	var host := get_parent()
+	if host != null and host.has_method("show_title"):
+		host.show_title()
 
 
 func _close_pause() -> void:
