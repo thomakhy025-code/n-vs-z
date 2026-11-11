@@ -5,8 +5,11 @@
 Thumbs.db
 shot.png
 menu_shot.png
+menu_shot.png.import
 battle_shot.png
+battle_shot.png.import
 export/
 *.exe
 *.pck
+!docs/*.pck
 *.zip
