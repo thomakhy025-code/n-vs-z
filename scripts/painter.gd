@@ -1,11 +1,16 @@
 extends RefCounted
 
 static var _tilt: float = 0.0
+static var saber_navy: bool = false
 
 
 static func look(kind: String) -> Dictionary:
 	var row := _painted(kind)
 	row["paint"] = kind
+	if kind == "saber" and saber_navy:
+		row["skin"] = Color("f0c14a")
+		row["cloth"] = Color("1e3f8f")
+		row["trim"] = Color("e2b034")
 	return row
 
 
@@ -18,7 +23,7 @@ static func _painted(kind: String) -> Dictionary:
 		"shield":
 			return _look(Color("f0c9a0"), Color("1c1814"), Color("c4a574"), "shield", false, "ninja")
 		"saber":
-			return _look(Color("f0c14a"), Color("1e3f8f"), Color("e2b034"), "nodachi", false, "ninja")
+			return _look(Color("f0c9a0"), Color("1a1216"), Color("c44536"), "nodachi", false, "ninja")
 		"lancer":
 			return _look(Color("f0c9a0"), Color("161820"), Color("9aa4d4"), "spear", false, "ninja")
 		"berserker":
@@ -195,7 +200,7 @@ static func paint_local(ci: CanvasItem, look: Dictionary, pose: Dictionary) -> v
 	var snap := 0.0
 	if phase == "act":
 		snap = tip.x - chest.x
-	if cycle == "nodachi":
+	if cycle == "saber_navy":
 		_paint_saber(ci, chest, rear, front, tip, step, ground, phase, snap)
 		if phase == "act" and beat == contact_beat(weapon) and t > 0.35:
 			_arc(ci, front, 18.0 + t * 14.0, -1.2, 1.0, 14, Color(0.89, 0.69, 0.2, (1.0 - t) * 0.75), 3.0)
@@ -336,6 +341,8 @@ static func _is_quiet(cycle: String) -> bool:
 static func _cycle_id(paint: String, weapon: String) -> String:
 	if weapon == "bow" or weapon == "crossbow":
 		return weapon
+	if paint == "saber" and saber_navy:
+		return "saber_navy"
 	match paint:
 		"horse":
 			return "horse"
@@ -500,6 +507,14 @@ static func _frames(cycle: String) -> Array:
 				_f(4, 4, 12, 4, 36, 2, 2, 0, 0.2, 0.1),
 			]
 		"nodachi":
+			return [
+				_f(-2, -4, 6, -10, 8, -32, 1, 0, 0.1, 0.06),
+				_f(0, 8, 8, 4, 16, 16, 0, 0.4, 0.05, 0.02),
+				_f(-14, -8, -6, -18, -24, -4, -5, 1, -0.5, -0.42),
+				_f(6, 6, 14, 0, 38, 18, 8, 0.3, 1.1, 0.4),
+				_f(0, -2, 6, -8, 10, -26, 1, 0.2, 0.1, 0.08),
+			]
+		"saber_navy":
 			return [
 				_f(-9, 0, 6, 2, 16, 26, 2, 0, 0.25, 0.04),
 				_f(2, 8, 8, 4, 6, -36, 0, 0.2, 0.4, 0.02),
