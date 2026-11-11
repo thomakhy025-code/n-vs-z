@@ -31,6 +31,7 @@ var count_label: Label
 var start_button: Button
 var last_id: String = ""
 var unlocked: int = 1
+var cleared: int = 0
 var chosen_level: int = 1
 var screen: String = "menu"
 
@@ -45,6 +46,8 @@ func _ready() -> void:
 		_layout_check()
 	elif _has_arg("--unlock-check"):
 		_unlock_check()
+	elif _has_arg("--win-check"):
+		_win_check()
 	elif _has_arg("--shot"):
 		_shot_flow()
 	elif _has_arg("--sim-cheap"):
@@ -137,8 +140,8 @@ func _show_menu() -> void:
 	panel.set_anchors_preset(Control.PRESET_CENTER)
 	panel.offset_left = -310
 	panel.offset_right = 310
-	panel.offset_top = -230
-	panel.offset_bottom = 230
+	panel.offset_top = -270
+	panel.offset_bottom = 270
 	panel.add_theme_stylebox_override("panel", UiSkin.panel(Color("f3e6c8"), Color("e6c36a"), 20, 4))
 	root.add_child(panel)
 	var box := VBoxContainer.new()
@@ -146,13 +149,21 @@ func _show_menu() -> void:
 	panel.add_child(box)
 	var title := UiSkin.label("N-vs-Z", 40, Color("1c140e"))
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(title)
 	var sub := UiSkin.label("Two gates. Three roads. Choose six.", 18, Color("6b3a32"))
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	sub.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(sub)
-	box.add_child(_menu_button("Play", Color("c44536"), _show_levels))
+	var nxt := _next_index()
+	if nxt >= 1:
+		var road: Dictionary = Levels.level(nxt)
+		box.add_child(_menu_button("Next level · %s" % str(road["name"]), Color("c44536"), next_level))
+		box.add_child(_menu_button("Choose a road", Color("e6c36a"), _show_levels))
+	else:
+		box.add_child(_menu_button("Play", Color("c44536"), _show_levels))
 	box.add_child(_menu_button("How to play", Color("e6c36a"), _show_how))
-	box.add_child(_menu_button("Quit", Color("f3e6c8"), func() -> void: get_tree().quit()))
+	box.add_child(_menu_button("Quit", Color("6b3a32"), func() -> void: get_tree().quit()))
 
 
 func _show_how() -> void:
@@ -436,9 +447,7 @@ func _start_battle(chosen: Array, mode: String = "", level_index: int = 0) -> vo
 	screen = "battle"
 	loadout = chosen.duplicate()
 	_clear_screens()
-	for child in get_children():
-		if child.get_script() == BattleScript:
-			child.queue_free()
+	_drop_battle()
 	var battle = BattleScript.new()
 	add_child(battle)
 	battle.start(loadout, mode, chosen_level)
@@ -451,39 +460,77 @@ func rematch() -> void:
 
 func change_squad() -> void:
 	Engine.time_scale = 1.0
-	for child in get_children():
-		if child.get_script() == BattleScript:
-			child.queue_free()
+	_drop_battle()
 	_show_select()
 
 
 func show_title() -> void:
 	Engine.time_scale = 1.0
+	_drop_battle()
+	_show_menu()
+
+
+func next_level() -> void:
+	Engine.time_scale = 1.0
+	var nxt := _next_index()
+	if nxt < 1:
+		show_title()
+		return
+	chosen_level = nxt
+	if loadout.size() == 6:
+		_start_battle(loadout, "", nxt)
+	else:
+		_drop_battle()
+		_show_select()
+
+
+func _drop_battle() -> void:
+	var doomed: Array = []
 	for child in get_children():
 		if child.get_script() == BattleScript:
-			child.queue_free()
-	_show_menu()
+			doomed.append(child)
+	for child in doomed:
+		remove_child(child)
+		child.queue_free()
+
+
+func _next_index() -> int:
+	if cleared < 1 or cleared >= Levels.count():
+		return 0
+	return cleared + 1
 
 
 func note_clear(level_index: int) -> void:
 	var opened := mini(Levels.count(), level_index + 1)
-	if opened <= unlocked:
-		return
-	unlocked = opened
-	_save_progress()
+	var changed := false
+	if level_index > cleared:
+		cleared = level_index
+		changed = true
+	if opened > unlocked:
+		unlocked = opened
+		changed = true
+	if changed:
+		_save_progress()
 
 
 func _load_progress() -> void:
 	unlocked = 1
+	cleared = 0
 	var cfg: ConfigFile = ConfigFile.new()
 	if cfg.load(SAVE_PATH) != OK:
 		return
 	unlocked = clampi(int(cfg.get_value("progress", "unlocked", 1)), 1, Levels.count())
+	var stored := int(cfg.get_value("progress", "cleared", -1))
+	if stored < 0:
+		cleared = maxi(0, unlocked - 1)
+	else:
+		cleared = clampi(stored, 0, Levels.count())
 
 
 func _save_progress() -> void:
 	var cfg: ConfigFile = ConfigFile.new()
 	cfg.set_value("progress", "unlocked", unlocked)
+	cfg.set_value("progress", "cleared", cleared)
 	cfg.save(SAVE_PATH)
 
 
@@ -562,6 +609,62 @@ func _unlock_check() -> void:
 	var ok := after1 >= before and after1 >= mini(Levels.count(), maxi(before, 2)) and after10 == Levels.count() and unlocked == Levels.count()
 	print("UNLOCK ", "OK" if ok else "FAIL")
 	get_tree().quit(0 if ok else 1)
+
+
+func _win_check() -> void:
+	get_window().size = Vector2i(1280, 720)
+	for _i in 2:
+		await get_tree().process_frame
+	unlocked = 5
+	cleared = 4
+	chosen_level = 5
+	_start_battle(["sword", "archer", "shield", "lancer", "berserker", "heal"], "", 5)
+	await get_tree().process_frame
+	var battle := _battle_node()
+	if battle == null:
+		print("WIN FAIL no battle")
+		get_tree().quit(1)
+		return
+	battle.call("on_gate_fallen", 1)
+	for _i in 4:
+		await get_tree().process_frame
+	var vp := get_viewport().get_visible_rect().size
+	var nxt := _button_named(self, "Next level")
+	var onscreen := false
+	if nxt != null:
+		var rect := nxt.get_global_rect()
+		onscreen = rect.position.y >= 0.0 and rect.end.y <= vp.y + 1.0 and rect.size.y > 20.0
+		print("WIN next=", rect, " vp=", vp, " cleared=", cleared, " unlocked=", unlocked)
+	var saved := cleared == 5 and unlocked == 6 and onscreen
+	next_level()
+	for _i in 3:
+		await get_tree().process_frame
+	var again := _battle_node()
+	var moved_level := -1
+	if again != null:
+		moved_level = int(again.get("level_no"))
+	var moved := moved_level == 6
+	print("WIN moved=", moved, " level=", moved_level)
+	show_title()
+	for _i in 4:
+		await get_tree().process_frame
+	vp = get_viewport().get_visible_rect().size
+	var title_btn := _button_named(self, "Next level · Rising curse")
+	var title_on := false
+	if title_btn != null:
+		var title_rect := title_btn.get_global_rect()
+		title_on = title_rect.position.y >= 0.0 and title_rect.end.y <= vp.y + 1.0 and title_rect.size.y > 20.0
+		print("TITLE next=", title_rect, " vp=", vp)
+	var ok := saved and moved and title_on
+	print("WIN ", "OK" if ok else "FAIL")
+	get_tree().quit(0 if ok else 1)
+
+
+func _battle_node() -> Node:
+	for child in get_children():
+		if child.get_script() == BattleScript:
+			return child
+	return null
 
 
 func _find_scroll(node: Node) -> ScrollContainer:

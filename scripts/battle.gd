@@ -674,11 +674,13 @@ func on_gate_fallen(defender_side: int) -> void:
 		else:
 			var nxt: Dictionary = Levels.level(level_no + 1)
 			body = "Level %d, %s, is open." % [int(nxt["index"]), str(nxt["name"])]
-	end_layer = _overlay(title, body, [
-		{"text": "Rematch", "color": Color("c44536"), "call": Callable(get_parent(), "rematch")},
-		{"text": "Change the six", "color": Color("e6c36a"), "call": Callable(get_parent(), "change_squad")},
-		{"text": "Title", "color": Color("f3e6c8"), "call": Callable(get_parent(), "show_title")},
-	])
+	var actions: Array = []
+	if won and level_no < Levels.count():
+		actions.append({"text": "Next level", "color": Color("c44536"), "call": Callable(get_parent(), "next_level")})
+	actions.append({"text": "Rematch", "color": Color("e6c36a"), "call": Callable(get_parent(), "rematch")})
+	actions.append({"text": "Change the six", "color": Color("d7c4a3"), "call": Callable(get_parent(), "change_squad")})
+	actions.append({"text": "Title", "color": Color("f7f1df"), "call": Callable(get_parent(), "show_title")})
+	end_layer = _overlay(title, body, actions)
 	layer.add_child(end_layer)
 
 
@@ -717,32 +719,49 @@ func _overlay(title: String, body: String, buttons: Array) -> Control:
 	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
 	dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(dim)
+	var margin := MarginContainer.new()
+	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	margin.add_theme_constant_override("margin_left", 340)
+	margin.add_theme_constant_override("margin_right", 340)
+	margin.add_theme_constant_override("margin_top", 64)
+	margin.add_theme_constant_override("margin_bottom", 40)
+	root.add_child(margin)
 	var panel := PanelContainer.new()
-	panel.set_anchors_preset(Control.PRESET_CENTER)
-	panel.offset_left = -270
-	panel.offset_right = 270
-	panel.offset_top = -180
-	panel.offset_bottom = 190
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	panel.clip_contents = true
 	panel.add_theme_stylebox_override("panel", UiSkin.panel(Color("f3e6c8"), Color("e6c36a"), 18, 4))
-	root.add_child(panel)
+	margin.add_child(panel)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 10)
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	box.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	panel.add_child(box)
 	var heading := UiSkin.label(title, 32, Color("1c140e"))
 	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	heading.autowrap_mode = TextServer.AUTOWRAP_WORD
+	heading.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(heading)
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	box.add_child(scroll)
 	var copy := UiSkin.label(body, 18, Color("3a2a22"))
 	copy.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	copy.autowrap_mode = TextServer.AUTOWRAP_WORD
-	copy.custom_minimum_size = Vector2(480, 64)
-	box.add_child(copy)
+	copy.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	copy.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	copy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(copy)
 	for spec in buttons:
 		var btn := Button.new()
 		btn.text = str(spec["text"])
-		btn.custom_minimum_size = Vector2(240, 46)
+		btn.custom_minimum_size = Vector2(280, 48)
+		btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		UiSkin.apply(btn, spec["color"], 20, _ink(spec["color"]))
-		btn.pressed.connect(spec["call"])
+		var action: Callable = spec["call"]
+		btn.pressed.connect(action)
 		box.add_child(btn)
 	return root
 
