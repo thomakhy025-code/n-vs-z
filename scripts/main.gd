@@ -21,7 +21,7 @@ The cursed gate calls its own dead: walkers, runners, brutes, spitters, bombers,
 
 Play lists ten roads. The first is open. Winning a road opens the next one. Your purse stays the same on every road. Theirs gets heavier.
 
-Each road you open pays 100 diamonds. The store on the title sells the saber's navy skin for 200 diamonds. Until then the saber keeps its black wrap.
+Each road you open pays 100 diamonds. The store on the title is where you choose the saber's skin. Nothing keeps the black wrap. The navy skin costs 200 diamonds.
 
 Escape or Back returns to the title."
 
@@ -36,6 +36,7 @@ var unlocked: int = 1
 var cleared: int = 0
 var diamonds: int = 0
 var saber_skin: bool = false
+var saber_worn: String = "none"
 var diamond_paid: int = 1
 const ROAD_DIAMONDS := 100
 const SABER_SKIN_COST := 200
@@ -200,45 +201,69 @@ func _show_store() -> void:
 	purse.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	purse.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(purse)
-	var pay := UiSkin.label("Each road you open pays %d diamonds." % ROAD_DIAMONDS, 16, Color("6b3a32"))
+	var pay := UiSkin.label("Choose what the saber wears. A new road pays %d diamonds." % ROAD_DIAMONDS, 16, Color("6b3a32"))
 	pay.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	pay.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(pay)
-	var stage := SaberPreview.new()
-	stage.custom_minimum_size = Vector2(0, 280)
-	stage.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	stage.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	box.add_child(stage)
-	var name := UiSkin.label("Saber skin", 26, Color("1c140e"))
-	name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	name.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	box.add_child(name)
-	var blurb := UiSkin.label("Navy hood, gold trim, red scarf, and the long grey sword.", 16, Color("2c2118"))
-	blurb.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	blurb.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	blurb.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	box.add_child(blurb)
-	var state := "This skin is on every saber you call." if saber_skin else "The saber keeps its black wrap until you unlock this."
-	var note := UiSkin.label(state, 16, Color("6b3a32"))
-	note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	note.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	box.add_child(note)
-	var buy := _menu_button("Owned" if saber_skin else "Unlock for %d diamonds" % SABER_SKIN_COST, Color("1e3f8f"), _buy_saber_skin)
-	buy.disabled = saber_skin or diamonds < SABER_SKIN_COST
-	buy.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	box.add_child(buy)
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 28)
+	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	box.add_child(row)
+	row.add_child(_saber_choice(false))
+	row.add_child(_saber_choice(true))
 	var back := _menu_button("Back", Color("e6c36a"), _show_menu)
 	back.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	box.add_child(back)
 
 
-func _buy_saber_skin() -> void:
-	if saber_skin or diamonds < SABER_SKIN_COST:
-		return
-	diamonds -= SABER_SKIN_COST
-	saber_skin = true
-	Painter.saber_navy = true
+func _saber_choice(navy: bool) -> VBoxContainer:
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override("separation", 8)
+	column.custom_minimum_size = Vector2(300, 0)
+	var stage := SaberPreview.new()
+	stage.navy = navy
+	stage.custom_minimum_size = Vector2(300, 230)
+	stage.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	column.add_child(stage)
+	var title := UiSkin.label("Navy skin" if navy else "Nothing", 22, Color("1c140e"))
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	column.add_child(title)
+	var detail := "Black wrap and dark red scarf." if not navy else "Navy hood, gold trim, red scarf."
+	var blurb := UiSkin.label(detail, 15, Color("2c2118"))
+	blurb.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	blurb.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	blurb.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	column.add_child(blurb)
+	var wearing := (saber_worn == "navy") == navy
+	var caption := "Wearing this"
+	var color := Color("e6c36a")
+	if navy and not saber_skin:
+		caption = "Unlock for %d diamonds" % SABER_SKIN_COST
+		color = Color("1e3f8f")
+		wearing = false
+	elif not wearing:
+		caption = "Wear this"
+		color = Color("1e3f8f") if navy else Color("1a1216")
+	var button := _menu_button(caption, color, _wear_saber.bind(navy))
+	button.disabled = wearing or (navy and not saber_skin and diamonds < SABER_SKIN_COST)
+	button.custom_minimum_size = Vector2(280, 52)
+	column.add_child(button)
+	return column
+
+
+func _wear_saber(navy: bool) -> void:
+	if navy:
+		if not saber_skin:
+			if diamonds < SABER_SKIN_COST:
+				return
+			diamonds -= SABER_SKIN_COST
+			saber_skin = true
+		saber_worn = "navy"
+	else:
+		saber_worn = "none"
+	Painter.saber_navy = saber_worn == "navy"
 	_save_progress()
 	_show_store()
 
@@ -586,6 +611,7 @@ func _load_progress() -> void:
 	cleared = 0
 	diamonds = 0
 	saber_skin = false
+	saber_worn = "none"
 	diamond_paid = 1
 	var cfg: ConfigFile = ConfigFile.new()
 	if cfg.load(SAVE_PATH) == OK:
@@ -597,12 +623,18 @@ func _load_progress() -> void:
 			cleared = clampi(stored, 0, Levels.count())
 		diamonds = maxi(0, int(cfg.get_value("progress", "diamonds", 0)))
 		saber_skin = bool(cfg.get_value("progress", "saber_skin", false))
+		if cfg.has_section_key("progress", "saber_worn"):
+			saber_worn = str(cfg.get_value("progress", "saber_worn", "none"))
+		else:
+			saber_worn = "navy" if saber_skin else "none"
 		if cfg.has_section_key("progress", "diamond_paid"):
 			diamond_paid = clampi(int(cfg.get_value("progress", "diamond_paid", 1)), 1, Levels.count())
 		else:
 			diamond_paid = 1
+	if saber_worn != "navy" or not saber_skin:
+		saber_worn = "none"
 	var paid := _take_road_pay()
-	Painter.saber_navy = saber_skin
+	Painter.saber_navy = saber_worn == "navy"
 	if paid:
 		_save_progress()
 
@@ -613,6 +645,7 @@ func _save_progress() -> void:
 	cfg.set_value("progress", "cleared", cleared)
 	cfg.set_value("progress", "diamonds", diamonds)
 	cfg.set_value("progress", "saber_skin", saber_skin)
+	cfg.set_value("progress", "saber_worn", saber_worn)
 	cfg.set_value("progress", "diamond_paid", diamond_paid)
 	cfg.save(SAVE_PATH)
 
@@ -796,12 +829,13 @@ class SaberPreview:
 	extends Control
 
 	const Painter = preload("res://scripts/painter.gd")
+	var navy: bool = true
 
 	func _ready() -> void:
 		resized.connect(queue_redraw)
 
 	func _draw() -> void:
-		var origin := Vector2(size.x * 0.5, size.y * 0.58)
-		draw_set_transform(origin, 0.0, Vector2(3.7, 3.7))
-		Painter.paint_saber_front(self)
+		var origin := Vector2(size.x * 0.5, size.y * 0.62)
+		draw_set_transform(origin, 0.0, Vector2(2.55, 2.55))
+		Painter.paint_saber_front(self, navy)
 		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)

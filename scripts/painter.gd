@@ -225,67 +225,69 @@ static func paint_local(ci: CanvasItem, look: Dictionary, pose: Dictionary) -> v
 	_tilt = 0.0
 
 
-static func paint_saber_front(ci: CanvasItem) -> void:
+static func paint_saber_front(ci: CanvasItem, navy_skin: bool = true) -> void:
 	_tilt = 0.0
-	var navy := Color("1e3f8f")
-	var navy_dark := Color("142c68")
-	var gold := Color("e2b034")
-	var red := Color("c73636")
-	var wrap := Color("d2c2a4")
-	var eye := Color("f0c14a")
+	var cloth := Color("1e3f8f") if navy_skin else Color("1a1216")
+	var cloth_dark := Color("142c68") if navy_skin else Color("0c0a0e")
+	var trim := Color("e2b034") if navy_skin else Color("c44536")
+	var scarf := Color("c73636") if navy_skin else Color("c44536")
+	var wrap := Color("d2c2a4") if navy_skin else Color("f0c9a0")
+	var eye := Color("f0c14a") if navy_skin else Color("f0c9a0")
+	var face := Color("0c1a3a") if navy_skin else Color("2a211c")
 	_ellipse(ci, Vector2(0.0, 32.0), 20.0, 4.4, Color(0, 0, 0, 0.28))
-	_line(ci, Vector2(-7.0, 12.0), Vector2(-8.0, 28.0), navy_dark, 6.4)
-	_line(ci, Vector2(7.0, 12.0), Vector2(8.0, 28.0), navy, 6.4)
-	_line(ci, Vector2(-13.0, 27.0), Vector2(-3.0, 29.0), gold, 2.8)
-	_line(ci, Vector2(3.0, 27.0), Vector2(13.0, 29.0), gold, 2.8)
+	_line(ci, Vector2(-7.0, 12.0), Vector2(-8.0, 28.0), cloth_dark, 6.4)
+	_line(ci, Vector2(7.0, 12.0), Vector2(8.0, 28.0), cloth, 6.4)
+	_line(ci, Vector2(-13.0, 27.0), Vector2(-3.0, 29.0), trim, 2.8)
+	_line(ci, Vector2(3.0, 27.0), Vector2(13.0, 29.0), trim, 2.8)
 	_poly(ci, PackedVector2Array([
 		Vector2(-14.0, -8.0),
 		Vector2(14.0, -8.0),
 		Vector2(12.0, 16.0),
 		Vector2(-12.0, 16.0),
-	]), navy)
-	_line(ci, Vector2(-12.0, 15.0), Vector2(12.0, 15.0), gold, 2.2)
-	_line(ci, Vector2(-13.0, -6.0), Vector2(-11.0, 14.0), gold, 1.6)
-	_line(ci, Vector2(13.0, -6.0), Vector2(11.0, 14.0), gold, 1.6)
-	_line(ci, Vector2(0.0, -4.0), Vector2(0.0, 8.0), gold, 1.5)
-	_box(ci, Rect2(-12.0, 5.0, 24.0, 5.2), red)
+	]), cloth)
+	_line(ci, Vector2(-12.0, 15.0), Vector2(12.0, 15.0), trim, 2.2)
+	_line(ci, Vector2(-13.0, -6.0), Vector2(-11.0, 14.0), trim, 1.6)
+	_line(ci, Vector2(13.0, -6.0), Vector2(11.0, 14.0), trim, 1.6)
+	_line(ci, Vector2(0.0, -4.0), Vector2(0.0, 8.0), trim, 1.5)
+	_box(ci, Rect2(-12.0, 5.0, 24.0, 5.2), scarf)
 	_poly(ci, PackedVector2Array([
 		Vector2(-2.4, 10.0),
 		Vector2(2.4, 10.0),
 		Vector2(0.0, 18.0),
-	]), red.darkened(0.08))
+	]), scarf.darkened(0.08))
 	_poly(ci, PackedVector2Array([
 		Vector2(-6.0, -6.0),
 		Vector2(-18.0, 4.0),
 		Vector2(-12.0, 16.0),
-	]), red)
+	]), scarf)
 	_poly(ci, PackedVector2Array([
 		Vector2(6.0, -6.0),
 		Vector2(18.0, 6.0),
 		Vector2(12.0, 18.0),
-	]), red.darkened(0.08))
-	_box(ci, Rect2(-10.0, -8.0, 20.0, 4.0), red)
-	_line(ci, Vector2(-12.0, -4.0), Vector2(-20.0, 8.0), navy_dark, 5.2)
+	]), scarf.darkened(0.08))
+	_box(ci, Rect2(-10.0, -8.0, 20.0, 4.0), scarf)
+	_line(ci, Vector2(-12.0, -4.0), Vector2(-20.0, 8.0), cloth_dark, 5.2)
 	_line(ci, Vector2(-20.0, 8.0), Vector2(-18.0, 16.0), wrap, 4.6)
 	_dot(ci, Vector2(-18.0, 17.0), 2.6, wrap)
 	_saber_sword(ci, Vector2(16.0, 2.0), Vector2(18.0, -2.0), Vector2(24.0, -34.0))
-	_line(ci, Vector2(12.0, -4.0), Vector2(18.0, 4.0), navy, 5.2)
+	_line(ci, Vector2(12.0, -4.0), Vector2(18.0, 4.0), cloth, 5.2)
 	_line(ci, Vector2(18.0, 4.0), Vector2(17.0, 10.0), wrap, 4.4)
 	_dot(ci, Vector2(17.2, 11.0), 2.5, wrap)
-	_ellipse(ci, Vector2(0.0, -22.0), 13.5, 14.0, navy_dark)
-	_ellipse(ci, Vector2(0.0, -21.0), 12.0, 12.6, navy)
+	_ellipse(ci, Vector2(0.0, -22.0), 13.5, 14.0, cloth_dark)
+	_ellipse(ci, Vector2(0.0, -21.0), 12.0, 12.6, cloth)
 	_poly(ci, PackedVector2Array([
 		Vector2(-5.0, -30.0),
 		Vector2(0.0, -38.0),
 		Vector2(5.0, -30.0),
-	]), navy)
-	_poly(ci, PackedVector2Array([
-		Vector2(0.0, -33.0),
-		Vector2(2.2, -30.6),
-		Vector2(0.0, -28.2),
-		Vector2(-2.2, -30.6),
-	]), gold)
-	_ellipse(ci, Vector2(0.0, -20.0), 7.2, 7.6, Color("0c1a3a"))
+	]), cloth)
+	if navy_skin:
+		_poly(ci, PackedVector2Array([
+			Vector2(0.0, -33.0),
+			Vector2(2.2, -30.6),
+			Vector2(0.0, -28.2),
+			Vector2(-2.2, -30.6),
+		]), trim)
+	_ellipse(ci, Vector2(0.0, -20.0), 7.2, 7.6, face)
 	_dot(ci, Vector2(-3.1, -20.4), 2.35, eye)
 	_dot(ci, Vector2(3.1, -20.4), 2.35, eye)
 	_dot(ci, Vector2(-3.1, -20.4), 1.0, Color("1a1408"))
