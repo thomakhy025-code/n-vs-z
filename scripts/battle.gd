@@ -11,6 +11,7 @@ const FloatScript = preload("res://scripts/float_text.gd")
 const PoofScript = preload("res://scripts/poof.gd")
 const FieldScript = preload("res://scripts/field_input.gd")
 const UiSkin = preload("res://scripts/ui_skin.gd")
+const Levels = preload("res://scripts/levels.gd")
 
 const PLAYER_START := 16.0
 const PLAYER_INCOME := 3.6
@@ -20,6 +21,8 @@ const ENEMY_GROWTH := 0.065
 const MAX_SIDE := 24
 
 var mode: String = ""
+var rules: Dictionary = {}
+var level_no: int = 1
 var loadout: Array = []
 var finished: bool = false
 var paused: bool = false
@@ -51,6 +54,7 @@ var layer: CanvasLayer
 var hud: Control
 var value_label: Label
 var income_label: Label
+var level_label: Label
 var player_hp_label: Label
 var enemy_hp_label: Label
 var player_bar_fill: ColorRect
@@ -76,9 +80,13 @@ var sword_hold: bool = false
 var shoot_hold: bool = false
 
 
-func start(chosen: Array, run_mode: String) -> void:
+func start(chosen: Array, run_mode: String, level_index: int = 1) -> void:
 	loadout = chosen.duplicate()
 	mode = run_mode
+	rules = Levels.level(level_index)
+	level_no = int(rules["index"])
+	enemy_value = float(rules["start"])
+	enemy_income = float(rules["income"])
 	player_roster = Catalog.player_roster()
 	enemy_roster = Catalog.enemy_roster()
 	for entry in player_roster:
@@ -156,6 +164,9 @@ func _build_hud() -> void:
 	value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	income_label = _plain("+3.6 each second", 16, Color("f3e6c8"))
 	income_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	level_label = _plain("Level %d  ·  %s" % [level_no, str(rules["name"])], 18, Color("f3e6c8"))
+	level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	level_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hint = _plain("Drag between the three roads to move. WASD works too. Soldiers you call join the hero's road. Sword and Shoot are on the right. J and K match those buttons. Keys 1-6 call the six you chose.", 16, Color("f3e6c8"))
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -171,6 +182,7 @@ func _build_hud() -> void:
 	hud.add_child(enemy_hp_label)
 	hud.add_child(value_label)
 	hud.add_child(income_label)
+	hud.add_child(level_label)
 	hud.add_child(hint)
 	hud.add_child(down_label)
 	hud.add_child(player_track)
@@ -269,7 +281,10 @@ func _layout_hud() -> void:
 	value_label.size = Vector2(280, 36)
 	income_label.position = Vector2(size.x * 0.5 - 140, 42)
 	income_label.size = Vector2(280, 22)
-	hint.position = Vector2(size.x * 0.5 - 340, 112)
+	if level_label != null:
+		level_label.position = Vector2(size.x * 0.5 - 260, 104)
+		level_label.size = Vector2(520, 26)
+	hint.position = Vector2(size.x * 0.5 - 340, 132)
 	hint.size = Vector2(680, 72)
 	down_label.position = Vector2(size.x * 0.5 - 180, size.y - side_len - 42)
 	down_label.size = Vector2(360, 28)
@@ -290,7 +305,7 @@ func _process(delta: float) -> void:
 		for id in enemy_cd.keys():
 			enemy_cd[id] = maxf(0.0, float(enemy_cd[id]) - delta)
 		player_value += PLAYER_INCOME * delta
-		enemy_income += ENEMY_GROWTH * delta
+		enemy_income += _rule_f("growth", ENEMY_GROWTH) * delta
 		enemy_value += enemy_income * delta
 		_enemy_ai(delta)
 		if mode != "":
@@ -314,17 +329,20 @@ func _enemy_ai(delta: float) -> void:
 		lull -= delta
 		return
 	if wave_left <= 0:
-		wave_left = mini(8, 3 + int(battle_time / 22.0))
+		var every := _rule_f("wave_every", 22.0)
+		if every < 1.0:
+			every = 22.0
+		wave_left = mini(_rule_i("wave_cap", 8), _rule_i("wave_base", 3) + int(battle_time / every))
 	enemy_lock -= delta
 	if enemy_lock > 0.0:
 		return
-	enemy_lock = 0.42
+	enemy_lock = _rule_f("spawn_gap", 0.42)
 	var options: Array = ["walker", "walker", "runner"]
-	if battle_time >= 50.0:
+	if battle_time >= _rule_f("oni_at", 50.0):
 		options = ["oni", "brute", "bomber", "spitter", "walker", "runner"]
-	elif battle_time >= 24.0:
+	elif battle_time >= _rule_f("brute_at", 24.0):
 		options = ["brute", "bomber", "spitter", "walker", "runner"]
-	elif battle_time >= 12.0:
+	elif battle_time >= _rule_f("spitter_at", 12.0):
 		options = ["walker", "runner", "spitter", "bomber", "walker"]
 	options.shuffle()
 	var spawned := false
@@ -332,25 +350,55 @@ func _enemy_ai(delta: float) -> void:
 		if _try_enemy(str(id)):
 			spawned = true
 			break
+	if spawned and _rule_b("paired"):
+		for id in options:
+			if _try_enemy(str(id), true):
+				break
 	if not spawned:
 		lull = 1.3
 		wave_left = 0
 		return
 	wave_left -= 1
 	if wave_left <= 0:
-		lull = maxf(1.5, 3.3 - battle_time * 0.012)
+		lull = maxf(_rule_f("lull_floor", 1.5), _rule_f("lull_base", 3.3) - battle_time * _rule_f("lull_shrink", 0.012))
 
 
-func _try_enemy(id: String) -> bool:
+func _try_enemy(id: String, ignore_cd: bool = false) -> bool:
 	var entry := Catalog.find_in(enemy_roster, id)
 	if entry.is_empty():
 		return false
-	if float(enemy_cd[id]) > 0.0 or enemy_value < float(entry["cost"]) or _count(1) >= MAX_SIDE:
+	var cooling := float(enemy_cd[id]) > 0.0 and not ignore_cd
+	if cooling or enemy_value < float(entry["cost"]) or _count(1) >= MAX_SIDE:
 		return false
 	enemy_value -= float(entry["cost"])
 	enemy_cd[id] = float(entry["cooldown"])
-	_spawn(entry, 1)
+	_spawn(_scaled_enemy(entry), 1)
 	return true
+
+
+func _scaled_enemy(entry: Dictionary) -> Dictionary:
+	var copy: Dictionary = entry.duplicate()
+	copy["hp"] = maxi(1, int(round(float(copy["hp"]) * _rule_f("hp_mult", 1.0))))
+	copy["damage"] = maxi(1, int(round(float(copy["damage"]) * _rule_f("dmg_mult", 1.0))))
+	return copy
+
+
+func _rule_f(key: String, fallback: float) -> float:
+	if rules.is_empty() or not rules.has(key):
+		return fallback
+	return float(rules[key])
+
+
+func _rule_i(key: String, fallback: int) -> int:
+	if rules.is_empty() or not rules.has(key):
+		return fallback
+	return int(rules[key])
+
+
+func _rule_b(key: String) -> bool:
+	if rules.is_empty() or not rules.has(key):
+		return false
+	return bool(rules[key])
 
 
 func _autoplay(delta: float) -> void:
@@ -616,7 +664,16 @@ func on_gate_fallen(defender_side: int) -> void:
 		return
 	_close_pause()
 	var title := "The cursed gate breaks" if won else "Your gate has fallen"
-	var body := "The road is yours." if won else "The dead reached the clan gate. Call them again, or choose a different six."
+	var body := "The dead reached the clan gate. Call them again, or choose a different six."
+	if won:
+		var host := get_parent()
+		if host != null and host.has_method("note_clear"):
+			host.note_clear(level_no)
+		if level_no >= Levels.count():
+			body = "The last road is clear."
+		else:
+			var nxt: Dictionary = Levels.level(level_no + 1)
+			body = "Level %d, %s, is open." % [int(nxt["index"]), str(nxt["name"])]
 	end_layer = _overlay(title, body, [
 		{"text": "Rematch", "color": Color("c44536"), "call": Callable(get_parent(), "rematch")},
 		{"text": "Change the six", "color": Color("e6c36a"), "call": Callable(get_parent(), "change_squad")},
