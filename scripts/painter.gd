@@ -18,7 +18,7 @@ static func _painted(kind: String) -> Dictionary:
 		"shield":
 			return _look(Color("f0c9a0"), Color("1c1814"), Color("c4a574"), "shield", false, "ninja")
 		"saber":
-			return _look(Color("f0c9a0"), Color("1a1216"), Color("c44536"), "nodachi", false, "ninja")
+			return _look(Color("f0c14a"), Color("1e3f8f"), Color("e2b034"), "nodachi", false, "ninja")
 		"lancer":
 			return _look(Color("f0c9a0"), Color("161820"), Color("9aa4d4"), "spear", false, "ninja")
 		"berserker":
@@ -195,6 +195,12 @@ static func paint_local(ci: CanvasItem, look: Dictionary, pose: Dictionary) -> v
 	var snap := 0.0
 	if phase == "act":
 		snap = tip.x - chest.x
+	if cycle == "nodachi":
+		_paint_saber(ci, chest, rear, front, tip, step, ground, phase, snap)
+		if phase == "act" and beat == contact_beat(weapon) and t > 0.35:
+			_arc(ci, front, 18.0 + t * 14.0, -1.2, 1.0, 14, Color(0.89, 0.69, 0.2, (1.0 - t) * 0.75), 3.0)
+		_tilt = 0.0
+		return
 	_back(ci, chest, faction, weapon, cloth, trim, bool(look.get("pack", true)), snap)
 	if not mount:
 		_leg(ci, chest + Vector2(-3.5, 12.0), Vector2(-5.0 - step * 11.0, ground), cloth.darkened(0.34), 3.2)
@@ -212,6 +218,115 @@ static func paint_local(ci: CanvasItem, look: Dictionary, pose: Dictionary) -> v
 		var alpha := (1.0 - t) * 0.8
 		_arc(ci, front, 16.0 + t * 12.0, -1.15, 0.95, 14, Color(trim.r, trim.g, trim.b, alpha), 3.0)
 	_tilt = 0.0
+
+
+static func _paint_saber(ci: CanvasItem, chest: Vector2, rear: Vector2, front: Vector2, tip: Vector2, step: float, ground: float, phase: String, snap: float) -> void:
+	var navy := Color("1e3f8f")
+	var navy_dark := Color("142c68")
+	var gold := Color("e2b034")
+	var red := Color("c73636")
+	var wrap := Color("d2c2a4")
+	var behind := tip.x < chest.x - 4.0
+	if behind:
+		_saber_sword(ci, rear, front, tip)
+	_saber_scarf(ci, chest, snap, red)
+	var back_foot := Vector2(-5.0 - step * 11.0, ground)
+	var front_foot := Vector2(6.0 + step * 12.0, ground)
+	_leg(ci, chest + Vector2(-3.5, 12.0), back_foot, navy_dark, 3.6)
+	_saber_tunic(ci, chest, navy, gold, red)
+	_leg(ci, chest + Vector2(3.0, 12.0), front_foot, navy, 3.8)
+	_line(ci, back_foot + Vector2(-3.0, -2.0), back_foot + Vector2(4.0, -1.0), gold, 2.2)
+	_line(ci, front_foot + Vector2(-2.0, -2.0), front_foot + Vector2(5.0, -1.0), gold, 2.2)
+	_saber_hood(ci, chest + Vector2(1.4, -16.0), navy, navy_dark, gold, phase)
+	_arm(ci, chest + Vector2(-4.0, -1.0), rear, wrap, navy_dark, 3.3)
+	_arm(ci, chest + Vector2(5.0, -4.0), front, wrap, navy, 3.5)
+	if not behind:
+		_saber_sword(ci, rear, front, tip)
+
+
+static func _saber_scarf(ci: CanvasItem, chest: Vector2, snap: float, red: Color) -> void:
+	var neck := chest + Vector2(0.0, -3.0)
+	var end := chest + Vector2(-18.0, 9.0)
+	var flap := end + Vector2(-4.0, 8.0)
+	if snap > 12.0:
+		end = chest + Vector2(12.0 + snap * 0.3, 5.0)
+		flap = end + Vector2(5.0, 8.0)
+	_poly(ci, PackedVector2Array([neck, end, flap]), red)
+	_poly(ci, PackedVector2Array([
+		neck,
+		neck + Vector2(6.0, 3.0),
+		flap,
+	]), red.darkened(0.1))
+
+
+static func _saber_tunic(ci: CanvasItem, chest: Vector2, navy: Color, gold: Color, red: Color) -> void:
+	_poly(ci, PackedVector2Array([
+		chest + Vector2(-7.0, -6.0),
+		chest + Vector2(7.0, -5.0),
+		chest + Vector2(8.0, 8.0),
+		chest + Vector2(3.0, 14.0),
+		chest + Vector2(-5.0, 12.0),
+	]), navy)
+	_line(ci, chest + Vector2(-5.0, 12.0), chest + Vector2(3.0, 14.0), gold, 2.0)
+	_line(ci, chest + Vector2(6.0, -4.0), chest + Vector2(8.0, 8.0), gold, 1.6)
+	_box(ci, Rect2(chest.x - 6.0, chest.y + 6.0, 14.0, 4.5), red)
+	_poly(ci, PackedVector2Array([
+		chest + Vector2(2.0, 10.0),
+		chest + Vector2(5.0, 10.0),
+		chest + Vector2(3.5, 16.0),
+	]), red.darkened(0.08))
+
+
+static func _saber_hood(ci: CanvasItem, at: Vector2, navy: Color, navy_dark: Color, gold: Color, phase: String) -> void:
+	_ellipse(ci, at + Vector2(-3.0, 2.0), 8.4, 9.0, navy_dark)
+	_ellipse(ci, at + Vector2(2.2, 0.4), 7.2, 8.2, navy)
+	_poly(ci, PackedVector2Array([
+		at + Vector2(0.5, -4.0),
+		at + Vector2(3.2, -8.0),
+		at + Vector2(6.0, -3.0),
+	]), navy)
+	_poly(ci, PackedVector2Array([
+		at + Vector2(2.2, -5.2),
+		at + Vector2(3.4, -6.6),
+		at + Vector2(4.6, -5.0),
+		at + Vector2(3.4, -4.2),
+	]), gold)
+	if phase == "hurt" or phase == "fall":
+		_line(ci, at + Vector2(1.4, -1.2), at + Vector2(5.6, -0.2), Color("f4f4f0"), 1.3)
+		return
+	_dot(ci, at + Vector2(3.2, -1.0), 1.35, Color("f0c14a"))
+	_dot(ci, at + Vector2(5.4, -0.7), 1.15, Color("f0c14a"))
+
+
+static func _saber_sword(ci: CanvasItem, rear: Vector2, front: Vector2, tip: Vector2) -> void:
+	var dir := tip - front
+	if dir.length() < 1.0:
+		return
+	var n := dir.normalized()
+	var side := Vector2(-n.y, n.x)
+	var two_hands := front.distance_to(rear) < 16.0
+	var grip := front
+	if two_hands:
+		grip = (front + rear) * 0.5
+		_line(ci, rear - n * 5.0, front + n * 2.0, Color("6b4a32"), 3.4)
+	else:
+		_line(ci, front - n * 7.0, front + n * 2.0, Color("6b4a32"), 3.4)
+	_dot(ci, grip - n * 7.0, 2.6, Color("e2b034"))
+	var guard := front + n * 2.0
+	_poly(ci, PackedVector2Array([
+		guard + side * 8.0,
+		guard + n * 5.5,
+		guard - side * 8.0,
+		guard - n * 4.5,
+	]), Color("e2b034"))
+	var base := guard + n * 4.0
+	_poly(ci, PackedVector2Array([
+		base + side * 4.6,
+		base - side * 4.6,
+		tip,
+	]), Color("9aa3b0"))
+	_line(ci, base + side * 4.2, tip, Color("e8edf2"), 1.2)
+	_line(ci, base, tip - n * 2.0, Color("d24545"), 2.3)
 
 
 static func _is_quiet(cycle: String) -> bool:
@@ -386,11 +501,11 @@ static func _frames(cycle: String) -> Array:
 			]
 		"nodachi":
 			return [
-				_f(-2, -4, 6, -10, 8, -32, 1, 0, 0.1, 0.06),
-				_f(0, 8, 8, 4, 16, 16, 0, 0.4, 0.05, 0.02),
-				_f(-14, -8, -6, -18, -24, -4, -5, 1, -0.5, -0.42),
-				_f(6, 6, 14, 0, 38, 18, 8, 0.3, 1.1, 0.4),
-				_f(0, -2, 6, -8, 10, -26, 1, 0.2, 0.1, 0.08),
+				_f(-9, 0, 6, 2, 16, 26, 2, 0, 0.25, 0.04),
+				_f(2, 8, 8, 4, 6, -36, 0, 0.2, 0.4, 0.02),
+				_f(-2, 0, 4, -6, -16, -34, -1, 0.3, 0.7, -0.16),
+				_f(4, 6, 12, 2, 38, 14, 6, 0.2, 1.0, 0.22),
+				_f(-7, 2, 6, 6, 14, 24, 2, 0.1, 0.25, 0.04),
 			]
 		"shield":
 			return [
