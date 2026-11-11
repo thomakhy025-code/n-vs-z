@@ -1,4 +1,4 @@
-# Samurai vs Zombies
+# N-vs-Z
 
 An original side-view gate battle. Choose six soldiers, hold your clan gate, and break the cursed gate. It is inspired by the march-and-defend battles of Samurai vs Zombies Defense. It is not affiliated with Glu, and it does not use that game's art or code.
 

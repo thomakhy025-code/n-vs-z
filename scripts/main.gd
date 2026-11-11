@@ -117,7 +117,7 @@ func _show_menu() -> void:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 12)
 	panel.add_child(box)
-	var title := UiSkin.label("SAMURAI VS ZOMBIES", 40, Color("1c140e"))
+	var title := UiSkin.label("N-vs-Z", 40, Color("1c140e"))
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(title)
 	var sub := UiSkin.label("Two gates. One road. Choose six.", 18, Color("6b3a32"))

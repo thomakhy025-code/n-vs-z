@@ -12,4 +12,5 @@ export/
 *.exe
 *.pck
 !docs/*.pck
+docs/*.import
 *.zip
