@@ -615,6 +615,27 @@ func note_gate_hit(side: int) -> void:
 	hurt_flash.color = Color(0.75, 0.12, 0.1, 0.32) if side == 0 else Color(0.95, 0.78, 0.35, 0.18)
 
 
+func gate_gust(defender_side: int) -> void:
+	var mid := (player_front + enemy_front) * 0.5
+	var attacker_side := 1 - defender_side
+	for unit in units:
+		if not is_instance_valid(unit) or not unit.alive or int(unit.side) != attacker_side:
+			continue
+		var unit_x: float = unit.position.x
+		var past: bool = unit_x < mid if defender_side == 0 else unit_x > mid
+		if not past:
+			continue
+		if unit.has_method("catch_gust"):
+			unit.catch_gust(mid)
+	if defender_side == 1 and hero != null and is_instance_valid(hero) and hero.alive and hero.position.x > mid:
+		if hero.has_method("shove_back"):
+			hero.shove_back(mid)
+	for road_y in lane_ys:
+		poof(Vector2(mid, float(road_y)), Color("d5e6f2"))
+	Sfx.play("wind", 0.9, -5.0)
+	float_text(Vector2(mid, lane_y(0) - 28.0), "WIND", Color("d5e6f2"))
+
+
 func on_unit_down(unit) -> void:
 	if unit == null or not is_instance_valid(unit) or unit.down_handled:
 		return

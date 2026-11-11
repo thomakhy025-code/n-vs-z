@@ -13,7 +13,7 @@ const HOW_TO := "This is a side-view gate battle. Your clan gate is on the left.
 
 Choose 6 of the 11 soldiers. Value builds by itself. The buttons at the bottom left spend it. Each soldier has a cost and a call time before that soldier can be called again.
 
-There are three roads. Soldiers only march forward on the road where you called them, and they fight only that road. The Berserker stands across all three roads, hits every road at once, and enemies on every road can hit the Berserker. You move the hero onto any road. Drag, or use WASD. Sword and Shoot are the two large buttons at the bottom right. J and K do the same. Number keys 1 through 6 call the six you brought onto the hero's road.
+There are three roads. Soldiers only march forward on the road where you called them, and they fight only that road. The Berserker stands across all three roads, hits every road at once, and enemies on every road can hit the Berserker. The first time a house falls to half blood, a wind helps that side: fighters of the other team who have crossed the middle are blown back to the center and lose a quarter of the blood they still have. You move the hero onto any road. Drag, or use WASD. Sword and Shoot are the two large buttons at the bottom right. J and K do the same. Number keys 1 through 6 call the six you brought onto the hero's road.
 
 If a runner slips past the line, you are the one who runs back. If your gate breaks, you lose. Break the cursed gate to win.
 

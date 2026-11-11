@@ -45,6 +45,10 @@ var bot: bool = false
 var bot_axis: Vector2 = Vector2.ZERO
 var bot_sword: bool = false
 var bot_shoot: bool = false
+var winding: bool = false
+var strike_sent: bool = false
+var act_tool: String = "katana"
+var pending_kind: String = ""
 const RESPAWN: float = 6.0
 
 
@@ -117,6 +121,8 @@ func _process(delta: float) -> void:
 	flash = maxf(0.0, flash - delta)
 	lunge = maxf(0.0, lunge - delta * 3.4)
 	act = maxf(0.0, act - delta / 0.92)
+	if act <= 0.0:
+		winding = false
 	hurt = maxf(0.0, hurt - delta / 0.34)
 	slash = maxf(0.0, slash - delta)
 	muzzle = maxf(0.0, muzzle - delta)
@@ -164,6 +170,7 @@ func _move(delta: float) -> void:
 func _combat(delta: float) -> void:
 	sword_cd -= delta
 	shoot_cd -= delta
+	_land_hero()
 	var foe = _nearest(maxf(sword_reach(), shoot_reach))
 	if foe != null:
 		facing = -1.0 if foe.position.x < position.x else 1.0
@@ -171,10 +178,32 @@ func _combat(delta: float) -> void:
 		facing = 1.0
 	var want_sword := pointer_sword or bot_sword or (not bot and Input.is_action_pressed("sword"))
 	var want_shoot := pointer_shoot or bot_shoot or (not bot and Input.is_action_pressed("shoot"))
+	if winding:
+		return
 	if want_sword and sword_cd <= 0.0:
 		sword_cd = sword_interval
-		lunge = 1.0
 		act = 1.0
+		winding = true
+		strike_sent = false
+		act_tool = "katana"
+		pending_kind = "sword"
+	elif want_shoot and shoot_cd <= 0.0:
+		shoot_cd = shoot_interval
+		act = 1.0
+		winding = true
+		strike_sent = false
+		act_tool = "bow"
+		pending_kind = "shoot"
+
+
+func _land_hero() -> void:
+	if not winding or strike_sent:
+		return
+	if _act_beat() < Painter.contact_beat(act_tool):
+		return
+	strike_sent = true
+	lunge = 1.0
+	if pending_kind == "sword":
 		slash = 0.28
 		Sfx.play(Painter.hit_id("katana"), randf_range(0.97, 1.05), -4.0)
 		var melee = _nearest(sword_reach())
@@ -182,11 +211,8 @@ func _combat(delta: float) -> void:
 			melee.take_damage(sword_damage * damage_multiplier, true)
 		elif _gate_in(sword_reach()):
 			battle.damage_gate(1, sword_damage * damage_multiplier)
-	if want_shoot and shoot_cd <= 0.0:
-		shoot_cd = shoot_interval
+	else:
 		muzzle = 0.2
-		if act <= 0.0:
-			act = 0.72
 		Sfx.play(Painter.hit_id("bow"), 1.04, -4.0)
 		var road := lane
 		var road_y: float = battle.lane_y(road) - 10.0
@@ -197,6 +223,19 @@ func _combat(delta: float) -> void:
 		elif _gate_in(shoot_reach):
 			aim_x = battle.enemy_front
 		battle.fire_arrow(Vector2(position.x, road_y), Vector2(aim_x, road_y), shoot_damage * damage_multiplier, 0, Color("fff6c8"), shoot_reach, road, true, _gate_in(shoot_reach), false)
+
+
+func _act_beat() -> int:
+	var u := 1.0 - clampf(act, 0.0, 1.0)
+	return mini(3, int(u * 4.0))
+
+
+func shove_back(at_x: float) -> void:
+	position.x = at_x
+	hurt = 1.0
+	act = 0.0
+	winding = false
+	strike_sent = true
 
 
 func sword_reach() -> float:
@@ -235,28 +274,24 @@ func _revive() -> void:
 func _pose() -> Dictionary:
 	var phase := "idle"
 	var t := 0.0
+	var beat := 0
 	if not alive:
 		phase = "fall"
 		t = clampf(1.0 - down_timer / RESPAWN, 0.0, 1.0)
 	elif act > 0.0:
+		phase = "act"
 		var u := 1.0 - clampf(act, 0.0, 1.0)
-		if u < 0.22:
-			phase = "windup"
-			t = u / 0.22
-		elif u < 0.5:
-			phase = "strike"
-			t = (u - 0.22) / 0.28
-		else:
-			phase = "recover"
-			t = (u - 0.5) / 0.5
+		beat = mini(3, int(u * 4.0))
+		t = clampf(u * 4.0 - float(beat), 0.0, 1.0)
 	elif hurt > 0.0:
 		phase = "hurt"
 		t = 1.0 - clampf(hurt, 0.0, 1.0)
-	elif muzzle > 0.0:
-		phase = "cast"
 	elif stepping:
 		phase = "march"
-	return {"phase": phase, "t": t, "clock": bob_time, "flash": flash}
+	var pose := {"phase": phase, "t": t, "clock": bob_time, "flash": flash, "beat": beat}
+	if act_tool == "bow" and winding:
+		pose["tool"] = "bow"
+	return pose
 
 
 func _draw() -> void:

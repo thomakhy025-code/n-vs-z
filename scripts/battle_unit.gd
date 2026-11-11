@@ -35,6 +35,12 @@ var attack_reach: float = 70.0
 var lane: int = 1
 var strike_to: Vector2 = Vector2.ZERO
 var show_strike: bool = false
+var gust_lock: float = 0.0
+var winding: bool = false
+var strike_sent: bool = false
+var support_pulse: bool = false
+var pending_foe = null
+var pending_gate = null
 
 
 func setup(field, entry: Dictionary, which_side: int) -> void:
@@ -98,9 +104,22 @@ func _report_down() -> void:
 func _process(delta: float) -> void:
 	flash = maxf(0.0, flash - delta)
 	lunge = maxf(0.0, lunge - delta * 3.2)
-	act = maxf(0.0, act - delta / 0.92)
+	var cycle := Painter.cycle_time(str(data.get("paint", "")))
+	act = maxf(0.0, act - delta / cycle)
 	debut = maxf(0.0, debut - delta)
 	hurt = maxf(0.0, hurt - delta / 0.34)
+	gust_lock = maxf(0.0, gust_lock - delta)
+	if gust_lock > 0.0:
+		winding = false
+		act = 0.0
+		hurt = maxf(hurt, 0.45)
+	elif winding and not strike_sent:
+		var weapon := str(look.get("weapon", "katana"))
+		if _act_beat() >= Painter.contact_beat(weapon):
+			strike_sent = true
+			_resolve_strike()
+	if act <= 0.0:
+		winding = false
 	if lunge <= 0.0:
 		show_strike = false
 	if not alive:
@@ -115,7 +134,9 @@ func _process(delta: float) -> void:
 		return
 	attack_timer -= delta
 	bob_time += delta
-	if role == "heal" or role == "buff":
+	if gust_lock > 0.0:
+		moving = false
+	elif role == "heal" or role == "buff":
 		_support(delta)
 	else:
 		_fight(delta)
@@ -151,18 +172,21 @@ func _fight(delta: float) -> void:
 func _support(delta: float) -> void:
 	var target = _support_target()
 	support_target = target
-	if role == "heal" and target != null:
-		var gain := 40.0 * delta
-		var before: float = target.hp
-		target.hp = minf(target.max_hp, target.hp + gain)
-		heal_flash -= delta
-		if target.hp > before and heal_flash <= 0.0:
-			heal_flash = 0.55
-			act = 1.0
-			battle.float_text(target.position + Vector2(0, -46), "+%d" % int(round(40.0 * 0.55)), Color("8ee0a2"))
-			Sfx.play("heal", randf_range(0.96, 1.05), -8.0)
+	if role == "heal" and target != null and attack_timer <= 0.0 and not winding:
+		attack_timer = float(data["interval"])
+		act = 1.0
+		winding = true
+		strike_sent = false
+		support_pulse = true
+		pending_foe = target
 	elif role == "buff":
 		battle.set_buff_link(self, target)
+		if target != null and attack_timer <= 0.0 and not winding:
+			attack_timer = float(data["interval"])
+			act = 1.0
+			winding = true
+			strike_sent = false
+			support_pulse = false
 	var foe = _nearest_foe()
 	var blocked := foe != null and _along(foe) <= float(data["engage"])
 	if target != null or blocked or not _any_ally_ahead():
@@ -198,50 +222,97 @@ func _try_blink() -> void:
 
 
 func _try_strike(foe, gate) -> void:
-	if attack_timer > 0.0:
+	if attack_timer > 0.0 or winding or gust_lock > 0.0:
 		return
 	attack_timer = float(data["interval"])
-	lunge = 1.0
 	act = 1.0
+	winding = true
+	strike_sent = false
+	support_pulse = false
+	pending_foe = foe
+	pending_gate = gate
+
+
+func _act_beat() -> int:
+	var u := 1.0 - clampf(act, 0.0, 1.0)
+	return mini(3, int(u * 4.0))
+
+
+func _resolve_strike() -> void:
+	if support_pulse:
+		support_pulse = false
+		var ally = pending_foe
+		if ally != null and is_instance_valid(ally) and ally.alive:
+			ally.hp = minf(ally.max_hp, ally.hp + 40.0)
+			heal_flash = 0.55
+			battle.float_text(ally.position + Vector2(0, -46), "+40", Color("8ee0a2"))
+			Sfx.play("heal", randf_range(0.96, 1.05), -8.0)
+		return
+	if role == "buff":
+		return
+	lunge = 1.0
 	var amount := float(data["damage"]) * damage_multiplier
+	var foe = pending_foe
+	var gate = pending_gate
+	if foe != null and (not is_instance_valid(foe) or not foe.alive):
+		foe = null
 	if role != "suicide":
 		var swing := Painter.hit_id(str(look.get("weapon", "katana")))
 		Sfx.play(swing, randf_range(0.94, 1.06), -7.0)
+	var reach := float(data["reach"])
+	var siege := minf(reach, 150.0)
 	if role == "ranged":
-		var cross := foe != null and int(foe.lane) != lane
-		var aim_x: float = gate.front_x if foe == null else float(foe.position.x)
-		var aim_y := position.y
-		if cross:
-			aim_y = float(foe.position.y)
-		var tint: Color = Color("b6e36a") if side == 1 else Color("f2d38a")
-		battle.fire_arrow(position + Vector2(0, -16), Vector2(aim_x, aim_y - 16.0), amount, side, tint, float(data["reach"]) + 40.0, lane, false, true, cross)
+		if foe != null and _along(foe) <= reach + 8.0:
+			var cross := int(foe.lane) != lane
+			var aim_y := position.y
+			if cross:
+				aim_y = float(foe.position.y)
+			var tint: Color = Color("b6e36a") if side == 1 else Color("f2d38a")
+			battle.fire_arrow(position + Vector2(0, -16), Vector2(float(foe.position.x), aim_y - 16.0), amount, side, tint, reach + 40.0, lane, false, true, cross)
+		elif foe == null and gate != null and abs(position.x - gate.front_x) <= siege + 6.0:
+			var tint_gate: Color = Color("b6e36a") if side == 1 else Color("f2d38a")
+			battle.fire_arrow(position + Vector2(0, -16), Vector2(gate.front_x, position.y - 16.0), amount, side, tint_gate, reach + 40.0, lane, false, true, false)
 		return
 	if _is_berserker():
 		for other in battle.hostile_targets(side):
-			if abs(other.position.x - position.x) <= float(data["reach"]):
+			if abs(other.position.x - position.x) <= reach:
 				other.take_damage(amount, true)
-		if gate != null and abs(position.x - gate.front_x) <= float(data["reach"]) + 8.0:
+		if gate != null and abs(position.x - gate.front_x) <= reach + 8.0:
 			gate.take_damage(amount)
 		return
 	if role == "aoe" or role == "suicide":
 		for other in battle.hostile_targets(side):
 			if int(other.lane) != lane:
 				continue
-			if abs(other.position.x - position.x) <= float(data["reach"]):
+			if abs(other.position.x - position.x) <= reach:
 				other.take_damage(amount, true)
-		if gate != null and abs(position.x - gate.front_x) <= float(data["reach"]) + 8.0:
+		if gate != null and abs(position.x - gate.front_x) <= reach + 8.0:
 			gate.take_damage(amount)
 		if role == "suicide":
 			Sfx.play("explode", randf_range(0.92, 1.05), -3.0)
 			take_damage(float(data.get("self_damage", 40)), true)
 		return
-	if foe != null:
+	if foe != null and _along(foe) <= reach + 8.0:
 		if int(foe.lane) != lane:
 			strike_to = foe.position
 			show_strike = true
 		foe.take_damage(amount, true)
-	elif gate != null:
+	elif gate != null and abs(position.x - gate.front_x) <= siege + 6.0:
 		gate.take_damage(amount)
+
+
+func catch_gust(at_x: float) -> void:
+	position.x = at_x
+	hurt = 1.0
+	gust_lock = 0.6
+	act = 0.0
+	winding = false
+	strike_sent = true
+	var left := maxf(1.0, hp * 0.75)
+	var lost := hp - left
+	hp = left
+	if lost >= 1.0:
+		battle.float_text(position + Vector2(0, -48), str(int(round(lost))), Color("9fd4ff"))
 
 
 func _nearest_foe():
@@ -333,6 +404,7 @@ func _clamp_x() -> void:
 func _pose() -> Dictionary:
 	var phase := "idle"
 	var t := 0.0
+	var beat := 0
 	if not alive:
 		phase = "fall"
 		t = clampf(fall_t / 0.6, 0.0, 1.0)
@@ -340,24 +412,16 @@ func _pose() -> Dictionary:
 		phase = "debut"
 		t = 1.0 - clampf(debut / 0.46, 0.0, 1.0)
 	elif act > 0.0:
+		phase = "act"
 		var u := 1.0 - clampf(act, 0.0, 1.0)
-		if u < 0.22:
-			phase = "windup"
-			t = u / 0.22
-		elif u < 0.5:
-			phase = "strike"
-			t = (u - 0.22) / 0.28
-		else:
-			phase = "recover"
-			t = (u - 0.5) / 0.5
+		beat = mini(3, int(u * 4.0))
+		t = clampf(u * 4.0 - float(beat), 0.0, 1.0)
 	elif hurt > 0.0:
 		phase = "hurt"
 		t = 1.0 - clampf(hurt, 0.0, 1.0)
-	elif (role == "heal" or role == "buff") and not moving:
-		phase = "cast"
 	elif moving:
 		phase = "march"
-	return {"phase": phase, "t": t, "clock": bob_time, "flash": flash}
+	return {"phase": phase, "t": t, "clock": bob_time, "flash": flash, "beat": beat}
 
 
 func _road_span() -> float:

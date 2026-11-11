@@ -6,6 +6,7 @@ var max_hp: float = 1000.0
 var front_x: float = 0.0
 var battle = null
 var flicker: float = 0.0
+var gusted: bool = false
 
 
 func setup(field, which_side: int, where: Vector2, front: float) -> void:
@@ -27,6 +28,9 @@ func take_damage(amount: float, _quiet: bool = false) -> void:
 		text_y = float(battle.lane_ys[0]) - 36.0
 	battle.float_text(Vector2(front_x, text_y), str(int(round(amount))), Color("ff8d7a"))
 	battle.note_gate_hit(side)
+	if not gusted and hp <= max_hp * 0.5 and hp > 0.0:
+		gusted = true
+		battle.gate_gust(side)
 	Sfx.play("castle", randf_range(0.92, 1.05), -6.0)
 	queue_redraw()
 	if hp <= 0.0:

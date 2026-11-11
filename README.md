@@ -40,4 +40,4 @@ There are 11 soldiers. Each battle uses 6.
 | Healing Caster | 20 | 10s | 50 | Heals the most wounded ally in front for 40 blood each second |
 | Leveling Caster | 20 | 10s | 50 | Gives the highest-damage ally in front +20% damage and +20% blood |
 
-Soldiers shoot enemies at their own range. A gate is only hurt by someone who has walked up to it, so bows do not burn it from the back of the road.
+Soldiers shoot enemies at their own range. A gate is only hurt by someone who has walked up to it, so bows do not burn it from the back of the road. The first time either house falls to half blood, a wind helps that side and blows the other team's fighters who have crossed the middle back to the center.
