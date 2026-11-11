@@ -486,7 +486,6 @@ func summon_player(id: String) -> void:
 	player_value -= float(entry["cost"])
 	player_cd[id] = float(entry["cooldown"])
 	_spawn(entry, 0)
-	Sfx.play("spawn", randf_range(0.96, 1.06), -4.0)
 
 
 func _spawn(entry: Dictionary, side: int) -> void:
@@ -507,6 +506,8 @@ func _spawn(entry: Dictionary, side: int) -> void:
 	units.append(unit)
 	if side == 0:
 		spawned_player += 1
+	var paint := str(entry.get("paint", "sword"))
+	Sfx.play(Painter.call_id(paint), Painter.call_pitch(paint) * randf_range(0.97, 1.04), -5.0 if side == 0 else -9.0)
 	poof(unit.position, Color("f3e6c8") if side == 0 else Color("c6e38a"))
 
 

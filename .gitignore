@@ -8,6 +8,10 @@ menu_shot.png
 menu_shot.png.import
 battle_shot.png
 battle_shot.png.import
+pose_0.png
+pose_0.png.import
+pose_1.png
+pose_1.png.import
 export/
 *.exe
 *.pck

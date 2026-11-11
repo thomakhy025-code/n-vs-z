@@ -6,7 +6,7 @@ var _index: int = 0
 
 
 func _ready() -> void:
-	for _i in 14:
+	for _i in 20:
 		var player := AudioStreamPlayer.new()
 		player.volume_db = -2.0
 		add_child(player)

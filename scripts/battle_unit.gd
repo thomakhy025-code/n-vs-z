@@ -18,6 +18,10 @@ var down_handled: bool = false
 var attack_timer: float = 0.25
 var flash: float = 0.0
 var lunge: float = 0.0
+var act: float = 0.0
+var debut: float = 0.46
+var hurt: float = 0.0
+var fall_t: float = 0.0
 var bob_time: float = 0.0
 var moving: bool = false
 var support_target = null
@@ -67,7 +71,8 @@ func take_damage(amount: float, quiet: bool = false) -> void:
 	if not alive:
 		return
 	hp -= amount
-	flash = 0.12
+	flash = 0.16
+	hurt = 1.0
 	lunge = maxf(lunge, 0.2)
 	battle.register_damage()
 	battle.float_text(position + Vector2(0, -48), str(int(round(amount))), Color("ffd27a"))
@@ -90,11 +95,14 @@ func _report_down() -> void:
 func _process(delta: float) -> void:
 	flash = maxf(0.0, flash - delta)
 	lunge = maxf(0.0, lunge - delta * 3.2)
+	act = maxf(0.0, act - delta / 0.92)
+	debut = maxf(0.0, debut - delta)
+	hurt = maxf(0.0, hurt - delta / 0.34)
 	if lunge <= 0.0:
 		show_strike = false
 	if not alive:
-		modulate.a = maxf(0.0, modulate.a - delta * 2.4)
-		position.y -= delta * 16.0
+		fall_t += delta
+		modulate.a = maxf(0.0, 1.0 - fall_t * 1.65)
 		queue_redraw()
 		if modulate.a <= 0.0:
 			queue_free()
@@ -144,6 +152,7 @@ func _support(delta: float) -> void:
 		heal_flash -= delta
 		if target.hp > before and heal_flash <= 0.0:
 			heal_flash = 0.55
+			act = 1.0
 			battle.float_text(target.position + Vector2(0, -46), "+%d" % int(round(40.0 * 0.55)), Color("8ee0a2"))
 			Sfx.play("heal", randf_range(0.96, 1.05), -8.0)
 	elif role == "buff":
@@ -187,7 +196,11 @@ func _try_strike(foe, gate) -> void:
 		return
 	attack_timer = float(data["interval"])
 	lunge = 1.0
+	act = 1.0
 	var amount := float(data["damage"]) * damage_multiplier
+	if role != "suicide":
+		var swing := Painter.hit_id(str(look.get("weapon", "katana")))
+		Sfx.play(swing, randf_range(0.94, 1.06), -7.0)
 	if role == "ranged":
 		var cross := foe != null and int(foe.lane) != lane
 		var aim_x: float = gate.front_x if foe == null else float(foe.position.x)
@@ -196,9 +209,7 @@ func _try_strike(foe, gate) -> void:
 			aim_y = float(foe.position.y)
 		var tint: Color = Color("b6e36a") if side == 1 else Color("f2d38a")
 		battle.fire_arrow(position + Vector2(0, -16), Vector2(aim_x, aim_y - 16.0), amount, side, tint, float(data["reach"]) + 40.0, lane, false, true, cross)
-		Sfx.play("arrow", randf_range(0.94, 1.06), -6.0)
 		return
-	Sfx.play("hit", randf_range(0.9, 1.05), -8.0)
 	if _is_berserker():
 		for other in battle.hostile_targets(side):
 			if abs(other.position.x - position.x) <= float(data["reach"]):
@@ -313,14 +324,47 @@ func _clamp_x() -> void:
 		position.x = clampf(position.x, battle.player_front, battle.enemy_front + 8.0)
 
 
+func _pose() -> Dictionary:
+	var phase := "idle"
+	var t := 0.0
+	if not alive:
+		phase = "fall"
+		t = clampf(fall_t / 0.6, 0.0, 1.0)
+	elif debut > 0.0 and act <= 0.0:
+		phase = "debut"
+		t = 1.0 - clampf(debut / 0.46, 0.0, 1.0)
+	elif act > 0.0:
+		var u := 1.0 - clampf(act, 0.0, 1.0)
+		if u < 0.22:
+			phase = "windup"
+			t = u / 0.22
+		elif u < 0.5:
+			phase = "strike"
+			t = (u - 0.22) / 0.28
+		else:
+			phase = "recover"
+			t = (u - 0.5) / 0.5
+	elif hurt > 0.0:
+		phase = "hurt"
+		t = 1.0 - clampf(hurt, 0.0, 1.0)
+	elif (role == "heal" or role == "buff") and not moving:
+		phase = "cast"
+	elif moving:
+		phase = "march"
+	return {"phase": phase, "t": t, "clock": bob_time, "flash": flash}
+
+
 func _draw() -> void:
 	var sc: float = float(data.get("scale", 1.2))
 	var bob := 0.0
-	if moving and alive:
-		bob = sin(bob_time * 10.0) * 2.0
+	if moving and alive and debut <= 0.0:
+		bob = sin(bob_time * 8.0) * 1.5
 	draw_set_transform(Vector2(0, bob), 0, Vector2(facing * sc, sc))
-	Painter.paint_local(self, look, lunge > 0.35, flash)
+	Painter.paint_local(self, look, _pose())
 	draw_set_transform(Vector2.ZERO, 0, Vector2.ONE)
+	if debut > 0.0 and alive:
+		var ring := clampf(debut / 0.46, 0.0, 1.0)
+		draw_arc(Vector2(0, 10), 16.0 + (1.0 - ring) * 14.0, 0, TAU, 24, Color(1, 0.9, 0.62, ring), 2.2)
 	if not alive:
 		return
 	var ratio := clampf(hp / maxf(1.0, max_hp), 0.0, 1.0)

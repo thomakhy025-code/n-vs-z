@@ -27,10 +27,13 @@ var dragging: bool = false
 var target: Vector2 = Vector2.ZERO
 var flash: float = 0.0
 var lunge: float = 0.0
+var act: float = 0.0
+var hurt: float = 0.0
 var slash: float = 0.0
 var muzzle: float = 0.0
 var lane: int = 1
 var bob_time: float = 0.0
+var stepping: bool = false
 var down_timer: float = 0.0
 var invuln: float = 0.0
 var look: Dictionary = {}
@@ -88,7 +91,8 @@ func take_damage(amount: float, quiet: bool = false) -> void:
 	if not alive or invuln > 0.0:
 		return
 	hp -= amount
-	flash = 0.12
+	flash = 0.16
+	hurt = 1.0
 	battle.register_damage()
 	battle.float_text(position + Vector2(0, -58), str(int(round(amount))), Color("ffd27a"))
 	if not quiet:
@@ -112,6 +116,8 @@ func _go_down() -> void:
 func _process(delta: float) -> void:
 	flash = maxf(0.0, flash - delta)
 	lunge = maxf(0.0, lunge - delta * 3.4)
+	act = maxf(0.0, act - delta / 0.92)
+	hurt = maxf(0.0, hurt - delta / 0.34)
 	slash = maxf(0.0, slash - delta)
 	muzzle = maxf(0.0, muzzle - delta)
 	invuln = maxf(0.0, invuln - delta)
@@ -152,6 +158,7 @@ func _move(delta: float) -> void:
 	position.x = clampf(position.x, min_x, max_x)
 	position.y = clampf(position.y, min_y, max_y)
 	lane = battle.lane_index(position.y)
+	stepping = dragging or axis.length() > 0.15
 
 
 func _combat(delta: float) -> void:
@@ -167,8 +174,9 @@ func _combat(delta: float) -> void:
 	if want_sword and sword_cd <= 0.0:
 		sword_cd = sword_interval
 		lunge = 1.0
+		act = 1.0
 		slash = 0.28
-		Sfx.play("sword", randf_range(0.96, 1.06), -4.0)
+		Sfx.play(Painter.hit_id("katana"), randf_range(0.97, 1.05), -4.0)
 		var melee = _nearest(sword_reach())
 		if melee != null:
 			melee.take_damage(sword_damage * damage_multiplier, true)
@@ -177,7 +185,9 @@ func _combat(delta: float) -> void:
 	if want_shoot and shoot_cd <= 0.0:
 		shoot_cd = shoot_interval
 		muzzle = 0.2
-		Sfx.play("arrow", 1.08, -4.0)
+		if act <= 0.0:
+			act = 0.72
+		Sfx.play(Painter.hit_id("bow"), 1.04, -4.0)
 		var road := lane
 		var road_y: float = battle.lane_y(road) - 10.0
 		var ranged = _nearest(shoot_reach)
@@ -222,10 +232,39 @@ func _revive() -> void:
 	battle.float_text(position + Vector2(-16, -40), "RETURN", Color("f3e6c8"))
 
 
+func _pose() -> Dictionary:
+	var phase := "idle"
+	var t := 0.0
+	if not alive:
+		phase = "fall"
+		t = clampf(1.0 - down_timer / RESPAWN, 0.0, 1.0)
+	elif act > 0.0:
+		var u := 1.0 - clampf(act, 0.0, 1.0)
+		if u < 0.22:
+			phase = "windup"
+			t = u / 0.22
+		elif u < 0.5:
+			phase = "strike"
+			t = (u - 0.22) / 0.28
+		else:
+			phase = "recover"
+			t = (u - 0.5) / 0.5
+	elif hurt > 0.0:
+		phase = "hurt"
+		t = 1.0 - clampf(hurt, 0.0, 1.0)
+	elif muzzle > 0.0:
+		phase = "cast"
+	elif stepping:
+		phase = "march"
+	return {"phase": phase, "t": t, "clock": bob_time, "flash": flash}
+
+
 func _draw() -> void:
-	var bob := sin(bob_time * 10.0) * 2.0
+	var bob := 0.0
+	if stepping:
+		bob = sin(bob_time * 8.0) * 1.5
 	draw_set_transform(Vector2(0, bob), 0, Vector2(facing * 1.42, 1.42))
-	Painter.paint_local(self, look, slash > 0.0, flash)
+	Painter.paint_local(self, look, _pose())
 	draw_set_transform(Vector2.ZERO, 0, Vector2.ONE)
 	if slash > 0.0:
 		_draw_slash()
