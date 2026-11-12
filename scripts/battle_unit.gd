@@ -42,6 +42,7 @@ var support_pulse: bool = false
 var pending_foe = null
 var pending_gate = null
 var boss_marks: Array[Vector2] = []
+var net_id: int = 0
 
 
 func setup(field, entry: Dictionary, which_side: int) -> void:
@@ -111,6 +112,16 @@ func _process(delta: float) -> void:
 	act = maxf(0.0, act - delta / cycle)
 	debut = maxf(0.0, debut - delta)
 	hurt = maxf(0.0, hurt - delta / 0.34)
+	if battle != null and battle.puppet:
+		if not alive:
+			fall_t += delta
+			modulate.a = maxf(0.0, 1.0 - fall_t * 1.65)
+			queue_redraw()
+			if modulate.a <= 0.0:
+				queue_free()
+			return
+		queue_redraw()
+		return
 	gust_lock = maxf(0.0, gust_lock - delta)
 	if gust_lock > 0.0:
 		winding = false

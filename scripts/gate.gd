@@ -7,6 +7,7 @@ var front_x: float = 0.0
 var battle = null
 var flicker: float = 0.0
 var gusted: bool = false
+var clan_gate: bool = false
 
 
 func setup(field, which_side: int, where: Vector2, front: float) -> void:
@@ -48,7 +49,7 @@ func _process(delta: float) -> void:
 func _draw() -> void:
 	var ratio := clampf(hp / max_hp, 0.0, 1.0)
 	var span := _span()
-	if side == 0:
+	if side == 0 or clan_gate:
 		_player_gate(ratio, span)
 	else:
 		_enemy_gate(ratio, span)
@@ -58,7 +59,7 @@ func _draw() -> void:
 	draw_rect(Rect2(-34, bar_y, 68.0 * ratio, 8), fill)
 	var font: Font = ThemeDB.fallback_font
 	if font != null:
-		var title := "CLAN" if side == 0 else "CURSE"
+		var title := "CLAN" if side == 0 or clan_gate else "CURSE"
 		draw_string(font, Vector2(-22, bar_y - 6.0), title, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color("f3e6c8"))
 
 

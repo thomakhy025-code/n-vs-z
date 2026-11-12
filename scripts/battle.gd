@@ -81,6 +81,20 @@ var sword_hold: bool = false
 var shoot_hold: bool = false
 var purse_paid: Dictionary = {}
 var boss_up: bool = false
+var duel: bool = false
+var puppet: bool = false
+var local_side: int = 0
+var foe_loadout: Array = []
+var foe = null
+var controlled = null
+var duel_probe: bool = false
+var next_net: int = 1
+var net_acc: float = 0.0
+var skin_left: Dictionary = {}
+var skin_right: Dictionary = {}
+var sent_keys: Array = []
+var hand_seen: float = -1.0
+var fallen_side: int = -1
 
 
 func start(chosen: Array, run_mode: String, level_index: int = 1) -> void:
@@ -113,6 +127,49 @@ func start(chosen: Array, run_mode: String, level_index: int = 1) -> void:
 		hero.bot = true
 
 
+func begin_duel(local_ids: Array, other_ids: Array, side: int, runs_world: bool, skins: Dictionary) -> void:
+	duel = true
+	puppet = not runs_world
+	local_side = side
+	foe_loadout = other_ids.duplicate()
+	var left_raw: Variant = skins.get("left", {})
+	var right_raw: Variant = skins.get("right", {})
+	skin_left = left_raw if left_raw is Dictionary else {}
+	skin_right = right_raw if right_raw is Dictionary else {}
+	start(local_ids, "duel", 1)
+	enemy_value = PLAYER_START
+	enemy_income = PLAYER_INCOME
+	enemy_cd.clear()
+	for entry in player_roster:
+		enemy_cd[str(entry["id"])] = 0.0
+	if enemy_gate != null:
+		enemy_gate.clan_gate = true
+		enemy_gate.queue_redraw()
+	foe = HeroScript.new()
+	foe.side = 1
+	foe.setup(self)
+	add_child(foe)
+	foe.set_bounds(player_front - 40.0, enemy_front - 12.0, lane_y(0), lane_y(lane_ys.size() - 1))
+	foe.net_pos = foe.position
+	hero.look = _worn_look(0, "hero")
+	foe.look = _worn_look(1, "hero")
+	hero.driven = local_side != 0
+	foe.driven = local_side == 0 and not duel_probe
+	controlled = foe if local_side == 1 else hero
+	if level_label != null:
+		level_label.text = "1 vs 1"
+	if hint != null:
+		hint.text = "Both sides are the clan. Drag your hero, or use WASD. Sword, Shoot, and keys 1-6 call the six you chose. The other ninja has the same value and the same calls."
+	_bind_duel_signals()
+	if duel_probe:
+		Engine.time_scale = 8.0
+		summon_player("sword")
+		summon_foe("sword")
+		foe.bot = true
+		foe.bot_sword = true
+		foe.bot_axis = Vector2(-1, 0)
+
+
 func _build_world() -> void:
 	var scenery = SceneryScript.new()
 	add_child(scenery)
@@ -140,6 +197,7 @@ func _build_world() -> void:
 	hero.setup(self)
 	add_child(hero)
 	hero.set_bounds(player_front - 40.0, enemy_front - 12.0, lane_y(0), lane_y(lane_ys.size() - 1))
+	controlled = hero
 
 
 func _build_hud() -> void:
@@ -311,31 +369,46 @@ func _layout_hud() -> void:
 func _process(delta: float) -> void:
 	texts_this_frame = 0
 	battle_time += delta
+	if puppet:
+		_send_hand()
+		_update_hud(delta)
+		_run_harness()
+		return
 	if not finished and not paused:
 		for id in player_cd.keys():
 			player_cd[id] = maxf(0.0, float(player_cd[id]) - delta)
 		for id in enemy_cd.keys():
 			enemy_cd[id] = maxf(0.0, float(enemy_cd[id]) - delta)
 		player_value += PLAYER_INCOME * delta
-		if battle_time < _rule_f("warmup", 0.0):
+		if duel:
+			enemy_value += PLAYER_INCOME * delta
+			if hand_seen >= 0.0 and battle_time - hand_seen > 0.45 and foe != null:
+				foe.pointer_sword = false
+				foe.pointer_shoot = false
+			if duel_probe and foe != null and foe.alive:
+				foe.bot_axis = Vector2(-1, 0)
+				foe.bot_sword = true
+		elif battle_time < _rule_f("warmup", 0.0):
 			lull = 0.0
 			wave_left = 0
 		else:
 			enemy_income += _rule_f("growth", ENEMY_GROWTH) * delta
 			enemy_value += enemy_income * delta
 			_enemy_ai(delta)
-		if mode != "":
+		if mode != "" and mode != "duel":
 			_autoplay(delta)
 			_drive_hero()
-		if hero != null:
+		if hero != null and (not duel or local_side == 0):
 			hero.pointer_sword = sword_hold
 			hero.pointer_shoot = shoot_hold
-		for i in slot_hold.size():
-			if slot_hold[i]:
-				summon_player(str(loadout[i]))
-		for i in loadout.size():
-			if Input.is_action_pressed("slot%d" % (i + 1)):
-				summon_player(str(loadout[i]))
+		if not duel or local_side == 0:
+			for i in slot_hold.size():
+				if slot_hold[i]:
+					summon_player(str(loadout[i]))
+			for i in loadout.size():
+				if Input.is_action_pressed("slot%d" % (i + 1)):
+					summon_player(str(loadout[i]))
+	_send_state(delta)
 	_update_hud(delta)
 	_run_harness()
 
@@ -504,6 +577,21 @@ func summon_player(id: String) -> void:
 	_spawn(entry, 0)
 
 
+func summon_foe(id: String) -> void:
+	if finished or paused or not duel:
+		return
+	if not foe_loadout.has(id):
+		return
+	var entry := Catalog.find_in(player_roster, id)
+	if entry.is_empty():
+		return
+	if float(enemy_cd.get(id, 0.0)) > 0.0 or enemy_value < float(entry["cost"]) or _count(1) >= MAX_SIDE:
+		return
+	enemy_value -= float(entry["cost"])
+	enemy_cd[id] = float(entry["cooldown"])
+	_spawn(entry, 1)
+
+
 func _spawn(entry: Dictionary, side: int) -> void:
 	var unit = UnitScript.new()
 	unit.setup(self, entry, side)
@@ -512,8 +600,11 @@ func _spawn(entry: Dictionary, side: int) -> void:
 		if hero != null and is_instance_valid(hero) and hero.alive:
 			road = hero.lane
 	else:
-		road = lane_tick % maxi(lane_ys.size(), 1)
-		lane_tick += 1
+		if duel and foe != null and is_instance_valid(foe) and foe.alive:
+			road = foe.lane
+		else:
+			road = lane_tick % maxi(lane_ys.size(), 1)
+			lane_tick += 1
 	road = clampi(road, 0, maxi(lane_ys.size() - 1, 0))
 	var kind: String = str(entry.get("id", ""))
 	if kind == "berserker" or kind == "boss":
@@ -521,6 +612,10 @@ func _spawn(entry: Dictionary, side: int) -> void:
 	unit.lane = road
 	var y := lane_y(road)
 	unit.position = Vector2(player_front + 20.0, y) if side == 0 else Vector2(enemy_front - 20.0, y)
+	unit.net_id = next_net
+	next_net += 1
+	if duel:
+		unit.look = _worn_look(side, str(entry.get("paint", "sword")))
 	world.add_child(unit)
 	units.append(unit)
 	if side == 0:
@@ -544,8 +639,9 @@ func hostile_targets(attacker_side: int) -> Array:
 	for unit in units:
 		if is_instance_valid(unit) and unit.alive and unit.side == defend:
 			out.append(unit)
-	if defend == 0 and hero != null and is_instance_valid(hero) and hero.alive:
-		out.append(hero)
+	var defender = _hero_for(defend)
+	if defender != null:
+		out.append(defender)
 	return out
 
 
@@ -554,8 +650,9 @@ func support_candidates(side: int) -> Array:
 	for unit in units:
 		if is_instance_valid(unit) and unit.alive and unit.side == side:
 			out.append(unit)
-	if side == 0 and hero != null and is_instance_valid(hero) and hero.alive:
-		out.append(hero)
+	var ally = _hero_for(side)
+	if ally != null:
+		out.append(ally)
 	return out
 
 
@@ -654,9 +751,15 @@ func gate_gust(defender_side: int) -> void:
 			continue
 		if unit.has_method("catch_gust"):
 			unit.catch_gust(mid)
-	if defender_side == 1 and hero != null and is_instance_valid(hero) and hero.alive and hero.position.x > mid:
-		if hero.has_method("shove_back"):
-			hero.shove_back(mid)
+	var breaker = null
+	if defender_side == 1:
+		breaker = hero
+	elif duel:
+		breaker = foe
+	if breaker != null and is_instance_valid(breaker) and breaker.alive:
+		var past_mid: bool = breaker.position.x > mid if defender_side == 1 else breaker.position.x < mid
+		if past_mid and breaker.has_method("shove_back"):
+			breaker.shove_back(mid)
 	for road_y in lane_ys:
 		poof(Vector2(mid, float(road_y)), Color("d5e6f2"))
 	Sfx.play("wind", 0.9, -5.0)
@@ -707,7 +810,7 @@ func _can_buff(node) -> bool:
 
 
 func note_enemy_purse() -> void:
-	if enemy_gate == null:
+	if duel or enemy_gate == null:
 		return
 	var ratio: float = float(enemy_gate.hp) / maxf(1.0, float(enemy_gate.max_hp))
 	var start: float = float(rules.get("start", ENEMY_START))
@@ -729,6 +832,9 @@ func _pay_purse(key: String, line: float, ratio: float, start: float) -> void:
 
 func on_gate_fallen(defender_side: int) -> void:
 	if finished:
+		return
+	if duel:
+		_finish_battle(defender_side)
 		return
 	if defender_side == 1 and level_no >= 10 and not boss_up:
 		_summon_boss()
@@ -752,14 +858,20 @@ func _finish_battle(defender_side: int) -> void:
 		return
 	finished = true
 	paused = false
+	fallen_side = defender_side
 	var won := defender_side == 1
+	if duel:
+		won = defender_side != local_side
 	Sfx.play("win" if won else "lose", 1.0, -2.0)
-	if mode != "":
+	if mode != "" and mode != "duel":
 		return
 	_close_pause()
 	var title := "The cursed gate breaks" if won else "Your gate has fallen"
 	var body := "The dead reached the clan gate. Call them again, or choose a different six."
-	if won:
+	if duel:
+		title = "Their gate falls" if won else "Your gate has fallen"
+		body = "The other clan is broken." if won else "Your gate broke. Fight the same six, or choose again."
+	elif won:
 		var host := get_parent()
 		if host != null and host.has_method("note_clear"):
 			host.note_clear(level_no)
@@ -772,7 +884,7 @@ func _finish_battle(defender_side: int) -> void:
 			var nxt: Dictionary = Levels.level(level_no + 1)
 			body = "Level %d, %s, is open." % [int(nxt["index"]), str(nxt["name"])]
 	var actions: Array = []
-	if won and level_no < Levels.count():
+	if won and not duel and level_no < Levels.count():
 		actions.append({"text": "Next level", "color": Color("c44536"), "call": Callable(get_parent(), "next_level")})
 	actions.append({"text": "Rematch", "color": Color("e6c36a"), "call": Callable(get_parent(), "rematch")})
 	actions.append({"text": "Change the six", "color": Color("d7c4a3"), "call": Callable(get_parent(), "change_squad")})
@@ -783,6 +895,9 @@ func _finish_battle(defender_side: int) -> void:
 
 func _toggle_pause() -> void:
 	if finished:
+		return
+	if duel and puppet:
+		Net.ask_pause.rpc_id(1)
 		return
 	if paused:
 		_close_pause()
@@ -875,16 +990,25 @@ func _update_hud(delta: float) -> void:
 		return
 	var player_ratio: float = float(player_gate.hp) / float(player_gate.max_hp)
 	var enemy_ratio: float = float(enemy_gate.hp) / float(enemy_gate.max_hp)
-	player_hp_label.text = "Clan gate  %d" % int(round(player_gate.hp))
-	enemy_hp_label.text = "Cursed gate  %d" % int(round(enemy_gate.hp))
+	if duel:
+		player_hp_label.text = "Left clan  %d" % int(round(player_gate.hp))
+		enemy_hp_label.text = "Right clan  %d" % int(round(enemy_gate.hp))
+		if level_label != null:
+			level_label.text = "1 vs 1"
+	else:
+		player_hp_label.text = "Clan gate  %d" % int(round(player_gate.hp))
+		enemy_hp_label.text = "Cursed gate  %d" % int(round(enemy_gate.hp))
 	player_hp_label.add_theme_color_override("font_color", Color("ffb4a8") if player_ratio < 0.3 else Color("f3e6c8"))
 	value_label.text = "Value  %d" % int(floor(player_value))
 	income_label.text = "+%.1f each second" % PLAYER_INCOME
 	player_bar_fill.size.x = 220.0 * clampf(player_ratio, 0.0, 1.0)
 	enemy_bar_fill.size.x = 220.0 * clampf(enemy_ratio, 0.0, 1.0)
 	player_bar_fill.color = Color("7dce6a") if player_ratio > 0.3 else Color("e24b3b")
-	if hero != null and not hero.alive:
-		down_label.text = "Hero returns in %.1f" % maxf(hero.down_timer, 0.0)
+	var watched = controlled if controlled != null else hero
+	if duel and paused and not finished:
+		down_label.text = "Paused"
+	elif watched != null and not watched.alive:
+		down_label.text = "Hero returns in %.1f" % maxf(watched.down_timer, 0.0)
 	else:
 		down_label.text = ""
 	if hint != null and battle_time > 11.0:
@@ -912,6 +1036,23 @@ func _run_harness() -> void:
 	var smoke_ready := mode == "smoke" and (battle_time >= 22.0 or (finished and battle_time >= 8.0))
 	var sim_ready := mode == "sim" and (battle_time >= 100.0 or finished)
 	var shot_ready := mode == "shot" and battle_time >= 18.0
+	if duel_probe and battle_time >= 2.0:
+		harness_done = true
+		var ninja := false
+		var walker := false
+		for unit in units:
+			if not is_instance_valid(unit) or not unit.alive:
+				continue
+			var kind := str(unit.data.get("id", ""))
+			if kind == "walker":
+				walker = true
+			if kind == "sword" and int(unit.side) == 1 and int(unit.data.get("hp", 0)) == 100:
+				ninja = true
+		var clan_ok: bool = enemy_gate != null and bool(enemy_gate.clan_gate)
+		var duel_ok: bool = ninja and not walker and foe != null and int(foe.side) == 1 and clan_ok and _count(0) >= 1 and _count(1) >= 1
+		print("DUEL_%s left=%d right=%d" % ["OK" if duel_ok else "FAIL", _count(0), _count(1)])
+		get_tree().quit(0 if duel_ok else 1)
+		return
 	if smoke_ready:
 		harness_done = true
 		var ok := damage_events > 0 and spawned_player > 0 and player_gate != null
@@ -950,6 +1091,278 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("pause"):
 		_toggle_pause()
 		get_viewport().set_input_as_handled()
+
+
+func _hero_for(which: int):
+	if hero != null and is_instance_valid(hero) and int(hero.side) == which and hero.alive:
+		return hero
+	if foe != null and is_instance_valid(foe) and int(foe.side) == which and foe.alive:
+		return foe
+	return null
+
+
+func _worn_look(which: int, kind: String) -> Dictionary:
+	if not duel:
+		return Painter.look(kind)
+	var pack: Dictionary = skin_left if which == 0 else skin_right
+	var sheet_raw: Variant = pack.get("sheets", [])
+	var sheets: Array = sheet_raw if sheet_raw is Array else []
+	var sheet := false
+	for item in sheets:
+		if str(item) == kind:
+			sheet = true
+			break
+	var navy := bool(pack.get("navy", false)) and kind == "saber"
+	return Painter.look_as(kind, sheet, navy)
+
+
+func _bind_duel_signals() -> void:
+	if Net.role == "":
+		return
+	if not Net.input_got.is_connected(_on_hand):
+		Net.input_got.connect(_on_hand)
+	if not Net.buy_got.is_connected(_on_net_buy):
+		Net.buy_got.connect(_on_net_buy)
+	if not Net.state_got.is_connected(_on_state):
+		Net.state_got.connect(_on_state)
+	if not Net.pause_got.is_connected(_on_pause_ask):
+		Net.pause_got.connect(_on_pause_ask)
+
+
+func _exit_tree() -> void:
+	if Net.input_got.is_connected(_on_hand):
+		Net.input_got.disconnect(_on_hand)
+	if Net.buy_got.is_connected(_on_net_buy):
+		Net.buy_got.disconnect(_on_net_buy)
+	if Net.state_got.is_connected(_on_state):
+		Net.state_got.disconnect(_on_state)
+	if Net.pause_got.is_connected(_on_pause_ask):
+		Net.pause_got.disconnect(_on_pause_ask)
+
+
+func _on_hand(x: float, y: float, dragging: bool, sword: bool, shoot: bool) -> void:
+	if puppet or foe == null:
+		return
+	foe.net_pos = Vector2(x, y)
+	foe.net_step = dragging
+	foe.pointer_sword = sword
+	foe.pointer_shoot = shoot
+	hand_seen = battle_time
+
+
+func _on_net_buy(unit_id: String) -> void:
+	if puppet:
+		return
+	summon_foe(unit_id)
+
+
+func _on_pause_ask() -> void:
+	if puppet or finished:
+		return
+	if paused:
+		_close_pause()
+	else:
+		_toggle_pause()
+
+
+func _send_hand() -> void:
+	if Net.role != "guest" or controlled == null:
+		return
+	var sword := sword_hold or Input.is_action_pressed("sword")
+	var shoot := shoot_hold or Input.is_action_pressed("shoot")
+	Net.push_hand.rpc_id(1, controlled.position.x, controlled.position.y, controlled.dragging, sword, shoot)
+	for i in loadout.size():
+		var down := Input.is_action_pressed("slot%d" % (i + 1)) or (i < slot_hold.size() and bool(slot_hold[i]))
+		var was := i < sent_keys.size() and bool(sent_keys[i])
+		if down and not was:
+			Net.ask_buy.rpc_id(1, str(loadout[i]))
+		if i >= sent_keys.size():
+			sent_keys.append(down)
+		else:
+			sent_keys[i] = down
+
+
+func _send_state(delta: float) -> void:
+	if not duel or Net.role != "host" or Net.guest_id < 2:
+		return
+	net_acc += delta
+	if net_acc < 0.05:
+		return
+	net_acc = 0.0
+	Net.push_state.rpc_id(Net.guest_id, _pack_state())
+
+
+func _pack_state() -> Array:
+	return [
+		player_value,
+		enemy_value,
+		0.0 if player_gate == null else float(player_gate.hp),
+		0.0 if enemy_gate == null else float(enemy_gate.hp),
+		1 if paused else 0,
+		1 if finished else 0,
+		fallen_side,
+		_pack_hero(hero),
+		_pack_hero(foe),
+		_pack_cds(player_cd),
+		_pack_cds(enemy_cd),
+		_pack_units(),
+	]
+
+
+func _pack_hero(who) -> Array:
+	if who == null or not is_instance_valid(who):
+		return [0.0, 0.0, 0.0, 0, 1.0, 0.0, "katana", 0.0, 0.0, 0]
+	return [
+		who.position.x,
+		who.position.y,
+		who.hp,
+		1 if who.alive else 0,
+		who.facing,
+		who.act,
+		who.act_tool,
+		who.down_timer,
+		who.hurt,
+		1 if who.winding else 0,
+	]
+
+
+func _pack_cds(table: Dictionary) -> Array:
+	var out: Array = []
+	for entry in player_roster:
+		out.append(float(table.get(str(entry["id"]), 0.0)))
+	return out
+
+
+func _pack_units() -> Array:
+	var out: Array = []
+	for unit in units:
+		if not is_instance_valid(unit) or not unit.alive:
+			continue
+		out.append([
+			int(unit.net_id),
+			int(unit.side),
+			str(unit.data.get("id", "sword")),
+			unit.position.x,
+			unit.position.y,
+			unit.hp,
+			unit.facing,
+			unit.act,
+			unit.hurt,
+		])
+	return out
+
+
+func _on_state(packet: Array) -> void:
+	if not puppet or packet.size() < 12:
+		return
+	var gold0 := float(packet[0])
+	var gold1 := float(packet[1])
+	player_value = gold0 if local_side == 0 else gold1
+	if player_gate != null:
+		player_gate.hp = float(packet[2])
+		player_gate.queue_redraw()
+	if enemy_gate != null:
+		enemy_gate.hp = float(packet[3])
+		enemy_gate.queue_redraw()
+	var want_pause := int(packet[4]) == 1
+	if want_pause != paused and not finished:
+		paused = want_pause
+		if not want_pause:
+			_close_pause()
+	_apply_hero(hero, packet[7], local_side == 0)
+	_apply_hero(foe, packet[8], local_side == 1)
+	var cd_row: Array = packet[9] if local_side == 0 else packet[10]
+	_apply_cd_row(player_cd, cd_row)
+	_apply_units(packet[11])
+	if int(packet[5]) == 1 and not finished:
+		_finish_battle(int(packet[6]))
+
+
+func _apply_cd_row(table: Dictionary, row: Array) -> void:
+	var i := 0
+	for entry in player_roster:
+		if i < row.size():
+			table[str(entry["id"])] = float(row[i])
+		i += 1
+
+
+func _apply_hero(who, blob: Variant, local_control: bool) -> void:
+	if who == null or not is_instance_valid(who) or not (blob is Array):
+		return
+	var row: Array = blob
+	if row.size() < 10:
+		return
+	var hx := float(row[0])
+	var hy := float(row[1])
+	who.hp = float(row[2])
+	who.alive = int(row[3]) == 1
+	who.visible = who.alive or float(row[7]) > 0.0
+	who.facing = float(row[4])
+	who.act = float(row[5])
+	who.act_tool = str(row[6])
+	who.down_timer = float(row[7])
+	who.hurt = float(row[8])
+	who.winding = int(row[9]) == 1
+	if not local_control or not who.alive or absf(who.position.x - hx) > 140.0:
+		who.position = Vector2(hx, hy)
+		who.net_pos = who.position
+	who.lane = lane_index(who.position.y)
+
+
+func _apply_units(blob: Variant) -> void:
+	if not (blob is Array):
+		return
+	var rows: Array = blob
+	var seen: Dictionary = {}
+	for raw in rows:
+		if not (raw is Array):
+			continue
+		var row: Array = raw
+		if row.size() < 9:
+			continue
+		var nid := int(row[0])
+		seen[nid] = true
+		var unit = _unit_by_net(nid)
+		if unit == null:
+			unit = _make_puppet(int(row[1]), str(row[2]), nid)
+		if unit == null:
+			continue
+		unit.position = Vector2(float(row[3]), float(row[4]))
+		unit.hp = float(row[5])
+		unit.alive = true
+		unit.facing = float(row[6])
+		unit.act = float(row[7])
+		unit.hurt = float(row[8])
+		unit.lane = lane_index(unit.position.y)
+	var stale: Array = []
+	for unit in units:
+		if is_instance_valid(unit) and not seen.has(int(unit.net_id)):
+			stale.append(unit)
+	for unit in stale:
+		units.erase(unit)
+		unit.queue_free()
+
+
+func _unit_by_net(nid: int):
+	for unit in units:
+		if is_instance_valid(unit) and int(unit.net_id) == nid:
+			return unit
+	return null
+
+
+func _make_puppet(which: int, kind: String, nid: int):
+	var entry := Catalog.find_in(player_roster, kind)
+	if entry.is_empty():
+		return null
+	var unit = UnitScript.new()
+	unit.setup(self, entry, which)
+	unit.net_id = nid
+	unit.look = _worn_look(which, str(entry.get("paint", kind)))
+	unit.position = Vector2(player_front if which == 0 else enemy_front, lane_y(1))
+	world.add_child(unit)
+	units.append(unit)
+	Sfx.play(Painter.call_id(str(entry.get("paint", kind))), Painter.call_pitch(str(entry.get("paint", kind))), -8.0)
+	return unit
 
 
 func _ink(color: Color) -> Color:

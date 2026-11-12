@@ -45,6 +45,9 @@ var bot: bool = false
 var bot_axis: Vector2 = Vector2.ZERO
 var bot_sword: bool = false
 var bot_shoot: bool = false
+var driven: bool = false
+var net_pos: Vector2 = Vector2.ZERO
+var net_step: bool = false
 var winding: bool = false
 var strike_sent: bool = false
 var act_tool: String = "katana"
@@ -55,11 +58,16 @@ const RESPAWN: float = 6.0
 func setup(field) -> void:
 	battle = field
 	look = Painter.look("hero")
+	facing = 1.0 if side == 0 else -1.0
 	var start_y: float = field.ground_y
 	if field.lane_ys.size() > 1:
 		start_y = float(field.lane_ys[1])
 		lane = 1
-	position = Vector2(field.player_front + 10.0, start_y)
+	if side == 0:
+		position = Vector2(field.player_front + 10.0, start_y)
+	else:
+		position = Vector2(field.enemy_front - 10.0, start_y)
+	net_pos = position
 	z_index = 80
 
 
@@ -125,6 +133,13 @@ func _process(delta: float) -> void:
 	slash = maxf(0.0, slash - delta)
 	muzzle = maxf(0.0, muzzle - delta)
 	invuln = maxf(0.0, invuln - delta)
+	if battle != null and battle.puppet:
+		if self == battle.controlled and alive and not battle.finished and not battle.paused:
+			_move(delta)
+		if act <= 0.0:
+			winding = false
+		queue_redraw()
+		return
 	if not alive:
 		winding = false
 		act = 0.0
@@ -147,6 +162,12 @@ func _process(delta: float) -> void:
 
 
 func _move(delta: float) -> void:
+	if driven:
+		position.x = clampf(net_pos.x, min_x, max_x)
+		position.y = clampf(net_pos.y, min_y, max_y)
+		lane = battle.lane_index(position.y)
+		stepping = net_step
+		return
 	var axis := Vector2.ZERO
 	if bot:
 		axis = bot_axis
@@ -177,7 +198,7 @@ func _combat(delta: float) -> void:
 	if foe != null:
 		facing = -1.0 if foe.position.x < position.x else 1.0
 	else:
-		facing = 1.0
+		facing = 1.0 if side == 0 else -1.0
 	var want_sword := pointer_sword or bot_sword or (not bot and Input.is_action_pressed("sword"))
 	var want_shoot := pointer_shoot or bot_shoot or (not bot and Input.is_action_pressed("shoot"))
 	if winding:
@@ -213,19 +234,20 @@ func _land_hero() -> void:
 		if melee != null:
 			melee.take_damage(sword_damage * damage_multiplier, true)
 		elif _gate_in(sword_reach()):
-			battle.damage_gate(1, sword_damage * damage_multiplier)
+			battle.damage_gate(1 - side, sword_damage * damage_multiplier)
 	else:
 		muzzle = 0.2
 		Sfx.play(Painter.hit_id("bow"), 1.04, -4.0)
 		var road := lane
 		var road_y: float = battle.lane_y(road) - 10.0
 		var ranged = _nearest(shoot_reach)
+		var gate_x: float = float(battle.enemy_front) if side == 0 else float(battle.player_front)
 		var aim_x := position.x + facing * shoot_reach
 		if ranged != null:
 			aim_x = float(ranged.position.x)
 		elif _gate_in(shoot_reach):
-			aim_x = battle.enemy_front
-		battle.fire_arrow(Vector2(position.x, road_y), Vector2(aim_x, road_y), shoot_damage * damage_multiplier, 0, Color("fff6c8"), shoot_reach, road, true, _gate_in(shoot_reach), false)
+			aim_x = gate_x
+		battle.fire_arrow(Vector2(position.x, road_y), Vector2(aim_x, road_y), shoot_damage * damage_multiplier, side, Color("fff6c8"), shoot_reach, road, true, _gate_in(shoot_reach), false)
 
 
 func _act_clock() -> Vector2:
@@ -256,7 +278,7 @@ func _nearest(reach: float):
 	var best = null
 	var best_d := reach
 	var mine := lane
-	for foe in battle.hostile_targets(0):
+	for foe in battle.hostile_targets(side):
 		if int(foe.lane) != mine and not battle.is_boss(foe):
 			continue
 		var dist: float = absf(float(foe.position.x) - position.x)
@@ -267,7 +289,8 @@ func _nearest(reach: float):
 
 
 func _gate_in(reach: float) -> bool:
-	return abs(battle.enemy_front - position.x) <= minf(reach, 150.0)
+	var front: float = float(battle.enemy_front) if side == 0 else float(battle.player_front)
+	return abs(front - position.x) <= minf(reach, 150.0)
 
 
 func _revive() -> void:
@@ -277,7 +300,9 @@ func _revive() -> void:
 	visible = true
 	var revive_y: float = battle.lane_y(1)
 	lane = 1
-	position = Vector2(battle.player_front + 8.0, revive_y)
+	var home_x: float = float(battle.player_front) + 8.0 if side == 0 else float(battle.enemy_front) - 8.0
+	position = Vector2(home_x, revive_y)
+	net_pos = position
 	battle.float_text(position + Vector2(-16, -40), "RETURN", Color("f3e6c8"))
 
 

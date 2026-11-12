@@ -27,6 +27,8 @@ Each road you open pays 100 diamonds. Home is the night gate: Shop, Skin, the ro
 
 The shop sells one new skin for the hero and one for each soldier. A skin costs 200 diamonds. Buying it does not put it on. Wear it from Skin, and Nothing puts the old clothes back. The navy saber is a separate skin, also 200 diamonds.
 
+1 vs 1 is two clans. Each side chooses 6 of the 11. Both have the same value, the same calls, the same roads, the same wind, and a hero. On this page, Host makes a code. Send it to the other ninja, paste the code they send back, and apply it. On a computer build, Host opens port 3001 and the other ninja joins the address.
+
 Escape or Back returns to the title."
 
 var loadout: Array = []
@@ -52,6 +54,19 @@ const VIP_CODE := "tomissogood0205"
 const VIP_DIAMONDS := 100000000
 var chosen_level: int = 1
 var screen: String = "menu"
+var picking_duel: bool = false
+var duel_sent: bool = false
+var duel_started: bool = false
+var left_ids: Array = []
+var right_ids: Array = []
+var left_skin: Dictionary = {}
+var right_skin: Dictionary = {}
+var duel_left: Array = []
+var duel_right: Array = []
+var duel_skins: Dictionary = {}
+var duel_status: Label
+var duel_code: TextEdit
+var duel_address: LineEdit
 
 
 func _ready() -> void:
@@ -60,6 +75,7 @@ func _ready() -> void:
 	roster = Catalog.player_roster()
 	_bind_inputs()
 	_load_progress()
+	_bind_net()
 	if _has_arg("--layout"):
 		_layout_check()
 	elif _has_arg("--unlock-check"):
@@ -72,6 +88,8 @@ func _ready() -> void:
 		_start_battle(["sword", "archer", "shield", "lancer", "horse", "heal"], "sim")
 	elif _has_arg("--sim"):
 		_start_battle(["sword", "archer", "shield", "lancer", "berserker", "heal"], "sim")
+	elif _has_arg("--duel-smoke"):
+		_duel_probe()
 	elif _has_arg("--smoke"):
 		_start_battle(["sword", "archer", "shield", "lancer", "berserker", "heal"], "smoke")
 	else:
@@ -136,8 +154,14 @@ func _unhandled_input(event: InputEvent) -> void:
 	if screen == "how" or screen == "levels" or screen == "shop" or screen == "skin" or screen == "code":
 		_show_menu()
 		get_viewport().set_input_as_handled()
+	elif screen == "duel":
+		show_title()
+		get_viewport().set_input_as_handled()
 	elif screen == "select":
-		_show_levels()
+		if picking_duel:
+			_show_duel()
+		else:
+			_show_levels()
 		get_viewport().set_input_as_handled()
 
 
@@ -161,8 +185,8 @@ func _show_menu() -> void:
 	panel.set_anchors_preset(Control.PRESET_CENTER)
 	panel.offset_left = 70
 	panel.offset_right = 560
-	panel.offset_top = -250
-	panel.offset_bottom = 340
+	panel.offset_top = -300
+	panel.offset_bottom = 350
 	panel.add_theme_stylebox_override("panel", UiSkin.panel(Color("1a1614"), Color("e6c36a"), 22, 4))
 	root.add_child(panel)
 	var box := VBoxContainer.new()
@@ -190,6 +214,7 @@ func _show_menu() -> void:
 		box.add_child(_menu_button("Next level · %s" % str(road["name"]), Color("c44536"), next_level, 420))
 	else:
 		box.add_child(_menu_button("Play", Color("c44536"), _show_levels, 420))
+	box.add_child(_menu_button("1 vs 1", Color("7d9a6a"), _show_duel, 420))
 	box.add_child(_home_pair(
 		"Choose a road", Color("e6c36a"), _show_levels,
 		"How to play", Color("f3e6c8"), _show_how
@@ -690,6 +715,7 @@ func _fit_scroll_label(scroll: ScrollContainer, body: Label) -> void:
 
 func _show_select() -> void:
 	screen = "select"
+	duel_sent = false
 	_clear_screens()
 	card_panels.clear()
 	var root := Control.new()
@@ -717,7 +743,8 @@ func _show_select() -> void:
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
 	margin.add_child(box)
 	var rules: Dictionary = Levels.level(chosen_level)
-	var title := UiSkin.label("Level %d · %s" % [int(rules["index"]), str(rules["name"])], 32, Color("f3e6c8"))
+	var heading := "1 vs 1" if picking_duel else "Level %d · %s" % [int(rules["index"]), str(rules["name"])]
+	var title := UiSkin.label(heading, 32, Color("f3e6c8"))
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(title)
 	var choose := UiSkin.label("Choose 6 of 11", 18, Color("f3e6c8"))
@@ -747,8 +774,9 @@ func _show_select() -> void:
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.add_theme_constant_override("separation", 12)
 	box.add_child(row)
-	row.add_child(_menu_button("Back", Color("f3e6c8"), _show_levels))
-	start_button = _menu_button("Start battle", Color("c44536"), _begin_from_select)
+	row.add_child(_menu_button("Back", Color("f3e6c8"), _leave_select))
+	var start_text := "Ready" if picking_duel else "Start battle"
+	start_button = _menu_button(start_text, Color("c44536"), _begin_from_select)
 	row.add_child(start_button)
 	_refresh_cards()
 
@@ -807,6 +835,8 @@ func _num(value: float) -> String:
 
 
 func _on_card_input(event: InputEvent, id: String) -> void:
+	if duel_sent:
+		return
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		_toggle(id)
 
@@ -839,7 +869,9 @@ func _refresh_cards() -> void:
 			var entry := Catalog.find_in(roster, last_id)
 			detail_label.text = str(entry["detail"])
 	if start_button != null:
-		start_button.disabled = loadout.size() != 6
+		start_button.disabled = loadout.size() != 6 or duel_sent
+	if picking_duel and duel_sent and count_label != null:
+		count_label.text = "Waiting for the other ninja."
 
 
 func _loadout_names() -> String:
@@ -851,10 +883,20 @@ func _loadout_names() -> String:
 
 
 func _begin_from_select() -> void:
-	if loadout.size() != 6:
+	if loadout.size() != 6 or duel_sent:
 		return
 	Sfx.play("click", 1.1, -4.0)
+	if picking_duel:
+		_ready_duel()
+		return
 	_start_battle(loadout, "")
+
+
+func _leave_select() -> void:
+	if picking_duel:
+		_show_duel()
+		return
+	_show_levels()
 
 
 func _start_battle(chosen: Array, mode: String = "", level_index: int = 0) -> void:
@@ -871,11 +913,17 @@ func _start_battle(chosen: Array, mode: String = "", level_index: int = 0) -> vo
 
 func rematch() -> void:
 	Engine.time_scale = 1.0
+	if Net.role != "":
+		Net.rematch.rpc()
+		return
 	_start_battle(loadout, "")
 
 
 func change_squad() -> void:
 	Engine.time_scale = 1.0
+	if Net.role != "":
+		Net.reselect.rpc()
+		return
 	_drop_battle()
 	_show_select()
 
@@ -883,6 +931,11 @@ func change_squad() -> void:
 func show_title() -> void:
 	Engine.time_scale = 1.0
 	_drop_battle()
+	picking_duel = false
+	duel_sent = false
+	duel_started = false
+	if Net.role != "" or Net.live:
+		Net.close_match()
 	_show_menu()
 
 
@@ -1023,6 +1076,190 @@ func _unpack_keys(text: String) -> Dictionary:
 	return bag
 
 
+func _bind_net() -> void:
+	if Net.lobby_changed.is_connected(_on_lobby):
+		return
+	Net.lobby_changed.connect(_on_lobby)
+	Net.linked.connect(_on_duel_linked)
+	Net.dropped.connect(_on_duel_dropped)
+	Net.loadout_got.connect(_on_loadout_got)
+	Net.begin_match.connect(_on_begin_match)
+	Net.reselect_got.connect(_on_reselect)
+	Net.rematch_got.connect(_on_rematch)
+
+
+func _duel_probe() -> void:
+	var six: Array = ["sword", "archer", "shield", "lancer", "berserker", "heal"]
+	var other: Array = ["saber", "horse", "assassin", "suicide", "level", "sword"]
+	screen = "battle"
+	_clear_screens()
+	var battle = BattleScript.new()
+	battle.duel_probe = true
+	add_child(battle)
+	battle.begin_duel(six, other, 0, true, {})
+
+
+func _show_duel() -> void:
+	screen = "duel"
+	_clear_screens()
+	duel_status = null
+	duel_code = null
+	duel_address = null
+	var box := _open_page("1 vs 1")
+	var lead := UiSkin.label("Both sides are the clan. Each ninja chooses 6. Value, calls, roads, wind, and the hero are the same on both sides.", 16, Color("3a2a22"))
+	lead.autowrap_mode = TextServer.AUTOWRAP_WORD
+	lead.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(lead)
+	duel_status = UiSkin.label(Net.status, 16, Color("1c140e"))
+	duel_status.autowrap_mode = TextServer.AUTOWRAP_WORD
+	duel_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(duel_status)
+	if Net.live:
+		box.add_child(_menu_button("Choose 6", Color("c44536"), _show_select, 420))
+		box.add_child(_menu_button("Leave", Color("6b3a32"), show_title, 220, 18))
+		return
+	if OS.has_feature("web"):
+		box.add_child(_menu_button("Host", Color("7d9a6a"), Net.host_match, 420))
+		duel_code = TextEdit.new()
+		duel_code.placeholder_text = "Match code"
+		duel_code.custom_minimum_size = Vector2(0, 120)
+		duel_code.wrap_mode = TextEdit.LINE_WRAPPING_BOUNDARY
+		box.add_child(duel_code)
+		var tools := HBoxContainer.new()
+		tools.alignment = BoxContainer.ALIGNMENT_CENTER
+		tools.add_theme_constant_override("separation", 12)
+		box.add_child(tools)
+		tools.add_child(_menu_button("Copy code", Color("e6c36a"), _copy_duel_code, 200, 18))
+		tools.add_child(_menu_button("Apply code", Color("c44536"), _apply_duel_code, 200, 18))
+	else:
+		box.add_child(_menu_button("Host", Color("7d9a6a"), Net.host_match, 420))
+		duel_address = LineEdit.new()
+		duel_address.placeholder_text = "127.0.0.1"
+		duel_address.text = "127.0.0.1"
+		duel_address.custom_minimum_size = Vector2(0, 48)
+		duel_address.alignment = HORIZONTAL_ALIGNMENT_CENTER
+		box.add_child(duel_address)
+		box.add_child(_menu_button("Join", Color("c44536"), _join_duel, 420))
+	box.add_child(_menu_button("Back", Color("f3e6c8"), show_title, 220, 18))
+
+
+func _copy_duel_code() -> void:
+	if duel_code == null:
+		return
+	DisplayServer.clipboard_set(duel_code.text)
+	if duel_status != null:
+		duel_status.text = "Copied. Send it to the other ninja."
+
+
+func _apply_duel_code() -> void:
+	if duel_code == null:
+		return
+	Net.apply_code(duel_code.text)
+
+
+func _join_duel() -> void:
+	var ip := "127.0.0.1"
+	if duel_address != null:
+		ip = duel_address.text
+	Net.join_address(ip)
+
+
+func _on_lobby() -> void:
+	if screen != "duel" or duel_status == null or not is_instance_valid(duel_status):
+		return
+	duel_status.text = Net.status
+	if duel_code != null and is_instance_valid(duel_code) and Net.code != "" and duel_code.text != Net.code:
+		duel_code.text = Net.code
+		duel_code.release_focus()
+
+
+func _on_duel_linked() -> void:
+	picking_duel = true
+	duel_started = false
+	duel_sent = false
+	left_ids = []
+	right_ids = []
+	_show_select()
+
+
+func _on_duel_dropped() -> void:
+	_drop_battle()
+	picking_duel = false
+	duel_started = false
+	duel_sent = false
+	_show_duel()
+
+
+func _ready_duel() -> void:
+	duel_sent = true
+	if start_button != null:
+		start_button.disabled = true
+	if count_label != null:
+		count_label.text = "Waiting for the other ninja."
+	Net.share_loadout.rpc(loadout.duplicate(), _worn_ids(), saber_worn == "navy")
+
+
+func _worn_ids() -> Array:
+	var out: Array = []
+	for key in sheet_worn.keys():
+		if bool(sheet_worn[key]):
+			out.append(str(key))
+	return out
+
+
+func _on_loadout_got(side: int, ids: Array, sheets: Array, navy: bool) -> void:
+	if not multiplayer.is_server() or duel_started:
+		return
+	var skin := {"sheets": sheets.duplicate(), "navy": navy}
+	if side == 0:
+		left_ids = ids.duplicate()
+		left_skin = skin
+	else:
+		right_ids = ids.duplicate()
+		right_skin = skin
+	if left_ids.size() == 6 and right_ids.size() == 6:
+		duel_started = true
+		Net.start_duel.rpc(left_ids, right_ids, {"left": left_skin, "right": right_skin})
+
+
+func _on_begin_match(left: Array, right: Array, skins: Dictionary) -> void:
+	duel_left = left.duplicate()
+	duel_right = right.duplicate()
+	duel_skins = skins.duplicate(true)
+	_launch_duel()
+
+
+func _launch_duel() -> void:
+	var side := 0 if Net.role != "guest" else 1
+	var local_ids: Array = duel_left if side == 0 else duel_right
+	var other: Array = duel_right if side == 0 else duel_left
+	screen = "battle"
+	loadout = local_ids.duplicate()
+	_clear_screens()
+	_drop_battle()
+	var battle = BattleScript.new()
+	add_child(battle)
+	battle.begin_duel(local_ids, other, side, side == 0, duel_skins)
+
+
+func _on_reselect() -> void:
+	Engine.time_scale = 1.0
+	duel_started = false
+	duel_sent = false
+	left_ids = []
+	right_ids = []
+	_drop_battle()
+	picking_duel = true
+	_show_select()
+
+
+func _on_rematch() -> void:
+	Engine.time_scale = 1.0
+	if duel_left.size() != 6 or duel_right.size() != 6:
+		return
+	_launch_duel()
+
+
 func _layout_check() -> void:
 	get_window().size = Vector2i(1280, 720)
 	for _i in 2:
@@ -1033,6 +1270,18 @@ func _layout_check() -> void:
 	var vp := get_viewport().get_visible_rect().size
 	var play := _button_named(self, "Play")
 	var play_ok := false
+	var quit_b := _button_named(self, "Quit")
+	var duel_b := _button_named(self, "1 vs 1")
+	var quit_ok := false
+	var duel_ok := false
+	if quit_b != null:
+		var quit_rect := quit_b.get_global_rect()
+		quit_ok = quit_rect.position.y >= 0.0 and quit_rect.end.y <= vp.y + 1.0
+		print("TITLE quit=", quit_rect, " ok=", quit_ok)
+	if duel_b != null:
+		var duel_rect := duel_b.get_global_rect()
+		duel_ok = duel_rect.position.y >= 0.0 and duel_rect.end.y <= vp.y + 1.0
+		print("TITLE duel=", duel_rect, " ok=", duel_ok)
 	if play != null:
 		var play_rect := play.get_global_rect()
 		play_ok = play_rect.position.y >= 0.0 and play_rect.end.y <= vp.y + 1.0
@@ -1079,7 +1328,7 @@ func _layout_check() -> void:
 		if b.text.find("Night march") >= 0:
 			saw_night = true
 		print("LEVEL ", b.disabled, " ", b.text.replace("\n", " / "))
-	var win := play_ok and how_ok and back_ok and roads == 10 and first_open and saw_night and body_h > scroll_h and scroll_h > 40.0
+	var win := play_ok and quit_ok and duel_ok and how_ok and back_ok and roads == 10 and first_open and saw_night and body_h > scroll_h and scroll_h > 40.0
 	print("LAYOUT ", "OK" if win else "FAIL")
 	get_tree().quit(0 if win else 1)
 
