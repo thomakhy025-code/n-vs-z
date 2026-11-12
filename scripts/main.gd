@@ -19,7 +19,7 @@ If a runner slips past the line, you are the one who runs back. If your gate bre
 
 The cursed gate calls its own dead: walkers, runners, brutes, spitters, bombers, and later an oni.
 
-Play lists ten roads. The first is open. Winning a road opens the next one. Your purse stays the same on every road. Theirs gets heavier. Night march stays quiet for the first 10 seconds, so you can call an army before the dead move.
+Play lists ten roads. The first is open. Winning a road opens the next one. Your purse stays the same on every road. Theirs gets heavier.
 
 Each road you open pays 100 diamonds. Home is the night gate: Shop, Skin, the roads, and How to play are there, and the diamond count hangs by the lantern. During a fight, Home at the top returns you there.
 
