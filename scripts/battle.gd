@@ -315,9 +315,13 @@ func _process(delta: float) -> void:
 		for id in enemy_cd.keys():
 			enemy_cd[id] = maxf(0.0, float(enemy_cd[id]) - delta)
 		player_value += PLAYER_INCOME * delta
-		enemy_income += _rule_f("growth", ENEMY_GROWTH) * delta
-		enemy_value += enemy_income * delta
-		_enemy_ai(delta)
+		if battle_time < _rule_f("warmup", 0.0):
+			lull = 0.0
+			wave_left = 0
+		else:
+			enemy_income += _rule_f("growth", ENEMY_GROWTH) * delta
+			enemy_value += enemy_income * delta
+			_enemy_ai(delta)
 		if mode != "":
 			_autoplay(delta)
 			_drive_hero()

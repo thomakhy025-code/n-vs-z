@@ -16,20 +16,20 @@ static func level(index: int) -> Dictionary:
 
 static func _all() -> Array:
 	return [
-		_row(1, "First road", "+7.2 each second, starts at 22.", 7.2, 22.0, 0.065, 12.0, 24.0, 50.0, 3, 8, 22.0, 1.5, 3.3, 0.012, 0.42, 1.0, 1.0, false),
-		_row(2, "Open purse", "+8.3 each second, starts at 28.", 8.3, 28.0, 0.065, 12.0, 24.0, 50.0, 3, 8, 22.0, 1.5, 3.3, 0.012, 0.42, 1.0, 1.0, false),
-		_row(3, "Early spit", "Spitters and bombers from the first wave. +9.4 each second, starts at 34.", 9.4, 34.0, 0.065, 0.0, 24.0, 50.0, 3, 8, 22.0, 1.5, 3.3, 0.012, 0.42, 1.0, 1.0, false),
-		_row(4, "Short breath", "Shorter lulls, and each wave is one body larger. +10.4 each second, starts at 40.", 10.4, 40.0, 0.065, 12.0, 24.0, 50.0, 4, 9, 22.0, 0.95, 2.1, 0.016, 0.42, 1.0, 1.0, false),
-		_row(5, "Thick hide", "15% more blood. Brutes from 16s. +11.5 each second, starts at 46.", 11.5, 46.0, 0.065, 12.0, 16.0, 50.0, 3, 8, 22.0, 1.5, 3.3, 0.012, 0.42, 1.15, 1.0, false),
-		_row(6, "Rising curse", "Their purse grows twice as fast. +12.6 each second, starts at 52.", 12.6, 52.0, 0.13, 12.0, 24.0, 50.0, 3, 8, 22.0, 1.5, 3.3, 0.012, 0.42, 1.0, 1.0, false),
-		_row(7, "Oni early", "The oni can be called from 28s. +13.7 each second, starts at 58.", 13.7, 58.0, 0.065, 12.0, 24.0, 28.0, 3, 8, 22.0, 1.5, 3.3, 0.012, 0.42, 1.0, 1.0, false),
-		_row(8, "Paired muster", "Two dead in one beat, on two roads. +14.8 each second, starts at 64.", 14.8, 64.0, 0.065, 12.0, 24.0, 50.0, 3, 8, 22.0, 1.5, 3.3, 0.012, 0.42, 1.0, 1.0, true),
-		_row(9, "Fast muster", "Faster calls, waves up to 11, tougher dead. +15.8 each second, starts at 70.", 15.8, 70.0, 0.065, 12.0, 24.0, 50.0, 4, 11, 16.0, 1.1, 2.4, 0.015, 0.30, 1.25, 1.1, false),
-		_row(10, "Night march", "Early oni, paired calls, fast waves, tougher dead. +17.3 each second, starts at 76.", 17.3, 76.0, 0.065, 12.0, 24.0, 28.0, 4, 11, 16.0, 1.1, 2.4, 0.015, 0.30, 1.25, 1.1, true),
+		_row(1, "First road", "+0.8 each second, starts at 1.5.", 0.8, 1.5, 0.004, 18.0, 32.0, 60.0, 2, 5, 26.0, 2.4, 4.6, 0.008, 1.05, 1.0, 0.19, false),
+		_row(2, "Open purse", "+0.9 each second, starts at 2.", 0.9, 2.0, 0.004, 18.0, 32.0, 60.0, 2, 5, 26.0, 2.4, 4.6, 0.008, 1.0, 1.0, 0.19, false),
+		_row(3, "Early spit", "Spitters and bombers from the first wave. +1.0 each second, starts at 2.", 1.0, 2.0, 0.004, 0.0, 32.0, 60.0, 2, 5, 26.0, 2.4, 4.6, 0.008, 1.0, 1.0, 0.19, false),
+		_row(4, "Short breath", "Shorter lulls between waves. +1.05 each second, starts at 2.5.", 1.05, 2.5, 0.004, 18.0, 32.0, 60.0, 2, 5, 26.0, 1.8, 3.4, 0.01, 0.95, 1.0, 0.19, false),
+		_row(5, "Thick hide", "5% more blood. Brutes from 28s. +1.1 each second, starts at 2.5.", 1.1, 2.5, 0.004, 18.0, 28.0, 60.0, 2, 5, 26.0, 2.2, 4.2, 0.008, 1.0, 1.05, 0.19, false),
+		_row(6, "Rising curse", "Their purse grows twice as fast. +1.15 each second, starts at 3.", 1.15, 3.0, 0.008, 18.0, 32.0, 60.0, 2, 5, 26.0, 2.2, 4.2, 0.008, 1.0, 1.0, 0.19, false),
+		_row(7, "Oni early", "The oni can be called from 55s. +1.2 each second, starts at 3.", 1.2, 3.0, 0.004, 18.0, 32.0, 55.0, 2, 5, 26.0, 2.2, 4.2, 0.008, 1.0, 1.0, 0.2, false),
+		_row(8, "Paired muster", "Two dead in one beat, on two roads. +1.25 each second, starts at 3.", 1.25, 3.0, 0.004, 18.0, 32.0, 60.0, 2, 5, 26.0, 2.4, 4.4, 0.008, 1.1, 1.0, 0.2, true),
+		_row(9, "Fast muster", "Slightly faster calls and tougher dead. +1.3 each second, starts at 3.5.", 1.3, 3.5, 0.005, 16.0, 28.0, 55.0, 2, 6, 24.0, 2.0, 3.8, 0.008, 0.9, 1.05, 0.2, false),
+		_row(10, "Night march", "Quiet for 10 seconds, then paired calls. The oni from 55s. +1.4 each second, starts at 2.", 1.4, 2.0, 0.005, 16.0, 30.0, 55.0, 2, 6, 24.0, 2.2, 4.2, 0.008, 1.05, 1.05, 0.2, true, 10.0),
 	]
 
 
-static func _row(index: int, title: String, blurb: String, income: float, start_value: float, growth: float, spitter_at: float, brute_at: float, oni_at: float, wave_base: int, wave_cap: int, wave_every: float, lull_floor: float, lull_base: float, lull_shrink: float, spawn_gap: float, hp_mult: float, dmg_mult: float, paired: bool) -> Dictionary:
+static func _row(index: int, title: String, blurb: String, income: float, start_value: float, growth: float, spitter_at: float, brute_at: float, oni_at: float, wave_base: int, wave_cap: int, wave_every: float, lull_floor: float, lull_base: float, lull_shrink: float, spawn_gap: float, hp_mult: float, dmg_mult: float, paired: bool, warmup: float = 0.0) -> Dictionary:
 	return {
 		"index": index,
 		"name": title,
@@ -50,4 +50,5 @@ static func _row(index: int, title: String, blurb: String, income: float, start_
 		"hp_mult": hp_mult,
 		"dmg_mult": dmg_mult,
 		"paired": paired,
+		"warmup": warmup,
 	}
