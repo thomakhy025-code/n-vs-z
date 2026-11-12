@@ -709,8 +709,8 @@ func _can_buff(node) -> bool:
 func note_enemy_purse() -> void:
 	if enemy_gate == null:
 		return
-	var ratio := enemy_gate.hp / maxf(1.0, enemy_gate.max_hp)
-	var start := float(rules.get("start", ENEMY_START))
+	var ratio: float = float(enemy_gate.hp) / maxf(1.0, float(enemy_gate.max_hp))
+	var start: float = float(rules.get("start", ENEMY_START))
 	if level_no >= 10:
 		_pay_purse("70", 0.70, ratio, start)
 	if level_no >= 5:
