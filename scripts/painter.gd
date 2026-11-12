@@ -2,15 +2,36 @@ extends RefCounted
 
 static var _tilt: float = 0.0
 static var saber_navy: bool = false
+static var sheet_on: Dictionary = {}
 
 
 static func look(kind: String) -> Dictionary:
+	var sheet := false
+	if sheet_on.has(kind):
+		sheet = bool(sheet_on[kind])
+	return look_as(kind, sheet, kind == "saber" and saber_navy)
+
+
+static func look_as(kind: String, sheet: bool, navy: bool) -> Dictionary:
 	var row := _painted(kind)
 	row["paint"] = kind
-	if kind == "saber" and saber_navy:
+	if kind == "saber" and navy:
 		row["skin"] = Color("f0c14a")
 		row["cloth"] = Color("1e3f8f")
 		row["trim"] = Color("e2b034")
+		return row
+	if sheet:
+		var pal := _sheet_row(kind)
+		if not pal.is_empty():
+			row["skin"] = pal["skin"]
+			row["cloth"] = pal["cloth"]
+			row["trim"] = pal["trim"]
+			row["sheet"] = true
+			row["eye"] = pal["eye"]
+			row["mask"] = pal["mask"]
+			row["bare"] = pal["bare"]
+			row["scarf"] = pal["scarf"]
+			row["blade"] = pal["blade"]
 	return row
 
 
@@ -157,6 +178,154 @@ static func _look(skin: Color, cloth: Color, trim: Color, weapon: String, mount:
 	}
 
 
+static func _palette(skin: Color, cloth: Color, trim: Color, eye: Color, mask: Color, bare: bool, scarf: Color, blade: Color) -> Dictionary:
+	return {
+		"skin": skin,
+		"cloth": cloth,
+		"trim": trim,
+		"eye": eye,
+		"mask": mask,
+		"bare": bare,
+		"scarf": scarf,
+		"blade": blade,
+	}
+
+
+static func _sheet_row(kind: String) -> Dictionary:
+	var none := Color(0, 0, 0, 0)
+	match kind:
+		"sword":
+			return _palette(Color("d8dbe2"), Color("1c1e24"), Color("c5ccd6"), Color("f4f6f8"), Color("16181c"), false, none, Color("d5dbe3"))
+		"archer":
+			return _palette(Color("d8dbe2"), Color("1a1e24"), Color("2f9e44"), Color("7dff6a"), Color("14161a"), false, Color("2f9e44"), Color("c8b48a"))
+		"shield":
+			return _palette(Color("e7c2a4"), Color("5c3d24"), Color("e2b034"), Color("f0c14a"), Color("1a140e"), false, none, Color("e2b034"))
+		"saber":
+			return _palette(Color("1a1214"), Color("1a1216"), Color("c44536"), Color("e23b3b"), Color("141214"), false, Color("c44536"), Color("2c2c32"))
+		"lancer":
+			return _palette(Color("d8dbe2"), Color("1a2744"), Color("3d7ec9"), Color("7ecbff"), Color("101820"), false, none, Color("d5dbe3"))
+		"berserker":
+			return _palette(Color("e7b090"), Color("7a1f2b"), Color("e2b034"), Color("f0c14a"), Color("1a1214"), true, Color("8e2430"), Color("e2b034"))
+		"horse":
+			return _palette(Color("1a1c22"), Color("1a1c22"), Color("e2b034"), Color("f0c14a"), Color("14161a"), false, none, Color("e2b034"))
+		"suicide":
+			return _palette(Color("1a1214"), Color("1a1216"), Color("c44536"), Color("e23b3b"), Color("141214"), false, Color("c44536"), Color("1a1214"))
+		"assassin":
+			return _palette(Color("c9b8d4"), Color("4a2d78"), Color("c9a0ff"), Color("d7b4ff"), Color("1a1224"), false, none, Color("c9a0ff"))
+		"heal":
+			return _palette(Color("f4f1ea"), Color("f4f7f8"), Color("1aa6a6"), Color("3ee0e0"), Color("f7f7f4"), false, none, Color("3ee0e0"))
+		"level":
+			return _palette(Color("e6c9a0"), Color("e6d3a8"), Color("a56b2b"), Color("f0c14a"), Color("1a140e"), false, none, Color("f3e6c4"))
+		"hero":
+			return _palette(Color("f3d2b0"), Color("f4efe4"), Color("c44536"), Color("e23b3b"), Color("1a1214"), false, Color("c44536"), Color("d5dbe3"))
+		_:
+			return {}
+
+
+static func _paint_sheet(ci: CanvasItem, look: Dictionary, chest: Vector2, rear: Vector2, front: Vector2, tip: Vector2, step: float, ground: float, phase: String, beat: int, t: float, cycle: String, snap: float, mount: bool, flash: float) -> void:
+	var cloth: Color = look["cloth"] as Color
+	var trim: Color = look["trim"] as Color
+	var skin: Color = look["skin"] as Color
+	var eye: Color = look["eye"] as Color
+	var mask: Color = look["mask"] as Color
+	var blade: Color = look["blade"] as Color
+	var scarf: Color = look["scarf"] as Color
+	var bare: bool = bool(look["bare"])
+	if flash > 0.0:
+		var wash := clampf(flash * 4.0, 0.0, 0.72)
+		skin = skin.lerp(Color.WHITE, wash)
+		cloth = cloth.lerp(Color.WHITE, wash)
+		trim = trim.lerp(Color.WHITE, wash)
+		eye = eye.lerp(Color.WHITE, wash)
+		blade = blade.lerp(Color.WHITE, wash)
+	var paint := str(look.get("paint", ""))
+	if mount and paint == "horse":
+		_ellipse(ci, chest + Vector2(2.0, 22.0), 11.0, 3.6, Color("8e2430"))
+		_line(ci, chest + Vector2(-8.0, 22.0), chest + Vector2(10.0, 22.0), trim, 1.6)
+	if scarf.a > 0.2:
+		_saber_scarf(ci, chest, snap, scarf)
+	if paint == "archer":
+		_box(ci, Rect2(chest.x - 15.0, chest.y - 8.0, 7.0, 16.0), Color("6b4a32"))
+		_line(ci, chest + Vector2(-13.5, -11.0), chest + Vector2(-11.0, -4.0), trim, 1.5)
+		_line(ci, chest + Vector2(-12.0, -12.0), chest + Vector2(-9.0, -5.0), trim.lightened(0.25), 1.4)
+	var pants := cloth.darkened(0.28)
+	if cloth.get_luminance() > 0.55:
+		pants = Color("2c261e")
+	var back_foot := Vector2(-5.0 - step * 11.0, ground)
+	var front_foot := Vector2(6.0 + step * 12.0, ground)
+	if not mount:
+		_leg(ci, chest + Vector2(-3.5, 12.0), back_foot, pants, 3.4)
+		_line(ci, back_foot + Vector2(-3.2, -2.6), back_foot + Vector2(4.2, -1.8), trim, 2.0)
+	_sheet_tunic(ci, chest, cloth, trim, bare)
+	if not mount:
+		_leg(ci, chest + Vector2(3.0, 12.0), front_foot, pants.lightened(0.05), 3.6)
+		_line(ci, front_foot + Vector2(-2.2, -2.6), front_foot + Vector2(5.2, -1.8), trim, 2.0)
+	_sheet_hood(ci, chest + Vector2(1.6, -16.0), cloth, trim, eye, mask, phase)
+	var sleeve := cloth.darkened(0.08)
+	var hand := sleeve.lightened(0.22)
+	if bare:
+		sleeve = skin
+		hand = skin
+	elif cloth.get_luminance() > 0.55:
+		hand = skin
+	var arm_w := 3.4 if bare else 2.8
+	var fore_w := 3.6 if bare else 3.0
+	_arm(ci, chest + Vector2(-4.0, -1.0), rear, hand, sleeve, arm_w)
+	_arm(ci, chest + Vector2(5.0, -4.0), front, hand, sleeve.lightened(0.04), fore_w)
+	_dot(ci, front, 2.3, hand)
+	if cycle == "shield":
+		_sheet_shield(ci, front, trim)
+	else:
+		_tool(ci, cycle, phase, beat, t, chest, rear, front, tip, ground, trim, cloth, blade)
+
+
+static func _sheet_tunic(ci: CanvasItem, chest: Vector2, cloth: Color, trim: Color, bare: bool) -> void:
+	var wide := 9.0 if bare else 7.2
+	_poly(ci, PackedVector2Array([
+		chest + Vector2(-wide, -7.0),
+		chest + Vector2(wide, -5.5),
+		chest + Vector2(wide + 1.0, 9.0),
+		chest + Vector2(2.4, 14.0),
+		chest + Vector2(-wide + 1.5, 12.0),
+	]), cloth)
+	_line(ci, chest + Vector2(-wide + 1.5, 12.0), chest + Vector2(2.4, 14.0), trim, 2.0)
+	_line(ci, chest + Vector2(wide - 1.0, -4.0), chest + Vector2(wide + 1.0, 9.0), trim, 1.6)
+	_box(ci, Rect2(chest.x - wide + 1.0, chest.y + 5.5, wide + 4.0, 3.6), trim.darkened(0.15))
+	_poly(ci, PackedVector2Array([
+		chest + Vector2(1.2, 5.2),
+		chest + Vector2(3.4, 7.2),
+		chest + Vector2(1.2, 9.2),
+		chest + Vector2(-1.0, 7.2),
+	]), trim.lightened(0.15))
+
+
+static func _sheet_hood(ci: CanvasItem, at: Vector2, cloth: Color, trim: Color, eye: Color, mask: Color, phase: String) -> void:
+	_ellipse(ci, at + Vector2(-3.4, 1.8), 8.8, 9.4, cloth.darkened(0.28))
+	_ellipse(ci, at + Vector2(2.2, 0.2), 7.4, 8.4, cloth)
+	_poly(ci, PackedVector2Array([
+		at + Vector2(0.4, -5.0),
+		at + Vector2(3.4, -9.2),
+		at + Vector2(6.4, -3.6),
+	]), cloth.darkened(0.08))
+	_line(ci, at + Vector2(0.2, -3.6), at + Vector2(6.6, 2.8), trim, 2.1)
+	_ellipse(ci, at + Vector2(3.6, 2.4), 4.4, 3.3, mask)
+	if phase == "hurt" or phase == "fall":
+		_line(ci, at + Vector2(1.6, -1.2), at + Vector2(5.8, -0.2), Color("f4f4f0"), 1.3)
+		return
+	_dot(ci, at + Vector2(4.4, -1.2), 2.4, Color(eye.r, eye.g, eye.b, 0.35))
+	_dot(ci, at + Vector2(4.4, -1.2), 1.35, eye)
+	_dot(ci, at + Vector2(4.7, -1.4), 0.45, Color("f7f7f4"))
+
+
+static func _sheet_shield(ci: CanvasItem, hand: Vector2, trim: Color) -> void:
+	var at := hand + Vector2(7.0, 1.0)
+	_ellipse(ci, at, 12.0, 14.0, trim)
+	_ellipse(ci, at, 9.0, 11.0, Color("6b4a32"))
+	_line(ci, at + Vector2(0.0, -8.0), at + Vector2(0.0, 8.0), trim.darkened(0.25), 1.3)
+	_ellipse(ci, at, 3.2, 3.2, trim)
+	_dot(ci, at, 1.4, trim.lightened(0.35))
+
+
 static func paint_local(ci: CanvasItem, look: Dictionary, pose: Dictionary) -> void:
 	var phase := str(pose.get("phase", "idle"))
 	var t := float(pose.get("t", 0.0))
@@ -206,6 +375,12 @@ static func paint_local(ci: CanvasItem, look: Dictionary, pose: Dictionary) -> v
 		_paint_saber(ci, chest, rear, front, tip, step, ground, phase, snap)
 		if phase == "act" and beat == contact_beat(weapon) and t > 0.35:
 			_arc(ci, front, 18.0 + t * 14.0, -1.2, 1.0, 14, Color(0.89, 0.69, 0.2, (1.0 - t) * 0.75), 3.0)
+		_tilt = 0.0
+		return
+	if bool(look.get("sheet", false)):
+		_paint_sheet(ci, look, chest, rear, front, tip, step, ground, phase, beat, t, cycle, snap, mount, flash)
+		if phase == "act" and beat == contact_beat(weapon) and t > 0.35 and not _is_quiet(cycle):
+			_arc(ci, front, 16.0 + t * 12.0, -1.15, 0.95, 14, Color(trim.r, trim.g, trim.b, (1.0 - t) * 0.8), 3.0)
 		_tilt = 0.0
 		return
 	_back(ci, chest, faction, weapon, cloth, trim, bool(look.get("pack", true)), snap)
@@ -775,8 +950,10 @@ static func _head(ci: CanvasItem, at: Vector2, skin: Color, cloth: Color, trim: 
 		_ellipse(ci, at + Vector2(1.0, -16.0), 3.2, 2.2, trim)
 
 
-static func _tool(ci: CanvasItem, cycle: String, phase: String, beat: int, t: float, chest: Vector2, rear: Vector2, front: Vector2, tip: Vector2, ground: float, trim: Color, cloth: Color) -> void:
+static func _tool(ci: CanvasItem, cycle: String, phase: String, beat: int, t: float, chest: Vector2, rear: Vector2, front: Vector2, tip: Vector2, ground: float, trim: Color, cloth: Color, blade: Color = Color(0, 0, 0, 0)) -> void:
 	var steel := trim.lightened(0.28)
+	if blade.a > 0.01:
+		steel = blade
 	match cycle:
 		"bow":
 			_bow(ci, beat, t, front, rear, trim, cloth)
@@ -797,9 +974,15 @@ static func _tool(ci: CanvasItem, cycle: String, phase: String, beat: int, t: fl
 			_dot(ci, tip + Vector2(1.0, -2.0), 2.2, trim)
 			_line(ci, tip + Vector2(2.0, -5.0), tip + Vector2(5.0, -10.0), Color("e7c07a"), 1.4)
 		"staff":
-			_staff(ci, beat, t, front, tip, ground, trim)
+			var gem := trim
+			if blade.a > 0.01:
+				gem = blade
+			_staff(ci, beat, t, front, tip, ground, gem)
 		"scroll":
-			_scroll(ci, beat, rear, front, trim, cloth)
+			var paper := trim
+			if blade.a > 0.01:
+				paper = blade
+			_scroll(ci, beat, rear, front, paper, cloth)
 		"nodachi":
 			_line(ci, rear, front, cloth.darkened(0.35), 3.6)
 			_blade_to(ci, front, tip, steel, phase, beat, 3.4)

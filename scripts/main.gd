@@ -25,6 +25,8 @@ Play lists ten roads. The first is open. Winning a road opens the next one. Your
 
 Each road you open pays 100 diamonds. Home is the night gate: Shop, Skin, the roads, and How to play are there, and the diamond count hangs by the lantern. During a fight, Home at the top returns you there.
 
+The shop sells one new skin for the hero and one for each soldier. A skin costs 200 diamonds. Buying it does not put it on. Wear it from Skin, and Nothing puts the old clothes back. The navy saber is a separate skin, also 200 diamonds.
+
 Escape or Back returns to the title."
 
 var loadout: Array = []
@@ -39,9 +41,11 @@ var cleared: int = 0
 var diamonds: int = 0
 var saber_skin: bool = false
 var saber_worn: String = "none"
+var sheet_owned: Dictionary = {}
+var sheet_worn: Dictionary = {}
 var diamond_paid: int = 1
 const ROAD_DIAMONDS := 100
-const SABER_SKIN_COST := 200
+const SKIN_COST := 200
 var chosen_level: int = 1
 var screen: String = "menu"
 
@@ -227,6 +231,87 @@ func _show_how() -> void:
 	box.add_child(back)
 
 
+func _skin_ids() -> Array:
+	return ["hero", "sword", "archer", "shield", "saber", "lancer", "berserker", "horse", "suicide", "assassin", "heal", "level"]
+
+
+func _known_skin(id: String) -> bool:
+	return id in _skin_ids()
+
+
+func _skin_title(id: String) -> String:
+	match id:
+		"sword":
+			return "Sword"
+		"archer":
+			return "Archer"
+		"shield":
+			return "Shield"
+		"saber":
+			return "Saber"
+		"lancer":
+			return "Lancer"
+		"berserker":
+			return "Berserker"
+		"horse":
+			return "Horse"
+		"suicide":
+			return "Bomb"
+		"assassin":
+			return "Assassin"
+		"heal":
+			return "Heal"
+		"level":
+			return "Level"
+		"hero":
+			return "Hero"
+		_:
+			return id
+
+
+func _skin_line(id: String) -> String:
+	match id:
+		"sword":
+			return "Black hood, silver bands, and a silver sword."
+		"archer":
+			return "Green scarf, green eyes, bow, and a quiver."
+		"shield":
+			return "Brown coat and a round gold shield."
+		"saber":
+			return "Black hood, red scarf, and a dark curved sword."
+		"lancer":
+			return "Blue hood and a blue spear."
+		"berserker":
+			return "Red armor, bare arms, and a gold axe."
+		"horse":
+			return "Black rider, red saddle, and a gold sword."
+		"suicide":
+			return "Black hood, red sash, and a lit bomb."
+		"assassin":
+			return "Purple hood and a purple dagger."
+		"heal":
+			return "White robe and a teal crystal staff."
+		"level":
+			return "Gold hood and an open scroll."
+		"hero":
+			return "White hood, red scarf, and a silver sword."
+		_:
+			return ""
+
+
+func _page_list(box: VBoxContainer) -> VBoxContainer:
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	box.add_child(scroll)
+	var list := VBoxContainer.new()
+	list.add_theme_constant_override("separation", 16)
+	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(list)
+	return list
+
+
 func _show_shop() -> void:
 	screen = "shop"
 	var box := _open_page("Shop")
@@ -234,45 +319,97 @@ func _show_shop() -> void:
 	purse.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	purse.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(purse)
-	var pay := UiSkin.label("A new road pays %d diamonds. Skins are worn from the home porch." % ROAD_DIAMONDS, 16, Color("6b3a32"))
+	var pay := UiSkin.label("A new road pays %d diamonds. Each skin is %d. Wear it from the home porch." % [ROAD_DIAMONDS, SKIN_COST], 16, Color("6b3a32"))
 	pay.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	pay.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	pay.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(pay)
-	var stage := SaberPreview.new()
-	stage.navy = true
-	stage.custom_minimum_size = Vector2(0, 220)
-	stage.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	stage.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	box.add_child(stage)
-	var name := UiSkin.label("Navy saber skin", 26, Color("1c140e"))
-	name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	name.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	box.add_child(name)
-	var blurb := UiSkin.label("Navy hood, gold trim, red scarf, and the long grey sword.", 16, Color("2c2118"))
-	blurb.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	blurb.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	blurb.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	box.add_child(blurb)
-	var caption := "Owned"
-	var color := Color("e6c36a")
-	if not saber_skin:
-		caption = "Unlock for %d diamonds" % SABER_SKIN_COST
-		color = Color("1e3f8f")
-	var buy := _menu_button(caption, color, _buy_saber_skin)
-	buy.disabled = saber_skin or diamonds < SABER_SKIN_COST
-	buy.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	box.add_child(buy)
+	var list := _page_list(box)
+	list.add_child(_shop_navy())
+	for id in _skin_ids():
+		list.add_child(_shop_sheet(str(id)))
 	var back := _menu_button("Back", Color("e6c36a"), _show_menu)
 	back.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	box.add_child(back)
 
 
+func _shop_navy() -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 16)
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	var stage := SkinPreview.new()
+	stage.kind = "saber"
+	stage.navy = true
+	stage.custom_minimum_size = Vector2(180, 150)
+	row.add_child(stage)
+	var text := VBoxContainer.new()
+	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	text.add_theme_constant_override("separation", 6)
+	row.add_child(text)
+	var name := UiSkin.label("Navy saber", 22, Color("1c140e"))
+	name.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	text.add_child(name)
+	var blurb := UiSkin.label("Navy hood, gold trim, red scarf, and the long grey sword.", 15, Color("2c2118"))
+	blurb.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	blurb.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	text.add_child(blurb)
+	var caption := "Owned"
+	var color := Color("e6c36a")
+	if not saber_skin:
+		caption = "Unlock for %d diamonds" % SKIN_COST
+		color = Color("1e3f8f")
+	var buy := _menu_button(caption, color, _buy_saber_skin, 220, 16)
+	buy.disabled = saber_skin or diamonds < SKIN_COST
+	text.add_child(buy)
+	return row
+
+
+func _shop_sheet(id: String) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 16)
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	var stage := SkinPreview.new()
+	stage.kind = id
+	stage.sheet = true
+	stage.custom_minimum_size = Vector2(180, 150)
+	row.add_child(stage)
+	var text := VBoxContainer.new()
+	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	text.add_theme_constant_override("separation", 6)
+	row.add_child(text)
+	var name := UiSkin.label("%s skin" % _skin_title(id), 22, Color("1c140e"))
+	name.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	text.add_child(name)
+	var blurb := UiSkin.label(_skin_line(id), 15, Color("2c2118"))
+	blurb.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	blurb.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	text.add_child(blurb)
+	var owned := bool(sheet_owned.get(id, false))
+	var caption := "Owned"
+	var color := Color("e6c36a")
+	if not owned:
+		caption = "Unlock for %d diamonds" % SKIN_COST
+		color = Color("1e3f8f")
+	var buy := _menu_button(caption, color, _buy_sheet.bind(id), 220, 16)
+	buy.disabled = owned or diamonds < SKIN_COST
+	text.add_child(buy)
+	return row
+
+
 func _buy_saber_skin() -> void:
-	if saber_skin or diamonds < SABER_SKIN_COST:
+	if saber_skin or diamonds < SKIN_COST:
 		return
-	diamonds -= SABER_SKIN_COST
+	diamonds -= SKIN_COST
 	saber_skin = true
+	_save_progress()
+	_show_shop()
+
+
+func _buy_sheet(id: String) -> void:
+	if not _known_skin(id) or bool(sheet_owned.get(id, false)) or diamonds < SKIN_COST:
+		return
+	diamonds -= SKIN_COST
+	sheet_owned[id] = true
 	_save_progress()
 	_show_shop()
 
@@ -284,68 +421,108 @@ func _show_skin() -> void:
 	purse.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	purse.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(purse)
-	var pay := UiSkin.label("Choose what the saber wears.", 16, Color("6b3a32"))
+	var pay := UiSkin.label("Wear a skin you own. Nothing puts the old clothes back.", 16, Color("6b3a32"))
 	pay.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	pay.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	pay.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(pay)
-	var row := HBoxContainer.new()
-	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.add_theme_constant_override("separation", 28)
-	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	box.add_child(row)
-	row.add_child(_saber_choice(false))
-	row.add_child(_saber_choice(true))
+	var list := _page_list(box)
+	for id in _skin_ids():
+		list.add_child(_skin_block(str(id)))
 	var back := _menu_button("Back", Color("e6c36a"), _show_menu)
 	back.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	box.add_child(back)
 
 
-func _saber_choice(navy: bool) -> VBoxContainer:
-	var column := VBoxContainer.new()
-	column.add_theme_constant_override("separation", 8)
-	column.custom_minimum_size = Vector2(300, 0)
-	var stage := SaberPreview.new()
-	stage.navy = navy
-	stage.custom_minimum_size = Vector2(300, 230)
-	stage.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	column.add_child(stage)
-	var title := UiSkin.label("Navy skin" if navy else "Nothing", 22, Color("1c140e"))
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+func _skin_block(id: String) -> VBoxContainer:
+	var block := VBoxContainer.new()
+	block.add_theme_constant_override("separation", 8)
+	var title := UiSkin.label(_skin_title(id), 22, Color("1c140e"))
 	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	column.add_child(title)
-	var detail := "Black wrap and dark red scarf." if not navy else "Navy hood, gold trim, red scarf."
-	var blurb := UiSkin.label(detail, 15, Color("2c2118"))
-	blurb.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	blurb.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	blurb.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	column.add_child(blurb)
-	var wearing := (saber_worn == "navy") == navy
+	block.add_child(title)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 18)
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	block.add_child(row)
+	row.add_child(_wear_column(id, false, false))
+	row.add_child(_wear_column(id, true, false))
+	if id == "saber":
+		row.add_child(_wear_column(id, false, true))
+	return block
+
+
+func _wear_column(id: String, sheet: bool, navy: bool) -> VBoxContainer:
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override("separation", 6)
+	column.custom_minimum_size = Vector2(210, 0)
+	var stage := SkinPreview.new()
+	stage.kind = id
+	stage.sheet = sheet
+	stage.navy = navy
+	stage.custom_minimum_size = Vector2(210, 150)
+	column.add_child(stage)
+	var heading := "Nothing"
+	if navy:
+		heading = "Navy skin"
+	elif sheet:
+		heading = "New skin"
+	var label := UiSkin.label(heading, 16, Color("1c140e"))
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	column.add_child(label)
+	var owned := true
+	var wearing := false
+	if navy:
+		owned = saber_skin
+		wearing = saber_worn == "navy"
+	elif sheet:
+		owned = bool(sheet_owned.get(id, false))
+		wearing = bool(sheet_worn.get(id, false))
+	else:
+		wearing = not bool(sheet_worn.get(id, false))
+		if id == "saber" and saber_worn == "navy":
+			wearing = false
 	var caption := "Wearing this"
 	var color := Color("e6c36a")
-	if navy and not saber_skin:
+	if not owned:
 		caption = "In the shop"
 		color = Color("1e3f8f")
 		wearing = false
 	elif not wearing:
 		caption = "Wear this"
-		color = Color("1e3f8f") if navy else Color("1a1216")
-	var button := _menu_button(caption, color, _wear_saber.bind(navy))
-	button.disabled = wearing or (navy and not saber_skin)
-	button.custom_minimum_size = Vector2(280, 52)
+		color = Color("1e3f8f") if sheet or navy else Color("1a1216")
+	var button := _menu_button(caption, color, _wear_choice.bind(id, sheet, navy), 200, 16)
+	button.disabled = wearing or not owned
 	column.add_child(button)
 	return column
 
 
-func _wear_saber(navy: bool) -> void:
+func _wear_choice(id: String, sheet: bool, navy: bool) -> void:
 	if navy:
 		if not saber_skin:
 			return
 		saber_worn = "navy"
+		sheet_worn.erase("saber")
+	elif sheet:
+		if not bool(sheet_owned.get(id, false)):
+			return
+		sheet_worn[id] = true
+		if id == "saber":
+			saber_worn = "none"
 	else:
-		saber_worn = "none"
-	Painter.saber_navy = saber_worn == "navy"
+		sheet_worn.erase(id)
+		if id == "saber":
+			saber_worn = "none"
+	_apply_skins()
 	_save_progress()
 	_show_skin()
+
+
+func _apply_skins() -> void:
+	Painter.saber_navy = saber_worn == "navy"
+	Painter.sheet_on.clear()
+	for key in sheet_worn.keys():
+		Painter.sheet_on[str(key)] = true
 
 
 func _show_levels() -> void:
@@ -692,6 +869,8 @@ func _load_progress() -> void:
 	diamonds = 0
 	saber_skin = false
 	saber_worn = "none"
+	sheet_owned = {}
+	sheet_worn = {}
 	diamond_paid = 1
 	var cfg: ConfigFile = ConfigFile.new()
 	if cfg.load(SAVE_PATH) == OK:
@@ -711,10 +890,22 @@ func _load_progress() -> void:
 			diamond_paid = clampi(int(cfg.get_value("progress", "diamond_paid", 1)), 1, Levels.count())
 		else:
 			diamond_paid = 1
+		sheet_owned = _unpack_keys(str(cfg.get_value("progress", "sheet_owned", "")))
+		sheet_worn = _unpack_keys(str(cfg.get_value("progress", "sheet_worn", "")))
 	if saber_worn != "navy" or not saber_skin:
 		saber_worn = "none"
+	var keep: Dictionary = {}
+	for key in sheet_worn.keys():
+		var id := str(key)
+		if bool(sheet_owned.get(id, false)):
+			keep[id] = true
+	sheet_worn = keep
+	if sheet_worn.has("saber"):
+		saber_worn = "none"
+	elif saber_worn == "navy":
+		sheet_worn.erase("saber")
 	var paid := _take_road_pay()
-	Painter.saber_navy = saber_worn == "navy"
+	_apply_skins()
 	if paid:
 		_save_progress()
 
@@ -726,8 +917,31 @@ func _save_progress() -> void:
 	cfg.set_value("progress", "diamonds", diamonds)
 	cfg.set_value("progress", "saber_skin", saber_skin)
 	cfg.set_value("progress", "saber_worn", saber_worn)
+	cfg.set_value("progress", "sheet_owned", _pack_keys(sheet_owned))
+	cfg.set_value("progress", "sheet_worn", _pack_keys(sheet_worn))
 	cfg.set_value("progress", "diamond_paid", diamond_paid)
 	cfg.save(SAVE_PATH)
+
+
+func _pack_keys(bag: Dictionary) -> String:
+	var parts: PackedStringArray = PackedStringArray()
+	for key in bag.keys():
+		var id := str(key)
+		if _known_skin(id):
+			parts.append(id)
+	return ",".join(parts)
+
+
+func _unpack_keys(text: String) -> Dictionary:
+	var bag: Dictionary = {}
+	if text == "":
+		return bag
+	var parts: PackedStringArray = text.split(",", false)
+	for part in parts:
+		var id := str(part).strip_edges()
+		if _known_skin(id):
+			bag[id] = true
+	return bag
 
 
 func _layout_check() -> void:
@@ -946,6 +1160,52 @@ class HomeYard:
 		draw_rect(Rect2(at.x - 12.0, at.y - 14.0, 24.0, 28.0), Color("f0b429"))
 		draw_rect(Rect2(at.x - 8.0, at.y - 10.0, 16.0, 12.0), Color("fff1c9"))
 		draw_line(at + Vector2(0.0, -14.0), at + Vector2(0.0, 14.0), Color("2a1e18"), 2.0)
+
+
+class SkinPreview:
+	extends Control
+
+	const Painter = preload("res://scripts/painter.gd")
+	var kind: String = "sword"
+	var sheet: bool = false
+	var navy: bool = false
+	var clock: float = 0.0
+
+	func _ready() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		resized.connect(queue_redraw)
+
+	func _process(delta: float) -> void:
+		if not is_visible_in_tree():
+			return
+		clock += delta
+		queue_redraw()
+
+	func _draw() -> void:
+		var origin := Vector2(size.x * 0.5, size.y * 0.74)
+		var zoom := 2.05
+		if kind == "horse" and not navy:
+			zoom = 1.65
+			origin.y = size.y * 0.8
+		draw_set_transform(origin, 0.0, Vector2(zoom, zoom))
+		if navy:
+			Painter.paint_saber_front(self, true)
+		else:
+			var look: Dictionary = Painter.look_as(kind, sheet, false)
+			var span := fmod(clock, 2.2)
+			var phase := "march"
+			var beat := 0
+			var along := 0.0
+			if span < 0.7:
+				along = span / 0.7
+			else:
+				phase = "act"
+				var act := (span - 0.7) / 1.5
+				beat = mini(3, int(act * 4.0))
+				along = clampf(act * 4.0 - float(beat), 0.0, 1.0)
+			var pose := {"phase": phase, "t": along, "clock": clock, "beat": beat}
+			Painter.paint_local(self, look, pose)
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
 class SaberPreview:
