@@ -31,6 +31,8 @@ func take_damage(amount: float, _quiet: bool = false) -> void:
 	if not gusted and hp <= max_hp * 0.5 and hp > 0.0:
 		gusted = true
 		battle.gate_gust(side)
+	if side == 1:
+		battle.note_enemy_purse()
 	Sfx.play("castle", randf_range(0.92, 1.05), -6.0)
 	queue_redraw()
 	if hp <= 0.0:

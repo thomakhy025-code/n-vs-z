@@ -41,6 +41,7 @@ var strike_sent: bool = false
 var support_pulse: bool = false
 var pending_foe = null
 var pending_gate = null
+var boss_marks: Array[Vector2] = []
 
 
 func setup(field, entry: Dictionary, which_side: int) -> void:
@@ -57,6 +58,8 @@ func setup(field, entry: Dictionary, which_side: int) -> void:
 	attack_timer = 0.55 if role == "berserker" or role == "aoe" else 0.22
 	if role == "suicide":
 		attack_timer = 0.08
+	if role == "boss":
+		attack_timer = 0.9
 	bob_time = randf() * TAU
 
 
@@ -141,7 +144,7 @@ func _process(delta: float) -> void:
 		_support(delta)
 	else:
 		_fight(delta)
-	if _is_berserker() and battle.lane_ys.size() > 0:
+	if _spans_roads() and battle.lane_ys.size() > 0:
 		z_index = int(battle.lane_ys[battle.lane_ys.size() - 1]) + 24
 	else:
 		z_index = int(position.y)
@@ -276,6 +279,9 @@ func _resolve_strike() -> void:
 			var tint_gate: Color = Color("b6e36a") if side == 1 else Color("f2d38a")
 			battle.fire_arrow(position + Vector2(0, -16), Vector2(gate.front_x, position.y - 16.0), amount, side, tint_gate, reach + 40.0, lane, false, true, false)
 		return
+	if _is_boss():
+		_strike_boss(amount, reach)
+		return
 	if _is_berserker():
 		for other in battle.hostile_targets(side):
 			if abs(other.position.x - position.x) <= reach:
@@ -285,7 +291,7 @@ func _resolve_strike() -> void:
 		return
 	if role == "aoe" or role == "suicide":
 		for other in battle.hostile_targets(side):
-			if int(other.lane) != lane:
+			if int(other.lane) != lane and not battle.is_boss(other):
 				continue
 			if abs(other.position.x - position.x) <= reach:
 				other.take_damage(amount, true)
@@ -319,7 +325,7 @@ func catch_gust(at_x: float) -> void:
 
 
 func _nearest_foe():
-	if _is_berserker():
+	if _is_berserker() or _is_boss():
 		return _closest_ahead(false)
 	var same = _closest_ahead(true)
 	if same != null:
@@ -347,7 +353,7 @@ func _berserker_in_reach():
 	var best = null
 	var best_d := reach
 	for foe in battle.hostile_targets(side):
-		if not battle.is_berserker(foe) or int(foe.lane) == lane:
+		if int(foe.lane) == lane or not (battle.is_berserker(foe) or battle.is_boss(foe)):
 			continue
 		var along := _along(foe)
 		if along < -8.0 or along > reach:
@@ -360,6 +366,40 @@ func _berserker_in_reach():
 
 func _is_berserker() -> bool:
 	return str(data.get("id", "")) == "berserker"
+
+
+func _is_boss() -> bool:
+	return str(data.get("id", "")) == "boss"
+
+
+func _spans_roads() -> bool:
+	return _is_berserker() or _is_boss()
+
+
+func _strike_boss(amount: float, reach: float) -> void:
+	var first = null
+	var second = null
+	var first_d := reach
+	var second_d := reach
+	for other in battle.hostile_targets(side):
+		var along := _along(other)
+		if along < -8.0 or along > reach:
+			continue
+		if first == null or along < first_d:
+			second = first
+			second_d = first_d
+			first = other
+			first_d = along
+		elif second == null or along < second_d:
+			second = other
+			second_d = along
+	boss_marks.clear()
+	if first != null:
+		first.take_damage(amount, true)
+		boss_marks.append(first.global_position)
+	if second != null:
+		second.take_damage(amount, true)
+		boss_marks.append(second.global_position)
 
 
 func _along(other) -> float:
@@ -435,7 +475,7 @@ func _road_span() -> float:
 
 func _body_scale() -> float:
 	var sc := float(data.get("scale", 1.2))
-	if not _is_berserker():
+	if not _spans_roads():
 		return sc
 	var span := _road_span()
 	if span <= 1.0:
@@ -444,7 +484,7 @@ func _body_scale() -> float:
 
 
 func _body_shift(sc: float) -> float:
-	if not _is_berserker():
+	if not _spans_roads():
 		return 0.0
 	return -0.5 * (BERSERK_TOP + BERSERK_BOTTOM) * sc
 
@@ -462,7 +502,7 @@ func _draw() -> void:
 		var ring := clampf(debut / 0.46, 0.0, 1.0)
 		var radius := 16.0 + (1.0 - ring) * 14.0
 		var at := Vector2(0, 10)
-		if _is_berserker():
+		if _spans_roads():
 			radius = _road_span() * 0.48
 			at = Vector2.ZERO
 		draw_arc(at, radius, 0, TAU, 24, Color(1, 0.9, 0.62, ring), 2.2)
@@ -470,10 +510,10 @@ func _draw() -> void:
 		return
 	var ratio := clampf(hp / maxf(1.0, max_hp), 0.0, 1.0)
 	var bar_y := -58.0 * sc
-	if _is_berserker():
+	if _spans_roads():
 		bar_y = shift + BERSERK_TOP * sc - 14.0
 	var bar_w := 36.0 * sc
-	var bar_h := 8.0 if _is_berserker() else 5.0
+	var bar_h := 8.0 if _spans_roads() else 5.0
 	draw_rect(Rect2(-bar_w * 0.5, bar_y, bar_w, bar_h), Color(0, 0, 0, 0.65))
 	var fill := Color("7dce6a") if ratio > 0.35 else Color("e24b3b")
 	draw_rect(Rect2(-bar_w * 0.5, bar_y, bar_w * ratio, bar_h), fill)
@@ -481,6 +521,10 @@ func _draw() -> void:
 		draw_circle(Vector2(-bar_w * 0.5 - 6.0, bar_y + 2.0), 3.2, Color("c084fc"))
 	if level_stacks > 0:
 		draw_circle(Vector2(bar_w * 0.5 + 6.0, bar_y + 2.0), 3.4, Color("e6c36a"))
+	if _is_boss() and lunge > 0.12:
+		var boss_alpha := clampf(lunge, 0.0, 1.0)
+		for mark in boss_marks:
+			draw_line(Vector2(0, -20), to_local(mark), Color(0.86, 0.16, 0.12, boss_alpha), 7.0)
 	if _is_berserker() and lunge > 0.12:
 		var reach := float(data["reach"])
 		var alpha := clampf(lunge, 0.0, 1.0)

@@ -79,6 +79,8 @@ var texts_this_frame: int = 0
 var harness_done: bool = false
 var sword_hold: bool = false
 var shoot_hold: bool = false
+var purse_paid: Dictionary = {}
+var boss_up: bool = false
 
 
 func start(chosen: Array, run_mode: String, level_index: int = 1) -> void:
@@ -513,7 +515,8 @@ func _spawn(entry: Dictionary, side: int) -> void:
 		road = lane_tick % maxi(lane_ys.size(), 1)
 		lane_tick += 1
 	road = clampi(road, 0, maxi(lane_ys.size() - 1, 0))
-	if str(entry.get("id", "")) == "berserker":
+	var kind: String = str(entry.get("id", ""))
+	if kind == "berserker" or kind == "boss":
 		road = lane_ys.size() / 2
 	unit.lane = road
 	var y := lane_y(road)
@@ -590,12 +593,22 @@ func lane_index(y: float) -> int:
 
 
 func is_berserker(unit) -> bool:
+	return _unit_id(unit) == "berserker"
+
+
+func is_boss(unit) -> bool:
+	return _unit_id(unit) == "boss"
+
+
+func _unit_id(unit) -> String:
 	if unit == null or not is_instance_valid(unit):
-		return false
+		return ""
 	if not ("data" in unit):
-		return false
+		return ""
 	var info = unit.data
-	return info is Dictionary and str(info.get("id", "")) == "berserker"
+	if not info is Dictionary:
+		return ""
+	return str(info.get("id", ""))
 
 
 func float_text(at: Vector2, text: String, color: Color) -> void:
@@ -670,6 +683,8 @@ func on_unit_down(unit) -> void:
 				target.remove_level_buff()
 		elif buff_links[source] == unit:
 			buff_links[source] = null
+	if boss_up and _unit_id(unit) == "boss":
+		_finish_battle(1)
 
 
 func set_buff_link(buffer, target) -> void:
@@ -691,7 +706,48 @@ func _can_buff(node) -> bool:
 	return node != null and is_instance_valid(node) and node.alive and node.has_method("remove_level_buff")
 
 
+func note_enemy_purse() -> void:
+	if enemy_gate == null:
+		return
+	var ratio := enemy_gate.hp / maxf(1.0, enemy_gate.max_hp)
+	var start := float(rules.get("start", ENEMY_START))
+	if level_no >= 10:
+		_pay_purse("70", 0.70, ratio, start)
+	if level_no >= 5:
+		_pay_purse("50", 0.50, ratio, start)
+	_pay_purse("25", 0.25, ratio, start)
+
+
+func _pay_purse(key: String, line: float, ratio: float, start: float) -> void:
+	if ratio > line or purse_paid.has(key):
+		return
+	purse_paid[key] = true
+	enemy_value += start
+	var stack := purse_paid.size() - 1
+	float_text(Vector2(enemy_front, lane_y(0) - 20.0 - float(stack) * 22.0), "+%d" % int(round(start)), Color("c6e38a"))
+
+
 func on_gate_fallen(defender_side: int) -> void:
+	if finished:
+		return
+	if defender_side == 1 and level_no >= 10 and not boss_up:
+		_summon_boss()
+		return
+	_finish_battle(defender_side)
+
+
+func _summon_boss() -> void:
+	boss_up = true
+	enemy_income = 1.0
+	var entry: Dictionary = Catalog.find_in(enemy_roster, "boss")
+	if entry.is_empty():
+		_finish_battle(1)
+		return
+	_spawn(entry, 1)
+	float_text(Vector2(enemy_front - 30.0, lane_y(1) - 78.0), "BOSS", Color("e6c36a"))
+
+
+func _finish_battle(defender_side: int) -> void:
 	if finished:
 		return
 	finished = true
@@ -707,7 +763,10 @@ func on_gate_fallen(defender_side: int) -> void:
 		var host := get_parent()
 		if host != null and host.has_method("note_clear"):
 			host.note_clear(level_no)
-		if level_no >= Levels.count():
+		if boss_up:
+			title = "The war boss falls"
+			body = "The last road is clear."
+		elif level_no >= Levels.count():
 			body = "The last road is clear."
 		else:
 			var nxt: Dictionary = Levels.level(level_no + 1)

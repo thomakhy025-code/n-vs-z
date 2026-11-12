@@ -65,6 +65,8 @@ func _hits(foe) -> bool:
 	var dx: float = foe.position.x - position.x
 	if dx * velocity.x < -10.0:
 		return false
+	if battle.is_boss(foe):
+		return absf(dx) <= 56.0
 	if homing and battle.is_berserker(foe):
 		return Vector2(dx, foe.position.y - position.y).length() <= 26.0
 	if int(foe.lane) != lane:

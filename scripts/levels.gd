@@ -25,7 +25,7 @@ static func _all() -> Array:
 		_row(7, "Oni early", "The oni can be called from 28s. +1.2 each second, starts at 58.", 1.2, 58.0, 0.0, 12.0, 24.0, 28.0, 3, 8, 22.0, 1.5, 3.3, 0.012, 0.42, 1.0, 1.0, false),
 		_row(8, "Paired muster", "Two dead in one beat, on two roads. +1.25 each second, starts at 64.", 1.25, 64.0, 0.0, 12.0, 24.0, 50.0, 3, 8, 22.0, 1.5, 3.3, 0.012, 0.42, 1.0, 1.0, true),
 		_row(9, "Fast muster", "Faster calls, waves up to 11, tougher dead. +1.3 each second, starts at 70.", 1.3, 70.0, 0.0, 12.0, 24.0, 50.0, 4, 11, 16.0, 1.1, 2.4, 0.015, 0.30, 1.25, 1.1, false),
-		_row(10, "Night march", "Early oni, paired calls, fast waves, tougher dead. +1.4 each second, starts at 76.", 1.4, 76.0, 0.0, 12.0, 24.0, 28.0, 4, 11, 16.0, 1.1, 2.4, 0.015, 0.30, 1.25, 1.1, true),
+		_row(10, "Night march", "Early oni, paired calls, fast waves, tougher dead. +1.4 each second, starts at 76. A war boss walks when the gate falls.", 1.4, 76.0, 0.0, 12.0, 24.0, 28.0, 4, 11, 16.0, 1.1, 2.4, 0.015, 0.30, 1.25, 1.1, true),
 	]
 
 

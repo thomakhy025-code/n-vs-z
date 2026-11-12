@@ -52,6 +52,8 @@ static func _painted(kind: String) -> Dictionary:
 			return _look(Color("e0c2a0"), Color("4a4634"), Color("e24b3b"), "bomb", false, "soldier")
 		"oni":
 			return _look(Color("e0c2a0"), Color("3d3428"), Color("e6c36a"), "polearm", false, "soldier")
+		"boss":
+			return _look(Color("e0c2a0"), Color("241c16"), Color("e6c36a"), "polearm", false, "soldier")
 		_:
 			return _look(Color("f0c9a0"), Color("1a1e28"), Color("c5ccd6"), "katana", false, "ninja")
 
@@ -76,7 +78,7 @@ static func call_id(paint: String) -> String:
 			return "call_magic"
 		"walker", "runner", "spitter":
 			return "call_dead"
-		"oni":
+		"oni", "boss":
 			return "call_oni"
 		"hero":
 			return "call_hero"

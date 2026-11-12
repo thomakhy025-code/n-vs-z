@@ -252,7 +252,7 @@ func _nearest(reach: float):
 	var best_d := reach
 	var mine := lane
 	for foe in battle.hostile_targets(0):
-		if int(foe.lane) != mine:
+		if int(foe.lane) != mine and not battle.is_boss(foe):
 			continue
 		var dist: float = absf(float(foe.position.x) - position.x)
 		if dist <= best_d:
