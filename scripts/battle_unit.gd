@@ -317,7 +317,7 @@ func catch_gust(at_x: float) -> void:
 	act = 0.0
 	winding = false
 	strike_sent = true
-	var left := maxf(1.0, hp * 0.75)
+	var left: float = maxf(1.0, hp * 0.5)
 	var lost := hp - left
 	hp = left
 	if lost >= 1.0:

@@ -241,6 +241,11 @@ func shove_back(at_x: float) -> void:
 	act = 0.0
 	winding = false
 	strike_sent = true
+	var left: float = maxf(1.0, hp * 0.5)
+	var lost: float = hp - left
+	hp = left
+	if lost >= 1.0:
+		battle.float_text(position + Vector2(0, -58), str(int(round(lost))), Color("9fd4ff"))
 
 
 func sword_reach() -> float:
