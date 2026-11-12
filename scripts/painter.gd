@@ -222,7 +222,7 @@ static func _sheet_row(kind: String) -> Dictionary:
 			return {}
 
 
-static func _paint_sheet(ci: CanvasItem, look: Dictionary, chest: Vector2, rear: Vector2, front: Vector2, tip: Vector2, step: float, ground: float, phase: String, beat: int, t: float, cycle: String, snap: float, mount: bool, flash: float) -> void:
+static func _paint_sheet(ci: CanvasItem, look: Dictionary, chest: Vector2, rear: Vector2, front: Vector2, tip: Vector2, step: float, ground: float, phase: String, beat: int, t: float, cycle: String, snap: float, mount: bool, flash: float, drop: float) -> void:
 	var cloth: Color = look["cloth"] as Color
 	var trim: Color = look["trim"] as Color
 	var skin: Color = look["skin"] as Color
@@ -231,99 +231,667 @@ static func _paint_sheet(ci: CanvasItem, look: Dictionary, chest: Vector2, rear:
 	var blade: Color = look["blade"] as Color
 	var scarf: Color = look["scarf"] as Color
 	var bare: bool = bool(look["bare"])
+	var wash := 0.0
 	if flash > 0.0:
-		var wash := clampf(flash * 4.0, 0.0, 0.72)
+		wash = clampf(flash * 4.0, 0.0, 0.72)
 		skin = skin.lerp(Color.WHITE, wash)
 		cloth = cloth.lerp(Color.WHITE, wash)
 		trim = trim.lerp(Color.WHITE, wash)
 		eye = eye.lerp(Color.WHITE, wash)
 		blade = blade.lerp(Color.WHITE, wash)
+	var ink := Color("141210").lerp(Color.WHITE, wash)
 	var paint := str(look.get("paint", ""))
-	if mount and paint == "horse":
-		_ellipse(ci, chest + Vector2(2.0, 22.0), 11.0, 3.6, Color("8e2430"))
-		_line(ci, chest + Vector2(-8.0, 22.0), chest + Vector2(10.0, 22.0), trim, 1.6)
+	if mount:
+		_px_horse(ci, trim, step, drop, ink)
 	if scarf.a > 0.2:
-		_saber_scarf(ci, chest, snap, scarf)
+		_px_scarf(ci, chest, snap, scarf, ink)
 	if paint == "archer":
-		_box(ci, Rect2(chest.x - 15.0, chest.y - 8.0, 7.0, 16.0), Color("6b4a32"))
-		_line(ci, chest + Vector2(-13.5, -11.0), chest + Vector2(-11.0, -4.0), trim, 1.5)
-		_line(ci, chest + Vector2(-12.0, -12.0), chest + Vector2(-9.0, -5.0), trim.lightened(0.25), 1.4)
+		_px_quiver(ci, chest, trim, ink)
 	var pants := cloth.darkened(0.28)
 	if cloth.get_luminance() > 0.55:
 		pants = Color("2c261e")
-	var back_foot := Vector2(-5.0 - step * 11.0, ground)
-	var front_foot := Vector2(6.0 + step * 12.0, ground)
-	if not mount:
-		_leg(ci, chest + Vector2(-3.5, 12.0), back_foot, pants, 3.4)
-		_line(ci, back_foot + Vector2(-3.2, -2.6), back_foot + Vector2(4.2, -1.8), trim, 2.0)
-	_sheet_tunic(ci, chest, cloth, trim, bare)
-	if not mount:
-		_leg(ci, chest + Vector2(3.0, 12.0), front_foot, pants.lightened(0.05), 3.6)
-		_line(ci, front_foot + Vector2(-2.2, -2.6), front_foot + Vector2(5.2, -1.8), trim, 2.0)
-	_sheet_hood(ci, chest + Vector2(1.6, -16.0), cloth, trim, eye, mask, phase)
+	var wraps := 2 if paint == "heal" else 1
+	if mount:
+		_px_leg(ci, chest + Vector2(-4.0, 8.0), chest + Vector2(-6.0 - step * 3.0, 16.0), pants, trim, ink, wraps)
+	else:
+		_px_leg(ci, chest + Vector2(-4.0, 8.0), Vector2(-5.0 - step * 11.0, ground), pants, trim, ink, wraps)
+	_px_tunic(ci, chest, cloth, trim, ink, bare, paint)
+	if mount:
+		_px_leg(ci, chest + Vector2(3.0, 8.0), chest + Vector2(7.0 + step * 3.0, 16.0), pants.lightened(0.06), trim, ink, wraps)
+	else:
+		_px_leg(ci, chest + Vector2(3.0, 8.0), Vector2(6.0 + step * 12.0, ground), pants.lightened(0.06), trim, ink, wraps)
+	if paint == "shield":
+		_px_hip_sword(ci, chest, trim, ink)
+	var head := chest + Vector2(1.6, -16.0)
+	var neck_x := int(round(head.x)) + 1
+	var neck_top := int(round(head.y)) + 5
+	var neck_bot := int(round(chest.y)) - 5
+	for y in range(neck_top, neck_bot):
+		_px_put(ci, Vector2(float(neck_x) - 1.0, float(y)), ink)
+		_px_run_x(ci, neck_x, neck_x + 2, y, cloth)
+	_px_hood(ci, head, cloth, trim, eye, mask, ink, phase, paint)
+	if scarf.a > 0.2:
+		var neck := Vector2(round(head.x), round(head.y) + 6.0)
+		_px_run_x(ci, int(neck.x) - 2, int(neck.x) + 5, int(neck.y), scarf)
+		_px_run_x(ci, int(neck.x) - 1, int(neck.x) + 4, int(neck.y) + 1, scarf.darkened(0.14))
 	var sleeve := cloth.darkened(0.08)
-	var hand := sleeve.lightened(0.22)
+	var glove := sleeve.lightened(0.22)
 	if bare:
 		sleeve = skin
-		hand = skin
+		glove = skin.lightened(0.08)
 	elif cloth.get_luminance() > 0.55:
-		hand = skin
-	var arm_w := 3.4 if bare else 2.8
-	var fore_w := 3.6 if bare else 3.0
-	_arm(ci, chest + Vector2(-4.0, -1.0), rear, hand, sleeve, arm_w)
-	_arm(ci, chest + Vector2(5.0, -4.0), front, hand, sleeve.lightened(0.04), fore_w)
-	_dot(ci, front, 2.3, hand)
-	if cycle == "shield":
-		_sheet_shield(ci, front, trim)
-	else:
-		_tool(ci, cycle, phase, beat, t, chest, rear, front, tip, ground, trim, cloth, blade)
+		glove = skin
+	_px_arm(ci, chest + Vector2(-4.0, -1.0), rear, sleeve, glove, ink, bare)
+	_px_arm(ci, chest + Vector2(5.0, -4.0), front, sleeve.lightened(0.05), glove, ink, bare)
+	if bare:
+		_px_bracer(ci, front, trim)
+		_px_bracer(ci, rear, trim.darkened(0.08))
+	_px_weapon(ci, cycle, phase, beat, t, chest, rear, front, tip, ground, trim, cloth, blade, ink)
 
 
-static func _sheet_tunic(ci: CanvasItem, chest: Vector2, cloth: Color, trim: Color, bare: bool) -> void:
-	var wide := 9.0 if bare else 7.2
-	_poly(ci, PackedVector2Array([
-		chest + Vector2(-wide, -7.0),
-		chest + Vector2(wide, -5.5),
-		chest + Vector2(wide + 1.0, 9.0),
-		chest + Vector2(2.4, 14.0),
-		chest + Vector2(-wide + 1.5, 12.0),
-	]), cloth)
-	_line(ci, chest + Vector2(-wide + 1.5, 12.0), chest + Vector2(2.4, 14.0), trim, 2.0)
-	_line(ci, chest + Vector2(wide - 1.0, -4.0), chest + Vector2(wide + 1.0, 9.0), trim, 1.6)
-	_box(ci, Rect2(chest.x - wide + 1.0, chest.y + 5.5, wide + 4.0, 3.6), trim.darkened(0.15))
-	_poly(ci, PackedVector2Array([
-		chest + Vector2(1.2, 5.2),
-		chest + Vector2(3.4, 7.2),
-		chest + Vector2(1.2, 9.2),
-		chest + Vector2(-1.0, 7.2),
-	]), trim.lightened(0.15))
+static func _px_tunic(ci: CanvasItem, chest: Vector2, cloth: Color, trim: Color, ink: Color, bare: bool, paint: String) -> void:
+	var rows: Array[String] = [
+		"..oooooooooo..",
+		".ohhhhhhhhhl..",
+		".ohhhttttthl..",
+		".ohhhhhtthhl..",
+		".ohhhhhhhhhl..",
+		".ottttttttttl.",
+		".ohhhhbhhhhlo.",
+		".ohhhhhhhhhl..",
+		".otttttttttl..",
+		"..oooooooooo..",
+	]
+	var colors := {
+		"o": ink,
+		"h": cloth,
+		"l": cloth.lightened(0.16),
+		"t": trim,
+		"b": trim.lightened(0.28),
+	}
+	var origin := Vector2(round(chest.x) - 6.0, round(chest.y) - 6.0)
+	_px_map(ci, origin, rows, colors)
+	if bare:
+		for y in range(1, 8):
+			_px_put(ci, origin + Vector2(12.0, float(y)), cloth)
+			_px_put(ci, origin + Vector2(13.0, float(y)), trim)
+		_px_run_x(ci, int(origin.x) + 8, int(origin.x) + 12, int(origin.y) + 1, trim)
+		_px_run_x(ci, int(origin.x) + 9, int(origin.x) + 11, int(origin.y) + 2, trim.lightened(0.2))
+	if paint == "heal":
+		_px_put(ci, chest + Vector2(2.0, 2.0), trim)
+		_px_run_x(ci, int(round(chest.x)) + 1, int(round(chest.x)) + 3, int(round(chest.y)) + 3, trim)
+		_px_put(ci, chest + Vector2(2.0, 4.0), trim)
 
 
-static func _sheet_hood(ci: CanvasItem, at: Vector2, cloth: Color, trim: Color, eye: Color, mask: Color, phase: String) -> void:
-	_ellipse(ci, at + Vector2(-3.4, 1.8), 8.8, 9.4, cloth.darkened(0.28))
-	_ellipse(ci, at + Vector2(2.2, 0.2), 7.4, 8.4, cloth)
-	_poly(ci, PackedVector2Array([
-		at + Vector2(0.4, -5.0),
-		at + Vector2(3.4, -9.2),
-		at + Vector2(6.4, -3.6),
-	]), cloth.darkened(0.08))
-	_line(ci, at + Vector2(0.2, -3.6), at + Vector2(6.6, 2.8), trim, 2.1)
-	_ellipse(ci, at + Vector2(3.6, 2.4), 4.4, 3.3, mask)
+static func _px_hood(ci: CanvasItem, at: Vector2, cloth: Color, trim: Color, eye: Color, mask: Color, ink: Color, phase: String, paint: String) -> void:
+	var rows: Array[String] = [
+		"....pppp........",
+		"...phhhhp.......",
+		"..odhhhhlo......",
+		".odddhhhlo......",
+		"ooddddhhlo......",
+		".otmmmtlo.......",
+		".odmmmmeo.......",
+		".odmmmmewo......",
+		".odmmmmewo......",
+		".ohhhhhhlo......",
+		"..ohhhhlo.......",
+		"...oooooo.......",
+	]
+	var eye_px := eye
+	var core := Color("f7f7f4")
 	if phase == "hurt" or phase == "fall":
-		_line(ci, at + Vector2(1.6, -1.2), at + Vector2(5.8, -0.2), Color("f4f4f0"), 1.3)
+		eye_px = Color("f4f4f0")
+		core = Color("f4f4f0")
+	var colors := {
+		"o": ink,
+		"p": cloth.darkened(0.06),
+		"h": cloth,
+		"d": cloth.darkened(0.34),
+		"l": cloth.lightened(0.14),
+		"t": trim,
+		"m": mask,
+		"e": eye_px,
+		"w": core,
+	}
+	var origin := Vector2(round(at.x) - 4.0, round(at.y) - 8.0)
+	_px_map(ci, origin, rows, colors)
+	_px_put(ci, at + Vector2(1.0, -9.0), trim)
+	_px_put(ci, at + Vector2(2.0, -10.0), trim.lightened(0.2))
+	_px_put(ci, at + Vector2(3.0, -9.0), trim)
+	_px_mark(ci, at, paint, trim, eye)
+	_px_face(ci, at, mask, trim, eye, ink, phase)
+
+
+static func _px_face(ci: CanvasItem, at: Vector2, mask: Color, trim: Color, eye: Color, ink: Color, phase: String) -> void:
+	var fx := int(round(at.x)) + 2
+	var fy := int(round(at.y)) - 3
+	_px_run_x(ci, fx - 1, fx + 4, fy, trim)
+	_px_run_x(ci, fx - 1, fx + 4, fy + 5, trim.darkened(0.15))
+	for y in range(1, 5):
+		_px_put(ci, Vector2(float(fx) - 1.0, float(fy + y)), trim)
+		_px_run_x(ci, fx, fx + 3, fy + y, mask)
+		_px_put(ci, Vector2(float(fx) + 4.0, float(fy + y)), ink)
+	if phase == "hurt" or phase == "fall":
+		_px_run_x(ci, fx + 1, fx + 3, fy + 2, Color("f4f4f0"))
 		return
-	_dot(ci, at + Vector2(4.4, -1.2), 2.4, Color(eye.r, eye.g, eye.b, 0.35))
-	_dot(ci, at + Vector2(4.4, -1.2), 1.35, eye)
-	_dot(ci, at + Vector2(4.7, -1.4), 0.45, Color("f7f7f4"))
+	_px_put(ci, Vector2(float(fx) + 2.0, float(fy) + 2.0), eye)
+	_px_put(ci, Vector2(float(fx) + 3.0, float(fy) + 2.0), eye)
+	_px_put(ci, Vector2(float(fx) + 3.0, float(fy) + 1.0), Color("f7f7f4"))
 
 
-static func _sheet_shield(ci: CanvasItem, hand: Vector2, trim: Color) -> void:
+static func _px_mark(ci: CanvasItem, at: Vector2, paint: String, trim: Color, eye: Color) -> void:
+	var o := at + Vector2(-6.0, -1.0)
+	match paint:
+		"hero":
+			_px_put(ci, o + Vector2(0.0, -2.0), trim)
+			_px_put(ci, o + Vector2(1.0, -1.0), trim)
+			_px_put(ci, o + Vector2(0.0, -1.0), trim.lightened(0.2))
+			_px_put(ci, o + Vector2(1.0, 0.0), trim)
+			_px_put(ci, o + Vector2(2.0, 1.0), trim)
+		"sword":
+			_px_put(ci, o + Vector2(1.0, -1.0), trim)
+			_px_put(ci, o + Vector2(0.0, 0.0), trim)
+			_px_put(ci, o + Vector2(2.0, 0.0), trim)
+			_px_put(ci, o + Vector2(1.0, 1.0), trim)
+		"saber", "suicide":
+			_px_put(ci, o + Vector2(1.0, -2.0), trim.lightened(0.25))
+			_px_put(ci, o + Vector2(0.0, -1.0), trim)
+			_px_put(ci, o + Vector2(1.0, -1.0), trim.lightened(0.15))
+			_px_put(ci, o + Vector2(2.0, 0.0), trim)
+			_px_put(ci, o + Vector2(1.0, 1.0), trim.darkened(0.15))
+		"lancer":
+			_px_put(ci, o + Vector2(1.0, -2.0), eye)
+			_px_put(ci, o + Vector2(0.0, -1.0), trim)
+			_px_put(ci, o + Vector2(1.0, -1.0), eye)
+			_px_put(ci, o + Vector2(2.0, -1.0), trim)
+		"berserker":
+			_px_run_x(ci, int(round(o.x)), int(round(o.x)) + 3, int(round(o.y)) - 2, trim)
+			_px_put(ci, o + Vector2(0.0, -3.0), trim.lightened(0.2))
+			_px_put(ci, o + Vector2(2.0, -3.0), trim.lightened(0.2))
+		"horse":
+			_px_put(ci, o + Vector2(1.0, -1.0), trim)
+			_px_put(ci, o + Vector2(0.0, 0.0), trim.lightened(0.2))
+			_px_put(ci, o + Vector2(2.0, 0.0), trim.lightened(0.2))
+			_px_put(ci, o + Vector2(1.0, 0.0), trim)
+			_px_put(ci, o + Vector2(1.0, 1.0), trim)
+		"assassin":
+			_px_put(ci, o + Vector2(0.0, -1.0), eye)
+			_px_put(ci, o + Vector2(2.0, -1.0), eye)
+			_px_put(ci, o + Vector2(1.0, 1.0), trim)
+		"heal":
+			_px_put(ci, o + Vector2(1.0, -1.0), trim)
+			_px_run_x(ci, int(round(o.x)), int(round(o.x)) + 2, int(round(o.y)), trim)
+			_px_put(ci, o + Vector2(1.0, 1.0), trim)
+		"level":
+			_px_put(ci, o + Vector2(1.0, -2.0), trim.lightened(0.3))
+			_px_put(ci, o + Vector2(0.0, -1.0), trim)
+			_px_put(ci, o + Vector2(1.0, -1.0), trim.lightened(0.15))
+			_px_put(ci, o + Vector2(1.0, 0.0), trim)
+		"shield":
+			_px_put(ci, o + Vector2(1.0, -2.0), trim.lightened(0.25))
+			_px_run_x(ci, int(round(o.x)), int(round(o.x)) + 2, int(round(o.y)) - 1, trim)
+			_px_put(ci, o + Vector2(1.0, 0.0), trim.darkened(0.1))
+		_:
+			pass
+
+
+static func _px_scarf(ci: CanvasItem, chest: Vector2, snap: float, color: Color, ink: Color) -> void:
+	var neck := chest + Vector2(-1.0, -8.0)
+	var end := chest + Vector2(-16.0, 4.0)
+	var tip := end + Vector2(-4.0, 7.0)
+	if snap > 12.0:
+		end = chest + Vector2(11.0 + snap * 0.22, 3.0)
+		tip = end + Vector2(5.0, 7.0)
+	_px_line(ci, neck, end, ink, 3)
+	_px_line(ci, neck, end, color, 2)
+	_px_line(ci, end, tip, color.darkened(0.12), 2)
+	_px_put(ci, end + Vector2(0.0, 1.0), color.lightened(0.12))
+	_px_put(ci, tip, color.lightened(0.18))
+
+
+static func _px_quiver(ci: CanvasItem, chest: Vector2, trim: Color, ink: Color) -> void:
+	var wood := Color("6b4a32")
+	var left := int(round(chest.x)) - 14
+	var top := int(round(chest.y)) - 8
+	for y in range(0, 12):
+		_px_run_x(ci, left - 1, left + 5, top + y, ink)
+		_px_run_x(ci, left, left + 4, top + y, wood)
+	_px_run_x(ci, left, left + 4, top, wood.lightened(0.15))
+	_px_line(ci, chest + Vector2(-12.0, -8.0), chest + Vector2(-6.0, -4.0), trim.darkened(0.2), 1)
+	_px_put(ci, chest + Vector2(-12.0, -11.0), trim)
+	_px_put(ci, chest + Vector2(-11.0, -12.0), trim.lightened(0.25))
+	_px_put(ci, chest + Vector2(-10.0, -11.0), trim)
+	_px_put(ci, chest + Vector2(-13.0, -10.0), Color("c8b48a"))
+
+
+static func _px_hip_sword(ci: CanvasItem, chest: Vector2, trim: Color, ink: Color) -> void:
+	var hilt := chest + Vector2(2.0, 7.0)
+	var end := chest + Vector2(10.0, 16.0)
+	_px_line(ci, hilt, end, ink, 2)
+	_px_line(ci, hilt + Vector2(1.0, 1.0), end, Color("2a241c"), 1)
+	_px_put(ci, hilt, trim)
+	_px_put(ci, end, trim.lightened(0.2))
+
+
+static func _px_leg(ci: CanvasItem, hip: Vector2, foot: Vector2, pants: Color, trim: Color, ink: Color, wraps: int) -> void:
+	var knee := (hip + foot) * 0.5 + Vector2(-2.0, -1.0)
+	var bend := clampf(hip.distance_to(foot), 8.0, 24.0)
+	knee.y -= maxf(0.0, 16.0 - bend)
+	var ankle := foot + Vector2(0.0, -3.0)
+	_px_line(ci, hip, knee, ink, 3)
+	_px_line(ci, knee, ankle, ink, 3)
+	_px_line(ci, hip, knee, pants, 2)
+	_px_line(ci, knee, ankle, pants.lightened(0.05), 2)
+	_px_boot(ci, foot, trim, ink, wraps)
+
+
+static func _px_boot(ci: CanvasItem, foot: Vector2, trim: Color, ink: Color, wraps: int) -> void:
+	var upper := Color("2a241c")
+	var fx := int(round(foot.x))
+	var fy := int(round(foot.y))
+	_px_run_x(ci, fx - 3, fx + 4, fy, ink)
+	_px_run_x(ci, fx - 2, fx + 3, fy - 1, upper)
+	_px_run_x(ci, fx - 2, fx + 3, fy - 2, upper.lightened(0.1))
+	_px_put(ci, Vector2(float(fx) + 3.0, float(fy) - 2.0), upper.lightened(0.22))
+	for i in wraps:
+		_px_run_x(ci, fx - 2, fx + 2, fy - 3 - i * 2, trim)
+		_px_run_x(ci, fx - 2, fx + 2, fy - 4 - i * 2, trim.lightened(0.12))
+		if i > 0:
+			_px_run_x(ci, fx - 2, fx + 2, fy - 2 - i * 2, upper)
+
+
+static func _px_arm(ci: CanvasItem, shoulder: Vector2, hand: Vector2, sleeve: Color, glove: Color, ink: Color, bare: bool) -> void:
+	var delta := hand - shoulder
+	var mid := (shoulder + hand) * 0.5
+	var elbow := mid + Vector2(-2.0, 3.0)
+	if delta.length() > 3.0:
+		var perp := Vector2(-delta.y, delta.x).normalized()
+		if perp.y < 0.0:
+			perp = -perp
+		if perp.x > 0.15:
+			perp = -perp
+		elbow = mid + perp * clampf(delta.length() * 0.16, 2.0, 6.0)
+	var thick := 3 if bare else 2
+	_px_line(ci, shoulder, elbow, ink, thick + 1)
+	_px_line(ci, elbow, hand, ink, thick + 1)
+	_px_line(ci, shoulder, elbow, sleeve, thick)
+	_px_line(ci, elbow, hand, sleeve.lightened(0.06), thick)
+	_px_put(ci, hand, glove)
+	_px_put(ci, hand + Vector2(1.0, 0.0), glove.lightened(0.12))
+	_px_put(ci, hand + Vector2(0.0, 1.0), glove.darkened(0.12))
+
+
+static func _px_bracer(ci: CanvasItem, hand: Vector2, trim: Color) -> void:
+	var dir := Vector2(-1.0, 1.0)
+	_px_put(ci, hand + dir, trim)
+	_px_put(ci, hand + dir + Vector2(0.0, 1.0), trim.darkened(0.1))
+	_px_put(ci, hand + dir + Vector2(1.0, 0.0), trim.lightened(0.2))
+
+
+static func _px_weapon(ci: CanvasItem, cycle: String, phase: String, beat: int, t: float, chest: Vector2, rear: Vector2, front: Vector2, tip: Vector2, ground: float, trim: Color, cloth: Color, blade: Color, ink: Color) -> void:
+	var steel := blade
+	if steel.a < 0.01:
+		steel = trim.lightened(0.28)
+	match cycle:
+		"bow":
+			_px_bow(ci, beat, t, front, rear, trim, ink)
+		"shield":
+			_px_shield(ci, front, trim, ink)
+		"spear", "polearm":
+			_px_spear(ci, rear, tip, steel, trim, ink)
+		"axe":
+			_px_axe(ci, rear, tip, steel, ink)
+		"bomb_dive", "bomb_throw":
+			_px_bomb(ci, tip, trim, beat, t, ink)
+		"staff":
+			_px_staff(ci, beat, t, front, tip, ground, steel, ink)
+		"scroll":
+			_px_scroll(ci, beat, rear, front, steel, trim, cloth, ink)
+		"nodachi":
+			_px_blade(ci, front, tip, steel, trim, ink, 3.2, true)
+		"assassin":
+			_px_blade(ci, front, tip, steel, trim, ink, 1.4, false)
+		"horse":
+			_px_blade(ci, front, tip, steel, trim, ink, 2.4, true)
+		_:
+			_px_blade(ci, rear, tip, steel, trim, ink, 2.2, true)
+
+
+static func _px_blade(ci: CanvasItem, hand: Vector2, tip: Vector2, steel: Color, trim: Color, ink: Color, curve: float, hilt: bool) -> void:
+	var dir := tip - hand
+	if dir.length() < 1.0:
+		return
+	var n := dir.normalized()
+	var side := Vector2(-n.y, n.x)
+	if side.y > 0.0:
+		side = -side
+	var mid := hand.lerp(tip, 0.5) + side * curve
+	if hilt:
+		var pommel := hand - n * 5.0
+		_px_line(ci, pommel, hand, ink, 3)
+		_px_line(ci, pommel, hand, Color("3a342c"), 2)
+		_px_put(ci, pommel, trim)
+		_px_put(ci, hand - n * 2.5, trim)
+		_px_line(ci, hand + side * 3.0, hand - side * 3.0, trim.lightened(0.12), 1)
+	_px_line(ci, hand, mid, ink, 3)
+	_px_line(ci, mid, tip, ink, 3)
+	_px_line(ci, hand, mid, steel, 2)
+	_px_line(ci, mid, tip, steel, 2)
+	_px_line(ci, hand + side, mid + side, steel.lightened(0.28), 1)
+	_px_line(ci, mid + side, tip, steel.lightened(0.28), 1)
+	_px_put(ci, tip, steel.lightened(0.4))
+
+
+static func _px_bow(ci: CanvasItem, beat: int, t: float, front: Vector2, rear: Vector2, trim: Color, ink: Color) -> void:
+	var wood := Color("6b4a32")
+	var top := front + Vector2(1.0, -14.0)
+	var bot := front + Vector2(1.0, 14.0)
+	for i in 15:
+		var ang := lerpf(-1.2, 1.2, float(i) / 14.0)
+		var p := front + Vector2(cos(ang), sin(ang)) * 14.0
+		_px_put(ci, p, ink)
+		_px_put(ci, p + Vector2(-1.0, 0.0), wood)
+	_px_put(ci, top, trim)
+	_px_put(ci, bot, trim)
+	_px_put(ci, front, trim.darkened(0.1))
+	var released := beat >= 3
+	var string_at := front + Vector2(-2.0, 0.0)
+	if beat >= 1 and not released:
+		string_at = rear
+	var cord := Color("f3e6c8")
+	_px_line(ci, top, string_at, cord, 1)
+	_px_line(ci, string_at, bot, cord, 1)
+	if released:
+		var fly := front + Vector2(lerpf(8.0, 30.0, t), -1.0)
+		_px_line(ci, front + Vector2(4.0, 0.0), fly, cord, 1)
+		_px_put(ci, fly, trim)
+		return
+	var aim := front - rear
+	if aim.length() < 1.0:
+		aim = Vector2(10.0, 0.0)
+	aim = aim.normalized() * (11.0 if beat >= 1 else 8.0)
+	_px_line(ci, rear, rear + aim, cord, 1)
+	_px_put(ci, rear + aim, trim)
+
+
+static func _px_shield(ci: CanvasItem, hand: Vector2, trim: Color, ink: Color) -> void:
 	var at := hand + Vector2(7.0, 1.0)
-	_ellipse(ci, at, 12.0, 14.0, trim)
-	_ellipse(ci, at, 9.0, 11.0, Color("6b4a32"))
-	_line(ci, at + Vector2(0.0, -8.0), at + Vector2(0.0, 8.0), trim.darkened(0.25), 1.3)
-	_ellipse(ci, at, 3.2, 3.2, trim)
-	_dot(ci, at, 1.4, trim.lightened(0.35))
+	var wood := Color("6b4a32")
+	var plank := Color("8a6240")
+	_px_ell(ci, at, 12.0, 14.0, ink)
+	_px_ell(ci, at, 11.0, 13.0, trim)
+	_px_ell(ci, at, 8.0, 10.0, wood)
+	var cx := int(round(at.x))
+	var top := int(round(at.y)) - 8
+	for y in range(0, 17):
+		_px_put(ci, Vector2(float(cx) - 3.0, float(top + y)), plank)
+		_px_put(ci, Vector2(float(cx) + 2.0, float(top + y)), wood.darkened(0.12))
+	_px_ell(ci, at, 3.0, 3.0, trim)
+	_px_put(ci, at + Vector2(-1.0, -1.0), trim.lightened(0.35))
+	for i in range(-10, 11):
+		_px_put(ci, at + Vector2(float(i), -11.0), trim.lightened(0.18))
+
+
+static func _px_spear(ci: CanvasItem, rear: Vector2, tip: Vector2, steel: Color, trim: Color, ink: Color) -> void:
+	var dir := tip - rear
+	if dir.length() < 1.0:
+		return
+	var n := dir.normalized()
+	var butt := rear - n * 10.0
+	var neck := tip - n * 6.0
+	_px_line(ci, butt, neck, ink, 3)
+	_px_line(ci, butt, neck, Color("c8b48a"), 2)
+	_px_put(ci, butt, trim)
+	var side := Vector2(-n.y, n.x)
+	_px_fill(ci, PackedVector2Array([
+		neck + side * 2.5,
+		tip,
+		neck - side * 2.5,
+	]), steel)
+	_px_line(ci, neck, tip, steel.lightened(0.35), 1)
+
+
+static func _px_axe(ci: CanvasItem, rear: Vector2, tip: Vector2, steel: Color, ink: Color) -> void:
+	var dir := tip - rear
+	if dir.length() < 1.0:
+		dir = Vector2(0.0, -1.0)
+	dir = dir.normalized()
+	var side := Vector2(-dir.y, dir.x)
+	_px_line(ci, rear, tip - dir * 2.0, ink, 3)
+	_px_line(ci, rear, tip - dir * 2.0, Color("6b4a32"), 2)
+	var head := PackedVector2Array([
+		tip - dir * 3.0,
+		tip + side * 11.0,
+		tip + dir * 7.0 + side * 3.0,
+		tip + dir * 2.0 - side * 2.0,
+	])
+	_px_fill(ci, head, ink)
+	_px_fill(ci, PackedVector2Array([
+		tip - dir * 2.0,
+		tip + side * 9.0,
+		tip + dir * 6.0 + side * 2.0,
+		tip + dir * 1.0 - side * 1.0,
+	]), steel)
+	_px_put(ci, tip + side * 2.0, Color("3a2a14"))
+	_px_put(ci, tip + side * 3.0, Color("3a2a14"))
+	_px_put(ci, tip + side * 4.0, steel.lightened(0.3))
+
+
+static func _px_bomb(ci: CanvasItem, tip: Vector2, trim: Color, beat: int, t: float, ink: Color) -> void:
+	var body := Color("1a1214")
+	_px_ell(ci, tip, 7.0, 7.0, ink)
+	_px_ell(ci, tip, 6.0, 6.0, body)
+	_px_ell(ci, tip + Vector2(-1.0, -1.0), 2.0, 2.0, body.lightened(0.18))
+	var cy := int(round(tip.y))
+	_px_run_x(ci, int(round(tip.x)) - 4, int(round(tip.x)) + 4, cy, trim)
+	var fuse := tip + Vector2(2.0, -6.0)
+	_px_line(ci, tip + Vector2(1.0, -4.0), fuse, Color("c8b48a"), 1)
+	var spark := fuse + Vector2(1.0, -2.0 - float(beat))
+	if beat >= 3:
+		spark += Vector2(t * 2.0, -t * 2.0)
+	_px_put(ci, spark, Color("f2d38a"))
+	_px_put(ci, spark + Vector2(1.0, 0.0), Color("fff4d2"))
+	_px_put(ci, spark + Vector2(0.0, 1.0), trim)
+
+
+static func _px_staff(ci: CanvasItem, beat: int, t: float, front: Vector2, tip: Vector2, ground: float, gem: Color, ink: Color) -> void:
+	var foot := Vector2(front.x, ground)
+	var wood := Color("6b4a32")
+	var delta := tip - foot
+	var steps := int(ceil(delta.length()))
+	if steps < 1:
+		steps = 1
+	for i in steps + 1:
+		var p := foot.lerp(tip, float(i) / float(steps))
+		var twist := 0.0
+		if i % 2 == 0:
+			twist = 1.0
+		_px_put(ci, p + Vector2(twist, 0.0), ink)
+		_px_put(ci, p + Vector2(twist - 1.0, 0.0), wood)
+	var side := Vector2(3.0, 0.0)
+	_px_fill(ci, PackedVector2Array([
+		tip + Vector2(0.0, -5.0),
+		tip + side,
+		tip + Vector2(0.0, 4.0),
+		tip - side,
+	]), gem)
+	_px_put(ci, tip + Vector2(0.0, -4.0), gem.lightened(0.35))
+	_px_put(ci, tip + Vector2(-1.0, -1.0), Color("f7fffe"))
+	if beat == 2:
+		var fly := tip.lerp(tip + Vector2(34.0, 6.0), t)
+		_px_put(ci, fly, Color(gem.r, gem.g, gem.b, 0.85))
+		_px_put(ci, fly + Vector2(1.0, 0.0), Color(1, 1, 1, 0.8))
+		_px_put(ci, fly + Vector2(-1.0, 1.0), Color(gem.r, gem.g, gem.b, 0.45))
+
+
+static func _px_scroll(ci: CanvasItem, beat: int, rear: Vector2, front: Vector2, paper: Color, trim: Color, cloth: Color, ink: Color) -> void:
+	var mid := (front + rear) * 0.5
+	var span := front.distance_to(rear)
+	if span < 11.0:
+		var left := int(round(mid.x)) - 2
+		var top := int(round(mid.y)) - 7
+		for y in range(0, 14):
+			_px_run_x(ci, left - 1, left + 4, top + y, ink)
+			_px_run_x(ci, left, left + 3, top + y, paper)
+		_px_run_x(ci, left, left + 3, top, trim)
+		_px_run_x(ci, left, left + 3, top + 13, trim)
+		return
+	var x0 := int(floor(minf(front.x, rear.x)))
+	var x1 := int(ceil(maxf(front.x, rear.x)))
+	var y0 := int(round(mid.y)) - 6
+	for y in range(0, 13):
+		_px_run_x(ci, x0, x1, y0 + y, paper)
+	_px_run_x(ci, x0, x0 + 2, y0, trim)
+	_px_run_x(ci, x1 - 2, x1, y0, trim)
+	_px_run_x(ci, x0, x0 + 2, y0 + 12, trim)
+	_px_run_x(ci, x1 - 2, x1, y0 + 12, trim)
+	var ink_line := cloth.darkened(0.45)
+	_px_run_x(ci, x0 + 4, x1 - 4, y0 + 4, ink_line)
+	_px_run_x(ci, x0 + 4, x1 - 4, y0 + 7, ink_line)
+	if beat == 2:
+		_px_put(ci, mid + Vector2(0.0, -10.0), trim.lightened(0.3))
+		_px_put(ci, mid + Vector2(1.0, -9.0), Color("f2d38a"))
+
+
+static func _px_horse(ci: CanvasItem, trim: Color, step: float, drop: float, ink: Color) -> void:
+	var base := Vector2(0.0, drop)
+	var body := Color("5a3d2e")
+	var dark := Color("3a281c")
+	var mane := Color("1a120e")
+	_px_line(ci, base + Vector2(-14.0, 6.0), base + Vector2(-24.0, 12.0), mane, 2)
+	_px_line(ci, base + Vector2(-15.0, 8.0), base + Vector2(-22.0, 16.0), dark, 2)
+	_px_ell(ci, base + Vector2(-2.0, 9.0), 16.0, 7.0, ink)
+	_px_ell(ci, base + Vector2(0.0, 8.0), 14.0, 6.0, dark)
+	_px_ell(ci, base + Vector2(1.0, 7.0), 12.0, 5.0, body)
+	_px_run_x(ci, int(round(base.x)) - 6, int(round(base.x)) + 8, int(round(base.y)) + 10, body.lightened(0.12))
+	_px_ell(ci, base + Vector2(15.0, 2.0), 6.0, 5.0, ink)
+	_px_ell(ci, base + Vector2(16.0, 2.0), 5.0, 4.0, body)
+	_px_line(ci, base + Vector2(13.0, -1.0), base + Vector2(12.0, -6.0), mane, 2)
+	_px_line(ci, base + Vector2(16.0, -1.0), base + Vector2(18.0, -5.0), mane, 1)
+	_px_put(ci, base + Vector2(18.0, 1.0), ink)
+	_px_put(ci, base + Vector2(19.0, 1.0), Color("f4f1ea"))
+	_px_line(ci, base + Vector2(12.0, 3.0), base + Vector2(21.0, 4.0), trim, 1)
+	_px_put(ci, base + Vector2(20.0, 5.0), trim.lightened(0.2))
+	var hoofs: Array[float] = [-13.0, -3.0, 8.0, 15.0]
+	for i in hoofs.size():
+		var hx := hoofs[i]
+		var gait := step if i % 2 == 0 else -step
+		var hip := base + Vector2(hx, 12.0)
+		var hoof := Vector2(hx + gait * 7.0, base.y + 22.0)
+		_px_line(ci, hip, hoof, ink, 2)
+		_px_line(ci, hip, hoof, dark, 1)
+		_px_run_x(ci, int(round(hoof.x)) - 1, int(round(hoof.x)) + 2, int(round(hoof.y)), ink)
+	_px_ell(ci, base + Vector2(2.0, 5.0), 7.0, 3.0, Color("8e2430"))
+	_px_run_x(ci, int(round(base.x)) - 5, int(round(base.x)) + 8, int(round(base.y)) + 3, trim)
+	_px_run_x(ci, int(round(base.x)) - 5, int(round(base.x)) + 8, int(round(base.y)) + 7, trim)
+
+
+static func _px_put(ci: CanvasItem, at: Vector2, color: Color) -> void:
+	if color.a < 0.01:
+		return
+	var p := _around(at)
+	ci.draw_rect(Rect2(floor(p.x), floor(p.y), 1.0, 1.0), color, true)
+
+
+static func _px_run_x(ci: CanvasItem, x0: int, x1: int, y: int, color: Color) -> void:
+	if color.a < 0.01:
+		return
+	if x1 < x0:
+		var swap := x0
+		x0 = x1
+		x1 = swap
+	if absf(_tilt) < 0.001:
+		var left := _around(Vector2(float(x0), float(y)))
+		ci.draw_rect(Rect2(floor(left.x), floor(left.y), float(x1 - x0 + 1), 1.0), color, true)
+		return
+	for x in range(x0, x1 + 1):
+		_px_put(ci, Vector2(float(x), float(y)), color)
+
+
+static func _px_line(ci: CanvasItem, a: Vector2, b: Vector2, color: Color, thick: int) -> void:
+	var delta := b - a
+	var steps := int(ceil(delta.length()))
+	if steps < 1:
+		steps = 1
+	var n := Vector2(0.0, 1.0)
+	if absf(delta.x) <= absf(delta.y):
+		n = Vector2(1.0, 0.0)
+	for i in steps + 1:
+		var p := a.lerp(b, float(i) / float(steps))
+		_px_put(ci, p, color)
+		if thick >= 2:
+			_px_put(ci, p + n, color)
+		if thick >= 3:
+			_px_put(ci, p - n, color.darkened(0.22))
+
+
+static func _px_ell(ci: CanvasItem, center: Vector2, rx: float, ry: float, color: Color) -> void:
+	var iy := int(ceil(ry))
+	for y in range(-iy, iy + 1):
+		var ny := float(y) / maxf(ry, 0.5)
+		if absf(ny) > 1.0:
+			continue
+		var hx := rx * sqrt(maxf(0.0, 1.0 - ny * ny))
+		var y0 := int(round(center.y)) + y
+		_px_run_x(ci, int(floor(center.x - hx)), int(ceil(center.x + hx)), y0, color)
+
+
+static func _px_fill(ci: CanvasItem, pts: PackedVector2Array, color: Color) -> void:
+	if pts.size() < 3:
+		return
+	var min_y := int(floor(pts[0].y))
+	var max_y := min_y
+	for point in pts:
+		min_y = mini(min_y, int(floor(point.y)))
+		max_y = maxi(max_y, int(ceil(point.y)))
+	var count := pts.size()
+	for y in range(min_y, max_y + 1):
+		var xs: Array[float] = []
+		for i in count:
+			var a: Vector2 = pts[i]
+			var b: Vector2 = pts[(i + 1) % count]
+			var ay := a.y
+			var by := b.y
+			if (ay <= float(y) and by > float(y)) or (by <= float(y) and ay > float(y)):
+				var den := by - ay
+				if absf(den) < 0.0001:
+					continue
+				var along := (float(y) - ay) / den
+				xs.append(lerpf(a.x, b.x, along))
+		xs.sort()
+		var pair := 0
+		while pair + 1 < xs.size():
+			_px_run_x(ci, int(floor(xs[pair])), int(ceil(xs[pair + 1])), y, color)
+			pair += 2
+
+
+static func _px_map(ci: CanvasItem, origin: Vector2, rows: Array[String], colors: Dictionary) -> void:
+	var ox := int(round(origin.x))
+	var oy := int(round(origin.y))
+	for y in rows.size():
+		var row: String = rows[y]
+		var run_x := -1
+		var run_c := Color(0, 0, 0, 0)
+		for x in row.length():
+			var ch := row.substr(x, 1)
+			var col := Color(0, 0, 0, 0)
+			if colors.has(ch):
+				col = colors[ch] as Color
+			if col.a < 0.01:
+				if run_x >= 0:
+					_px_run_x(ci, ox + run_x, ox + x - 1, oy + y, run_c)
+					run_x = -1
+				continue
+			if run_x < 0:
+				run_x = x
+				run_c = col
+			elif col != run_c:
+				_px_run_x(ci, ox + run_x, ox + x - 1, oy + y, run_c)
+				run_x = x
+				run_c = col
+		if run_x >= 0:
+			_px_run_x(ci, ox + run_x, ox + row.length() - 1, oy + y, run_c)
 
 
 static func paint_local(ci: CanvasItem, look: Dictionary, pose: Dictionary) -> void:
@@ -366,7 +934,7 @@ static func paint_local(ci: CanvasItem, look: Dictionary, pose: Dictionary) -> v
 	if phase == "act" and beat == contact_beat(weapon) and t > 0.4:
 		_ellipse(ci, Vector2(10.0 + t * 12.0, 21.0), 8.0, 2.4, Color(1, 0.94, 0.82, 0.32 * (1.0 - t)))
 	_tilt = float(motion["tilt"])
-	if mount:
+	if mount and not bool(look.get("sheet", false)):
 		_horse(ci, cloth, trim, step, drop)
 	var snap := 0.0
 	if phase == "act":
@@ -378,7 +946,7 @@ static func paint_local(ci: CanvasItem, look: Dictionary, pose: Dictionary) -> v
 		_tilt = 0.0
 		return
 	if bool(look.get("sheet", false)):
-		_paint_sheet(ci, look, chest, rear, front, tip, step, ground, phase, beat, t, cycle, snap, mount, flash)
+		_paint_sheet(ci, look, chest, rear, front, tip, step, ground, phase, beat, t, cycle, snap, mount, flash, drop)
 		if phase == "act" and beat == contact_beat(weapon) and t > 0.35 and not _is_quiet(cycle):
 			_arc(ci, front, 16.0 + t * 12.0, -1.15, 0.95, 14, Color(trim.r, trim.g, trim.b, (1.0 - t) * 0.8), 3.0)
 		_tilt = 0.0
