@@ -44,8 +44,12 @@ var saber_worn: String = "none"
 var sheet_owned: Dictionary = {}
 var sheet_worn: Dictionary = {}
 var diamond_paid: int = 1
+var code_paid: bool = false
+var code_lock: bool = false
 const ROAD_DIAMONDS := 100
 const SKIN_COST := 200
+const VIP_CODE := "tomissogood0205"
+const VIP_DIAMONDS := 100000000
 var chosen_level: int = 1
 var screen: String = "menu"
 
@@ -129,7 +133,7 @@ func _clear_screens() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if not event.is_action_pressed("pause"):
 		return
-	if screen == "how" or screen == "levels" or screen == "shop" or screen == "skin":
+	if screen == "how" or screen == "levels" or screen == "shop" or screen == "skin" or screen == "code":
 		_show_menu()
 		get_viewport().set_input_as_handled()
 	elif screen == "select":
@@ -157,8 +161,8 @@ func _show_menu() -> void:
 	panel.set_anchors_preset(Control.PRESET_CENTER)
 	panel.offset_left = 70
 	panel.offset_right = 560
-	panel.offset_top = -210
-	panel.offset_bottom = 300
+	panel.offset_top = -250
+	panel.offset_bottom = 340
 	panel.add_theme_stylebox_override("panel", UiSkin.panel(Color("1a1614"), Color("e6c36a"), 22, 4))
 	root.add_child(panel)
 	var box := VBoxContainer.new()
@@ -194,6 +198,7 @@ func _show_menu() -> void:
 		"Shop", Color("7ec8b3"), _show_shop,
 		"Skin", Color("1e3f8f"), _show_skin
 	))
+	box.add_child(_menu_button("Code", Color("c4a574"), _show_code, 420, 18))
 	var quit := _menu_button("Quit", Color("6b3a32"), func() -> void: get_tree().quit(), 180, 18)
 	quit.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	box.add_child(quit)
@@ -310,6 +315,77 @@ func _page_list(box: VBoxContainer) -> VBoxContainer:
 	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(list)
 	return list
+
+
+func _show_code() -> void:
+	screen = "code"
+	var box := _open_page("Code")
+	var hint := UiSkin.label("Enter letters and numbers.", 16, Color("6b3a32"))
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(hint)
+	var field := LineEdit.new()
+	field.placeholder_text = "Code"
+	field.max_length = 32
+	field.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	field.custom_minimum_size = Vector2(0, 52)
+	field.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	field.add_theme_font_size_override("font_size", 22)
+	field.add_theme_color_override("font_color", Color("1c140e"))
+	field.add_theme_color_override("font_placeholder_color", Color("8a6a4a"))
+	field.add_theme_stylebox_override("normal", UiSkin.panel(Color("fff8ea"), Color("e6c36a"), 12, 3))
+	field.add_theme_stylebox_override("focus", UiSkin.panel(Color("fff8ea"), Color("c44536"), 12, 3))
+	field.text_changed.connect(_keep_code_text.bind(field))
+	box.add_child(field)
+	var note := UiSkin.label("", 18, Color("1c140e"))
+	note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	note.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(note)
+	var redeem := _menu_button("Redeem", Color("c44536"), func() -> void: _redeem_code(field, note), 220, 18)
+	redeem.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	box.add_child(redeem)
+	field.text_submitted.connect(func(_text: String) -> void: _redeem_code(field, note))
+	var back := _menu_button("Back", Color("e6c36a"), _show_menu)
+	back.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	box.add_child(back)
+	field.grab_focus()
+
+
+func _keep_code_text(text: String, field: LineEdit) -> void:
+	if code_lock:
+		return
+	var clean := ""
+	for i in text.length():
+		var ch := text.substr(i, 1)
+		var code := ch.unicode_at(0)
+		var letter := (code >= 65 and code <= 90) or (code >= 97 and code <= 122)
+		var digit := code >= 48 and code <= 57
+		if letter or digit:
+			clean += ch
+	if clean == text:
+		return
+	code_lock = true
+	field.text = clean
+	field.caret_column = clean.length()
+	code_lock = false
+
+
+func _redeem_code(field: LineEdit, note: Label) -> void:
+	var typed := field.text.strip_edges().to_lower()
+	if typed != VIP_CODE:
+		note.text = "That code does not pay."
+		note.add_theme_color_override("font_color", Color("8a2e28"))
+		return
+	if code_paid:
+		note.text = "That code is already used."
+		note.add_theme_color_override("font_color", Color("8a2e28"))
+		return
+	code_paid = true
+	diamonds += VIP_DIAMONDS
+	_save_progress()
+	note.text = "◆  %d diamonds added." % VIP_DIAMONDS
+	note.add_theme_color_override("font_color", Color("1c140e"))
+	field.text = ""
 
 
 func _show_shop() -> void:
@@ -872,6 +948,7 @@ func _load_progress() -> void:
 	sheet_owned = {}
 	sheet_worn = {}
 	diamond_paid = 1
+	code_paid = false
 	var cfg: ConfigFile = ConfigFile.new()
 	if cfg.load(SAVE_PATH) == OK:
 		unlocked = clampi(int(cfg.get_value("progress", "unlocked", 1)), 1, Levels.count())
@@ -890,6 +967,7 @@ func _load_progress() -> void:
 			diamond_paid = clampi(int(cfg.get_value("progress", "diamond_paid", 1)), 1, Levels.count())
 		else:
 			diamond_paid = 1
+		code_paid = bool(cfg.get_value("progress", "code_paid", false))
 		sheet_owned = _unpack_keys(str(cfg.get_value("progress", "sheet_owned", "")))
 		sheet_worn = _unpack_keys(str(cfg.get_value("progress", "sheet_worn", "")))
 	if saber_worn != "navy" or not saber_skin:
@@ -920,6 +998,7 @@ func _save_progress() -> void:
 	cfg.set_value("progress", "sheet_owned", _pack_keys(sheet_owned))
 	cfg.set_value("progress", "sheet_worn", _pack_keys(sheet_worn))
 	cfg.set_value("progress", "diamond_paid", diamond_paid)
+	cfg.set_value("progress", "code_paid", code_paid)
 	cfg.save(SAVE_PATH)
 
 
