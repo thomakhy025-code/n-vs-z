@@ -734,6 +734,234 @@ static func _part_horse(ci: CanvasItem, trim: Color, step: float, drop: float) -
 	_line(ci, base + Vector2(-5.0, 7.2), base + Vector2(9.0, 7.2), trim, 1.4)
 
 
+static func _paint_hero(ci: CanvasItem, chest: Vector2, rear: Vector2, front: Vector2, tip: Vector2, step: float, ground: float, phase: String, beat: int, t: float, cycle: String, snap: float, flash: float) -> void:
+	var wash := 0.0
+	if flash > 0.0:
+		wash = clampf(flash * 4.0, 0.0, 0.72)
+	var cream := Color("f6f1e6").lerp(Color.WHITE, wash)
+	var shade := Color("e4d8c4").lerp(Color.WHITE, wash)
+	var red := Color("d23b32").lerp(Color.WHITE, wash)
+	var red_dark := Color("a32e28").lerp(Color.WHITE, wash)
+	var ink := Color("1c1614").lerp(Color.WHITE, wash)
+	var steel := Color("d8dee6").lerp(Color.WHITE, wash)
+	var gold := Color("e2b034").lerp(Color.WHITE, wash)
+	var wood := Color("8b5a32").lerp(Color.WHITE, wash)
+	_hero_scarf(ci, chest, snap, red, red_dark, false)
+	if cycle == "bow":
+		_hero_sheath(ci, chest, ink, red, gold)
+	_hero_leg(ci, chest + Vector2(-4.0, 11.0), Vector2(-5.0 - step * 11.0, ground), ink, red)
+	_hero_torso(ci, chest, cream, shade, red, red_dark)
+	_hero_leg(ci, chest + Vector2(3.2, 11.0), Vector2(6.0 + step * 12.0, ground), ink.lightened(0.04), red)
+	_hero_hood(ci, chest + Vector2(2.0, -17.2), cream, shade, red, ink, phase)
+	_hero_scarf(ci, chest, snap, red, red_dark, true)
+	_hero_arm(ci, chest + Vector2(-3.5, -1.0), rear, ink, red)
+	_hero_arm(ci, chest + Vector2(5.2, -4.2), front, ink.lightened(0.05), red)
+	if cycle == "bow":
+		_hero_bow(ci, beat, t, front, rear, wood, red, steel, ink)
+	else:
+		_hero_katana(ci, rear, tip, steel, ink, red, gold)
+
+
+static func _hero_hood(ci: CanvasItem, at: Vector2, cream: Color, shade: Color, red: Color, ink: Color, phase: String) -> void:
+	_ellipse(ci, at + Vector2(-3.6, 2.6), 10.2, 11.0, shade.darkened(0.08))
+	_ellipse(ci, at + Vector2(1.8, 0.8), 8.8, 9.6, cream)
+	_ellipse(ci, at + Vector2(4.4, -2.4), 4.0, 4.8, cream.lightened(0.08))
+	_poly(ci, PackedVector2Array([
+		at + Vector2(0.6, -7.4),
+		at + Vector2(4.2, -12.4),
+		at + Vector2(8.0, -5.0),
+	]), cream)
+	_line(ci, at + Vector2(1.6, -9.6), at + Vector2(6.2, -6.0), red, 2.2)
+	_poly(ci, PackedVector2Array([
+		at + Vector2(0.2, -4.6),
+		at + Vector2(3.0, -6.2),
+		at + Vector2(8.6, -1.2),
+		at + Vector2(8.8, 4.4),
+		at + Vector2(5.4, 5.6),
+		at + Vector2(1.6, 0.8),
+	]), red)
+	_ellipse(ci, at + Vector2(5.0, 2.0), 4.4, 3.4, ink)
+	if phase == "hurt" or phase == "fall":
+		_line(ci, at + Vector2(2.8, 0.2), at + Vector2(7.0, 1.0), Color("f4f4f0"), 1.6)
+		return
+	_line(ci, at + Vector2(3.2, -0.6), at + Vector2(6.8, 0.4), red, 2.4)
+	_dot(ci, at + Vector2(5.6, -0.2), 0.7, ink)
+
+
+static func _hero_torso(ci: CanvasItem, chest: Vector2, cream: Color, shade: Color, red: Color, red_dark: Color) -> void:
+	_poly(ci, PackedVector2Array([
+		chest + Vector2(-8.6, -6.0),
+		chest + Vector2(6.4, -5.0),
+		chest + Vector2(7.2, 10.0),
+		chest + Vector2(-7.4, 11.0),
+	]), shade)
+	_poly(ci, PackedVector2Array([
+		chest + Vector2(-7.4, -8.0),
+		chest + Vector2(8.2, -6.2),
+		chest + Vector2(8.8, 8.4),
+		chest + Vector2(2.4, 14.2),
+		chest + Vector2(-6.6, 12.2),
+	]), cream)
+	_poly(ci, PackedVector2Array([
+		chest + Vector2(1.4, -6.6),
+		chest + Vector2(7.6, -5.6),
+		chest + Vector2(8.2, 7.6),
+		chest + Vector2(2.8, 12.4),
+	]), cream.lightened(0.06))
+	_line(ci, chest + Vector2(-1.0, -7.2), chest + Vector2(7.4, 7.2), red, 1.8)
+	_line(ci, chest + Vector2(-6.2, 11.6), chest + Vector2(2.6, 14.0), red, 2.4)
+	_line(ci, chest + Vector2(6.6, -5.4), chest + Vector2(8.4, 8.0), red, 1.6)
+	_box(ci, Rect2(chest.x - 6.4, chest.y + 4.2, 13.5, 4.2), red_dark)
+	_line(ci, chest + Vector2(-5.2, 4.8), chest + Vector2(6.0, 4.8), red.lightened(0.16), 1.2)
+	_poly(ci, PackedVector2Array([
+		chest + Vector2(1.6, 8.2),
+		chest + Vector2(4.2, 8.2),
+		chest + Vector2(2.9, 13.6),
+	]), red)
+	var mark := chest + Vector2(3.4, 7.6)
+	_line(ci, mark + Vector2(-1.2, -2.2), mark + Vector2(1.6, -0.6), red, 1.7)
+	_line(ci, mark + Vector2(1.6, -0.6), mark + Vector2(-0.8, 1.0), red, 1.7)
+	_line(ci, mark + Vector2(-0.8, 1.0), mark + Vector2(1.8, 2.6), red, 1.7)
+
+
+static func _hero_scarf(ci: CanvasItem, chest: Vector2, snap: float, red: Color, red_dark: Color, knot: bool) -> void:
+	var neck := chest + Vector2(1.0, -8.4)
+	if knot:
+		_ellipse(ci, neck, 6.2, 2.8, red)
+		_ellipse(ci, neck + Vector2(1.4, 0.5), 2.6, 1.4, red_dark)
+		return
+	var end := chest + Vector2(-18.0, 2.0)
+	var flap := end + Vector2(-2.0, 10.0)
+	var lower := end + Vector2(3.0, 8.0)
+	if snap > 12.0:
+		end = chest + Vector2(14.0 + snap * 0.22, 1.0)
+		flap = end + Vector2(6.0, 9.0)
+		lower = end + Vector2(2.0, 7.0)
+	_line(ci, neck, end, red_dark, 6.4)
+	_line(ci, neck + Vector2(0.0, -1.2), end + Vector2(0.0, -2.0), red, 3.6)
+	_line(ci, end, flap, red, 4.4)
+	_line(ci, end + Vector2(1.0, 1.0), lower, red_dark, 3.6)
+
+
+static func _hero_leg(ci: CanvasItem, hip: Vector2, foot: Vector2, ink: Color, red: Color) -> void:
+	var knee := (hip + foot) * 0.5 + Vector2(-2.0, -1.6)
+	var bend := clampf(hip.distance_to(foot), 8.0, 24.0)
+	knee.y -= maxf(0.0, 16.0 - bend)
+	var ankle := foot + Vector2(0.6, -4.0)
+	_line(ci, hip, knee, ink, 4.8)
+	_ellipse(ci, knee, 2.2, 1.9, ink.lightened(0.08))
+	_line(ci, knee, ankle, ink.lightened(0.04), 4.0)
+	_line(ci, hip + Vector2(1.0, 1.0), knee, red, 1.3)
+	_ellipse(ci, foot + Vector2(1.8, -1.6), 5.2, 3.0, ink)
+	_ellipse(ci, foot + Vector2(2.6, 0.8), 5.6, 1.7, Color("12100e"))
+	_line(ci, ankle + Vector2(-2.4, 0.6), ankle + Vector2(3.0, 0.0), red, 1.9)
+
+
+static func _hero_arm(ci: CanvasItem, shoulder: Vector2, hand: Vector2, ink: Color, red: Color) -> void:
+	var delta := hand - shoulder
+	var mid := (shoulder + hand) * 0.5
+	var elbow := mid + Vector2(-2.0, 3.0)
+	if delta.length() > 3.0:
+		var perp := Vector2(-delta.y, delta.x).normalized()
+		if perp.y < 0.0:
+			perp = -perp
+		if perp.x > 0.15:
+			perp = -perp
+		elbow = mid + perp * clampf(delta.length() * 0.16, 2.4, 6.0)
+	_line(ci, shoulder, elbow, ink, 3.8)
+	_ellipse(ci, elbow, 2.0, 1.7, ink.lightened(0.08))
+	_line(ci, elbow, hand, ink.lightened(0.05), 3.2)
+	var wrist := hand.lerp(elbow, 0.24)
+	_line(ci, wrist + Vector2(-1.8, 1.2), wrist + Vector2(2.0, -0.8), red, 1.8)
+	_ellipse(ci, hand, 2.6, 2.2, ink)
+	_ellipse(ci, hand + Vector2(0.8, -0.5), 1.0, 0.8, ink.lightened(0.18))
+
+
+static func _hero_sheath(ci: CanvasItem, chest: Vector2, ink: Color, red: Color, gold: Color) -> void:
+	var top := chest + Vector2(-7.0, -1.0)
+	var bot := chest + Vector2(-2.0, 14.0)
+	_line(ci, top, bot, ink, 3.4)
+	_line(ci, top + Vector2(0.8, 0.4), bot, Color("3a342c"), 1.2)
+	_dot(ci, top, 2.0, gold)
+	_line(ci, top + Vector2(-0.4, 2.4), top + Vector2(1.2, 4.6), red, 1.6)
+
+
+static func _hero_katana(ci: CanvasItem, hand: Vector2, tip: Vector2, steel: Color, ink: Color, red: Color, gold: Color) -> void:
+	var dir := tip - hand
+	if dir.length() < 1.0:
+		return
+	var n := dir.normalized()
+	var side := Vector2(-n.y, n.x)
+	if side.y > 0.0:
+		side = -side
+	var mid := hand.lerp(tip, 0.5) + side * 3.2
+	var pommel := hand - n * 7.0
+	_line(ci, pommel, hand, ink, 3.2)
+	_line(ci, pommel + n * 1.8, hand - n * 2.2, red, 2.2)
+	_line(ci, pommel + n * 3.4, pommel + n * 4.6, red, 2.0)
+	_dot(ci, pommel, 2.0, gold)
+	_ellipse(ci, hand, 2.3, 1.6, ink)
+	_line(ci, hand + Vector2(-n.y, n.x) * 4.6, hand - Vector2(-n.y, n.x) * 4.6, ink, 2.6)
+	_line(ci, hand, mid, steel.darkened(0.22), 4.0)
+	_line(ci, mid, tip, steel, 3.2)
+	_line(ci, hand + side * 1.3, mid + side * 0.8, steel.lightened(0.28), 1.4)
+	_line(ci, mid + side * 0.8, tip, Color("f7f7f4"), 1.15)
+	_dot(ci, tip, 1.2, steel.lightened(0.35))
+	_dot(ci, hand + n * 1.4, 1.1, red)
+
+
+static func _hero_bow(ci: CanvasItem, beat: int, t: float, front: Vector2, rear: Vector2, wood: Color, red: Color, steel: Color, ink: Color) -> void:
+	_arc(ci, front + Vector2(-0.8, 0.0), 15.0, -1.25, 1.25, 16, wood.darkened(0.28), 4.0)
+	_arc(ci, front, 14.4, -1.2, 1.2, 16, wood, 2.6)
+	var top := front + Vector2(1.2, -14.4)
+	var bot := front + Vector2(1.2, 14.4)
+	_dot(ci, top, 2.0, red)
+	_dot(ci, bot, 2.0, red)
+	_ellipse(ci, front, 2.2, 2.6, red)
+	var released := beat >= 3
+	var string_at := front + Vector2(-2.0, 0.0)
+	if beat >= 1 and not released:
+		string_at = rear
+	var cord := Color("f4efe4")
+	_line(ci, top, string_at, cord, 1.2)
+	_line(ci, string_at, bot, cord, 1.2)
+	if released:
+		var fly := front + Vector2(lerpf(8.0, 32.0, t), -1.0)
+		_hero_arrow(ci, front + Vector2(4.0, 0.0), fly, steel, red, ink)
+		return
+	var aim := front - rear
+	if aim.length() < 1.0:
+		aim = Vector2(12.0, 0.0)
+	aim = aim.normalized() * (13.0 if beat >= 1 else 9.0)
+	var nock := rear - aim.normalized() * 3.0
+	_hero_arrow(ci, nock, rear + aim, steel, red, ink)
+
+
+static func _hero_arrow(ci: CanvasItem, nock: Vector2, head: Vector2, steel: Color, red: Color, ink: Color) -> void:
+	var dir := head - nock
+	if dir.length() < 1.0:
+		return
+	var n := dir.normalized()
+	var side := Vector2(-n.y, n.x)
+	_line(ci, nock, head, Color("c8b48a"), 1.5)
+	_poly(ci, PackedVector2Array([
+		head - n * 6.0 + side * 2.4,
+		head + n * 1.6,
+		head - n * 6.0 - side * 2.4,
+	]), steel)
+	_poly(ci, PackedVector2Array([
+		nock,
+		nock + n * 4.0 + side * 2.2,
+		nock + n * 2.4,
+	]), red)
+	_poly(ci, PackedVector2Array([
+		nock,
+		nock + n * 4.0 - side * 2.2,
+		nock + n * 2.4,
+	]), red.darkened(0.08))
+	_dot(ci, nock, 1.0, ink)
+
+
 static func paint_local(ci: CanvasItem, look: Dictionary, pose: Dictionary) -> void:
 	var phase := str(pose.get("phase", "idle"))
 	var t := float(pose.get("t", 0.0))
@@ -779,6 +1007,12 @@ static func paint_local(ci: CanvasItem, look: Dictionary, pose: Dictionary) -> v
 	var snap := 0.0
 	if phase == "act":
 		snap = tip.x - chest.x
+	if paint == "hero":
+		_paint_hero(ci, chest, rear, front, tip, step, ground, phase, beat, t, cycle, snap, flash)
+		if phase == "act" and beat == contact_beat(weapon) and t > 0.35 and not _is_quiet(cycle):
+			_arc(ci, front, 16.0 + t * 12.0, -1.15, 0.95, 14, Color(0.82, 0.23, 0.2, (1.0 - t) * 0.85), 3.0)
+		_tilt = 0.0
+		return
 	if cycle == "saber_navy":
 		_paint_saber(ci, chest, rear, front, tip, step, ground, phase, snap)
 		if phase == "act" and beat == contact_beat(weapon) and t > 0.35:
