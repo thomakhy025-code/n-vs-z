@@ -9,7 +9,9 @@ const Levels = preload("res://scripts/levels.gd")
 
 const SAVE_PATH := "user://progress.cfg"
 
-const HOW_TO := "This is a side-view gate battle. Your clan gate is on the left. The cursed gate is on the right. Both have 1000 blood.
+const HOW_TO := "This is a side-view gate battle. Your clan gate is on the left. The cursed gate is on the right. Both have 2000 blood.
+
+Fighters and the hero are born on the ground behind their own gate, so a new call is not standing in the fight. The other side cannot walk past a gate into the ground behind it. Someone standing there can still hit a fighter in front of that gate when the attack reaches. A blow that would have hit someone behind the gate hits the gate instead.
 
 Choose 6 of the 11 soldiers. Value builds by itself. Hold the phone or iPad sideways. A stick at the bottom left moves the hero. The six call buttons sit to the right of that stick, and Sword and Shoot sit at the bottom right, so the left thumb can stay on the stick.
 

@@ -224,7 +224,7 @@ func _try_blink() -> void:
 		if forward_gap < -6.0 or forward_gap > foe_reach:
 			continue
 		var dest: float = foe.position.x - foe_facing * 38.0
-		dest = minf(dest, battle.enemy_front - 8.0)
+		dest = clampf(dest, battle.player_front + 8.0, battle.enemy_front - 8.0)
 		if dest <= foe.position.x + 10.0:
 			continue
 		var old: Vector2 = position
@@ -450,9 +450,9 @@ func _any_ally_ahead() -> bool:
 
 func _clamp_x() -> void:
 	if side == 0:
-		position.x = clampf(position.x, battle.player_front - 8.0, battle.enemy_front)
+		position.x = clampf(position.x, battle.player_rear, battle.enemy_front)
 	else:
-		position.x = clampf(position.x, battle.player_front, battle.enemy_front + 8.0)
+		position.x = clampf(position.x, battle.player_front, battle.enemy_rear)
 
 
 func _pose() -> Dictionary:

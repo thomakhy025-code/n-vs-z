@@ -37,8 +37,14 @@ var spawned_player: int = 0
 var vp: Vector2 = Vector2(1280, 720)
 var ground_y: float = 400.0
 var lane_ys: Array[float] = []
-var player_front: float = 176.0
-var enemy_front: float = 1100.0
+const CASTLE_EDGE := 48.0
+const CASTLE_YARD := 100.0
+const CASTLE_HALF := 58.0
+
+var player_front: float = 264.0
+var enemy_front: float = 1016.0
+var player_rear: float = 48.0
+var enemy_rear: float = 1232.0
 var units: Array = []
 var buff_links: Dictionary = {}
 var player_cd: Dictionary = {}
@@ -153,7 +159,7 @@ func begin_duel(local_ids: Array, other_ids: Array, side: int, runs_world: bool,
 	foe.side = 1
 	foe.setup(self)
 	add_child(foe)
-	foe.set_bounds(player_front - 40.0, enemy_front - 12.0, lane_y(0), lane_y(lane_ys.size() - 1))
+	_bound_hero(foe)
 	foe.net_pos = foe.position
 	hero.look = _worn_look(0, "hero")
 	foe.look = _worn_look(1, "hero")
@@ -184,13 +190,15 @@ func _build_world() -> void:
 	var lanes: Array = metrics["lane_ys"]
 	for raw_y in lanes:
 		lane_ys.append(float(raw_y))
-	player_front = 176.0
-	enemy_front = vp.x - 176.0
+	player_rear = CASTLE_EDGE
+	player_front = CASTLE_EDGE + CASTLE_YARD + CASTLE_HALF * 2.0
+	enemy_front = vp.x - player_front
+	enemy_rear = vp.x - CASTLE_EDGE
 	player_gate = GateScript.new()
-	player_gate.setup(self, 0, Vector2(118, ground_y), player_front)
+	player_gate.setup(self, 0, Vector2(player_front - CASTLE_HALF, ground_y), player_front)
 	add_child(player_gate)
 	enemy_gate = GateScript.new()
-	enemy_gate.setup(self, 1, Vector2(vp.x - 118, ground_y), enemy_front)
+	enemy_gate.setup(self, 1, Vector2(enemy_front + CASTLE_HALF, ground_y), enemy_front)
 	add_child(enemy_gate)
 	world = Node2D.new()
 	add_child(world)
@@ -200,7 +208,7 @@ func _build_world() -> void:
 	hero = HeroScript.new()
 	hero.setup(self)
 	add_child(hero)
-	hero.set_bounds(player_front - 40.0, enemy_front - 12.0, lane_y(0), lane_y(lane_ys.size() - 1))
+	_bound_hero(hero)
 	controlled = hero
 
 
@@ -222,8 +230,8 @@ func _build_hud() -> void:
 	hurt_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hurt_flash.color = Color(0, 0, 0, 0)
 	hud.add_child(hurt_flash)
-	player_hp_label = _plain("1000", 22, Color("f3e6c8"))
-	enemy_hp_label = _plain("1000", 22, Color("f3e6c8"))
+	player_hp_label = _plain("2000", 22, Color("f3e6c8"))
+	enemy_hp_label = _plain("2000", 22, Color("f3e6c8"))
 	enemy_hp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	value_label = _plain("Value  16", 32, Color("e6c36a"))
 	value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -647,7 +655,10 @@ func _spawn(entry: Dictionary, side: int) -> void:
 		road = lane_ys.size() / 2
 	unit.lane = road
 	var y := lane_y(road)
-	unit.position = Vector2(player_front + 20.0, y) if side == 0 else Vector2(enemy_front - 20.0, y)
+	var born := player_rear if side == 0 else enemy_rear
+	if kind == "boss":
+		born = enemy_front - 24.0
+	unit.position = Vector2(born, y)
 	unit.net_id = next_net
 	next_net += 1
 	if duel:
@@ -669,14 +680,23 @@ func _count(side: int) -> int:
 	return total
 
 
+func sheltered(body) -> bool:
+	if body == null or not is_instance_valid(body):
+		return false
+	var x := float(body.position.x)
+	if int(body.side) == 0:
+		return x < player_front
+	return x > enemy_front
+
+
 func hostile_targets(attacker_side: int) -> Array:
 	var defend := 1 - attacker_side
 	var out: Array = []
 	for unit in units:
-		if is_instance_valid(unit) and unit.alive and unit.side == defend:
+		if is_instance_valid(unit) and unit.alive and unit.side == defend and not sheltered(unit):
 			out.append(unit)
 	var defender = _hero_for(defend)
-	if defender != null:
+	if defender != null and not sheltered(defender):
 		out.append(defender)
 	return out
 
@@ -1406,26 +1426,48 @@ func _make_puppet(which: int, kind: String, nid: int):
 	return unit
 
 
-func _to_norm(p: Vector2) -> Vector2:
-	var left := player_front - 40.0
-	var right := enemy_front - 12.0
+func _bound_hero(who) -> void:
 	var top := lane_y(0)
 	var bottom := lane_y(maxi(lane_ys.size() - 1, 0))
+	if int(who.side) == 0:
+		who.set_bounds(player_rear, enemy_front, top, bottom)
+	else:
+		who.set_bounds(player_front, enemy_rear, top, bottom)
+
+
+func _to_norm(p: Vector2) -> Vector2:
+	var depth := player_front - player_rear
+	var span := enemy_front - player_front
+	var far := enemy_rear - enemy_front
 	var nx := 0.0
+	if p.x < player_front and depth > 1.0:
+		nx = -(player_front - p.x) / depth
+	elif p.x > enemy_front and far > 1.0:
+		nx = 1.0 + (p.x - enemy_front) / far
+	elif span > 1.0:
+		nx = (p.x - player_front) / span
+	var top := lane_y(0)
+	var bottom := lane_y(maxi(lane_ys.size() - 1, 0))
 	var ny := 0.5
-	if right > left + 1.0:
-		nx = (p.x - left) / (right - left)
 	if bottom > top + 1.0:
 		ny = (p.y - top) / (bottom - top)
 	return Vector2(nx, ny)
 
 
 func _from_norm(nx: float, ny: float) -> Vector2:
-	var left := player_front - 40.0
-	var right := enemy_front - 12.0
+	var depth := player_front - player_rear
+	var span := enemy_front - player_front
+	var far := enemy_rear - enemy_front
+	var x := player_front
+	if nx < 0.0:
+		x = player_front + nx * depth
+	elif nx > 1.0:
+		x = enemy_front + (nx - 1.0) * far
+	else:
+		x = player_front + nx * span
 	var top := lane_y(0)
 	var bottom := lane_y(maxi(lane_ys.size() - 1, 0))
-	return Vector2(left + nx * (right - left), top + ny * (bottom - top))
+	return Vector2(x, top + ny * (bottom - top))
 
 
 func _ink(color: Color) -> Color:

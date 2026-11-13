@@ -1,8 +1,8 @@
 extends Node2D
 
 var side: int = 0
-var hp: float = 1000.0
-var max_hp: float = 1000.0
+var hp: float = 2000.0
+var max_hp: float = 2000.0
 var front_x: float = 0.0
 var battle = null
 var flicker: float = 0.0

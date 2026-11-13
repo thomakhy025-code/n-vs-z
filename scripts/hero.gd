@@ -6,16 +6,16 @@ const Painter = preload("res://scripts/painter.gd")
 var battle = null
 var side: int = 0
 var facing: float = 1.0
-var hp: float = 180.0
-var max_hp: float = 180.0
-var base_max_hp: float = 180.0
+var hp: float = 360.0
+var max_hp: float = 360.0
+var base_max_hp: float = 360.0
 var damage_multiplier: float = 1.0
 var level_stacks: int = 0
 var alive: bool = true
 var attack_reach: float = 78.0
-var sword_damage: float = 22.0
+var sword_damage: float = 44.0
 var sword_interval: float = 0.55
-var shoot_damage: float = 18.0
+var shoot_damage: float = 36.0
 var shoot_interval: float = 0.7
 var shoot_reach: float = 380.0
 var speed: float = 250.0
@@ -64,9 +64,9 @@ func setup(field) -> void:
 		start_y = float(field.lane_ys[1])
 		lane = 1
 	if side == 0:
-		position = Vector2(field.player_front + 10.0, start_y)
+		position = Vector2(field.player_rear, start_y)
 	else:
-		position = Vector2(field.enemy_front - 10.0, start_y)
+		position = Vector2(field.enemy_rear, start_y)
 	net_pos = position
 	z_index = 80
 
@@ -308,7 +308,7 @@ func _revive() -> void:
 	visible = true
 	var revive_y: float = battle.lane_y(1)
 	lane = 1
-	var home_x: float = float(battle.player_front) + 8.0 if side == 0 else float(battle.enemy_front) - 8.0
+	var home_x: float = float(battle.player_rear) if side == 0 else float(battle.enemy_rear)
 	position = Vector2(home_x, revive_y)
 	net_pos = position
 	battle.float_text(position + Vector2(-16, -40), "RETURN", Color("f3e6c8"))
