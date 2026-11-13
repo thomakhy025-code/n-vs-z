@@ -6,8 +6,13 @@ extends RefCounted
 static var _booted := false
 
 const BOOT := """
-window.__nv = window.__nv || {role:'', status:'search', inbox:[], open:false, peer:null, conn:null, busy:false, gen:0, passes:0, waitTimer:0, helloTimer:0, paired:false, down:0, blocked:0, badBrowser:false};
-window.nvCloud = {secure:true, host:'0.peerjs.com', port:443};
+window.__nv = window.__nv || {role:'', status:'search', inbox:[], open:false, peer:null, conn:null, busy:false, gen:0, passes:0, waitTimer:0, helloTimer:0, paired:false, down:0, blocked:0, badBrowser:false, latest:{}};
+window.nvCloud = {secure:true, host:'0.peerjs.com', port:443, config:{iceServers:[
+  {urls:['stun:stun.l.google.com:19302','stun:stun.cloudflare.com:3478','stun:freeturn.net:3478']},
+  {urls:'turn:freeturn.net:3478', username:'free', credential:'free'},
+  {urls:'turn:freeturn.net:3478?transport=tcp', username:'free', credential:'free'},
+  {urls:'turns:freeturn.net:5349', username:'free', credential:'free'}
+]}};
 window.nvStop = function(silent) {
   var box = window.__nv;
   box.gen += 1;
@@ -22,16 +27,35 @@ window.nvStop = function(silent) {
   box.conn = null;
   box.peer = null;
   box.inbox = [];
+  box.latest = {};
   if (!silent) box.status = 'closed';
 };
 window.nvSend = function(s) {
   var box = window.__nv;
-  if (!box || !box.conn || !box.open) return;
+  if (!box) return;
   var payload = s;
   try { payload = JSON.parse(s); } catch (e) {}
+  var kind = payload && payload.t ? payload.t : '';
+  if (kind === 'state' || kind === 'hand') {
+    if (!box.latest) box.latest = {};
+    box.latest[kind] = payload;
+    return;
+  }
+  if (!box.conn || !box.open) return;
   try { box.conn.send(payload); } catch (e2) {}
 };
+window.nvFlush = function() {
+  var box = window.__nv;
+  if (!box || !box.conn || !box.open || !box.latest) return;
+  var hand = box.latest.hand;
+  var state = box.latest.state;
+  box.latest.hand = null;
+  box.latest.state = null;
+  try { if (hand) box.conn.send(hand); } catch (e) {}
+  try { if (state) box.conn.send(state); } catch (e2) {}
+};
 window.nvState = function() {
+  window.nvFlush();
   var box = window.__nv;
   if (!box) return 'missing<<S>><<S>>0<<S>>';
   var lines = box.inbox;
@@ -161,8 +185,17 @@ window.nvHost = function(gen, room, done) {
     window.__nv.status = 'host';
     peer.on('connection', function(conn) {
       if (gen !== window.__nv.gen) { try { conn.close(); } catch (e) {} return; }
-      if (window.__nv.busy || window.__nv.conn) { try { conn.close(); } catch (e2) {} return; }
-      window.nvWire(conn, gen);
+      if (window.__nv.busy || window.__nv.open) { try { conn.close(); } catch (e2) {} return; }
+      var drop = setTimeout(function() {
+        if (window.__nv.conn !== conn) { try { conn.close(); } catch (e3) {} }
+      }, 8000);
+      conn.on('open', function() {
+        clearTimeout(drop);
+        if (gen !== window.__nv.gen || window.__nv.busy || window.__nv.open) { try { conn.close(); } catch (e4) {} return; }
+        window.nvWire(conn, gen);
+      });
+      conn.on('error', function() { clearTimeout(drop); });
+      conn.on('close', function() { clearTimeout(drop); });
     });
     peer.on('disconnected', function() {
       if (gen !== window.__nv.gen || window.__nv.conn) return;
@@ -187,11 +220,11 @@ window.nvSeek = function(gen, room) {
     window.__nv.status = (window.__nv.down > 0 && window.__nv.blocked === 0) ? 'error' : 'busy';
     return;
   }
-  window.nvGuest(gen, room, 10000, function(result) {
+  window.nvGuest(gen, room, 9000, function(result) {
     if (result === 'joined' || gen !== window.__nv.gen || window.__nv.badBrowser) return;
     window.nvHost(gen, room, function(hosted) {
       if (hosted || gen !== window.__nv.gen || window.__nv.badBrowser) return;
-      window.nvGuest(gen, room, 15000, function(again) {
+      window.nvGuest(gen, room, 9000, function(again) {
         if (again === 'joined' || gen !== window.__nv.gen || window.__nv.badBrowser) return;
         window.nvSeek(gen, room + 1);
       });
@@ -210,6 +243,7 @@ window.nvFind = function() {
   window.__nv.blocked = 0;
   window.__nv.badBrowser = false;
   window.__nv.paired = false;
+  window.__nv.latest = {};
   if (window.__nv.helloTimer) { clearInterval(window.__nv.helloTimer); window.__nv.helloTimer = 0; }
   window.__nv.inbox = [];
   window.nvEnsure(function() {

@@ -27,7 +27,7 @@ Each road you open pays 100 diamonds. Home is the night gate: Shop, Skin, the ro
 
 The shop sells one new skin for the hero and one for each soldier. A skin costs 200 diamonds. Buying it does not put it on. Wear it from Skin, and Nothing puts the old clothes back. The navy saber is a separate skin, also 200 diamonds.
 
-1 vs 1 is two clans. Each side chooses 6 of the 11. Both have the same value, the same calls, the same roads, the same wind, and a hero. On this page, press Find opponent. The game looks for one other ninja and connects. You do not type an address or a code. On a computer build, Host opens port 3001 and the other ninja joins the address.
+1 vs 1 is two clans. Each side chooses 6 of the 11. Both have the same value, the same calls, the same roads, the same wind, and a hero. On this page, press Find opponent. The game looks for one other ninja and connects. The match runs until a gate falls. You do not type an address or a code. On a computer build, Host opens port 3001 and the other ninja joins the address.
 
 Escape or Back returns to the title."
 

@@ -163,7 +163,7 @@ func begin_duel(local_ids: Array, other_ids: Array, side: int, runs_world: bool,
 	if level_label != null:
 		level_label.text = "1 vs 1"
 	if hint != null:
-		hint.text = "Both sides are the clan. Drag your hero, or use WASD. Sword, Shoot, and keys 1-6 call the six you chose. The other ninja has the same value and the same calls."
+		hint.text = "The stick moves your hero. The match runs until a gate falls."
 	_bind_duel_signals()
 	if duel_probe:
 		Engine.time_scale = 8.0
@@ -253,18 +253,19 @@ func _build_hud() -> void:
 	hud.add_child(player_track)
 	hud.add_child(enemy_track)
 	player_track.set_meta("bar", true)
-	pause_btn = Button.new()
-	pause_btn.text = "Pause"
-	pause_btn.focus_mode = Control.FOCUS_NONE
-	UiSkin.apply(pause_btn, Color("f3e6c8"), 16)
-	pause_btn.pressed.connect(_toggle_pause)
-	hud.add_child(pause_btn)
-	home_btn = Button.new()
-	home_btn.text = "Home"
-	home_btn.focus_mode = Control.FOCUS_NONE
-	UiSkin.apply(home_btn, Color("e6c36a"), 16)
-	home_btn.pressed.connect(_go_home)
-	hud.add_child(home_btn)
+	if not duel:
+		pause_btn = Button.new()
+		pause_btn.text = "Pause"
+		pause_btn.focus_mode = Control.FOCUS_NONE
+		UiSkin.apply(pause_btn, Color("f3e6c8"), 16)
+		pause_btn.pressed.connect(_toggle_pause)
+		hud.add_child(pause_btn)
+		home_btn = Button.new()
+		home_btn.text = "Home"
+		home_btn.focus_mode = Control.FOCUS_NONE
+		UiSkin.apply(home_btn, Color("e6c36a"), 16)
+		home_btn.pressed.connect(_go_home)
+		hud.add_child(home_btn)
 	sword_btn = Button.new()
 	sword_btn.text = "SWORD"
 	shoot_btn = Button.new()
@@ -929,10 +930,7 @@ func _finish_battle(defender_side: int) -> void:
 
 
 func _toggle_pause() -> void:
-	if finished:
-		return
-	if duel and puppet:
-		Net.announce_pause()
+	if finished or duel:
 		return
 	_release_stick()
 	if paused:
@@ -1125,6 +1123,9 @@ func _capture_and_quit() -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("pause"):
+		if duel and not finished:
+			get_viewport().set_input_as_handled()
+			return
 		_toggle_pause()
 		get_viewport().set_input_as_handled()
 
@@ -1179,7 +1180,7 @@ func _exit_tree() -> void:
 func _on_hand(x: float, y: float, dragging: bool, sword: bool, shoot: bool) -> void:
 	if puppet or foe == null:
 		return
-	foe.net_pos = Vector2(x, y)
+	foe.net_pos = _from_norm(x, y)
 	foe.net_step = dragging
 	foe.pointer_sword = sword
 	foe.pointer_shoot = shoot
@@ -1206,7 +1207,8 @@ func _send_hand() -> void:
 		return
 	var sword := sword_hold or Input.is_action_pressed("sword")
 	var shoot := shoot_hold or Input.is_action_pressed("shoot")
-	Net.announce_hand(controlled.position.x, controlled.position.y, controlled.dragging, sword, shoot)
+	var spot := _to_norm(controlled.position)
+	Net.announce_hand(spot.x, spot.y, controlled.stepping, sword, shoot)
 	for i in loadout.size():
 		var down := Input.is_action_pressed("slot%d" % (i + 1)) or (i < slot_hold.size() and bool(slot_hold[i]))
 		var was := i < sent_keys.size() and bool(sent_keys[i])
@@ -1248,9 +1250,10 @@ func _pack_state() -> Array:
 func _pack_hero(who) -> Array:
 	if who == null or not is_instance_valid(who):
 		return [0.0, 0.0, 0.0, 0, 1.0, 0.0, "katana", 0.0, 0.0, 0]
+	var spot := _to_norm(who.position)
 	return [
-		who.position.x,
-		who.position.y,
+		spot.x,
+		spot.y,
 		who.hp,
 		1 if who.alive else 0,
 		who.facing,
@@ -1274,12 +1277,13 @@ func _pack_units() -> Array:
 	for unit in units:
 		if not is_instance_valid(unit) or not unit.alive:
 			continue
+		var spot := _to_norm(unit.position)
 		out.append([
 			int(unit.net_id),
 			int(unit.side),
 			str(unit.data.get("id", "sword")),
-			unit.position.x,
-			unit.position.y,
+			spot.x,
+			spot.y,
 			unit.hp,
 			unit.facing,
 			unit.act,
@@ -1328,8 +1332,9 @@ func _apply_hero(who, blob: Variant, local_control: bool) -> void:
 	var row: Array = blob
 	if row.size() < 10:
 		return
-	var hx := float(row[0])
-	var hy := float(row[1])
+	var at := _from_norm(float(row[0]), float(row[1]))
+	var hx := at.x
+	var hy := at.y
 	who.hp = float(row[2])
 	who.alive = int(row[3]) == 1
 	who.visible = who.alive or float(row[7]) > 0.0
@@ -1363,7 +1368,7 @@ func _apply_units(blob: Variant) -> void:
 			unit = _make_puppet(int(row[1]), str(row[2]), nid)
 		if unit == null:
 			continue
-		unit.position = Vector2(float(row[3]), float(row[4]))
+		unit.position = _from_norm(float(row[3]), float(row[4]))
 		unit.hp = float(row[5])
 		unit.alive = true
 		unit.facing = float(row[6])
@@ -1399,6 +1404,28 @@ func _make_puppet(which: int, kind: String, nid: int):
 	units.append(unit)
 	Sfx.play(Painter.call_id(str(entry.get("paint", kind))), Painter.call_pitch(str(entry.get("paint", kind))), -8.0)
 	return unit
+
+
+func _to_norm(p: Vector2) -> Vector2:
+	var left := player_front - 40.0
+	var right := enemy_front - 12.0
+	var top := lane_y(0)
+	var bottom := lane_y(maxi(lane_ys.size() - 1, 0))
+	var nx := 0.0
+	var ny := 0.5
+	if right > left + 1.0:
+		nx = (p.x - left) / (right - left)
+	if bottom > top + 1.0:
+		ny = (p.y - top) / (bottom - top)
+	return Vector2(nx, ny)
+
+
+func _from_norm(nx: float, ny: float) -> Vector2:
+	var left := player_front - 40.0
+	var right := enemy_front - 12.0
+	var top := lane_y(0)
+	var bottom := lane_y(maxi(lane_ys.size() - 1, 0))
+	return Vector2(left + nx * (right - left), top + ny * (bottom - top))
 
 
 func _ink(color: Color) -> Color:
