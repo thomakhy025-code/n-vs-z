@@ -897,7 +897,7 @@ func _toggle_pause() -> void:
 	if finished:
 		return
 	if duel and puppet:
-		Net.ask_pause.rpc_id(1)
+		Net.announce_pause()
 		return
 	if paused:
 		_close_pause()
@@ -1170,12 +1170,12 @@ func _send_hand() -> void:
 		return
 	var sword := sword_hold or Input.is_action_pressed("sword")
 	var shoot := shoot_hold or Input.is_action_pressed("shoot")
-	Net.push_hand.rpc_id(1, controlled.position.x, controlled.position.y, controlled.dragging, sword, shoot)
+	Net.announce_hand(controlled.position.x, controlled.position.y, controlled.dragging, sword, shoot)
 	for i in loadout.size():
 		var down := Input.is_action_pressed("slot%d" % (i + 1)) or (i < slot_hold.size() and bool(slot_hold[i]))
 		var was := i < sent_keys.size() and bool(sent_keys[i])
 		if down and not was:
-			Net.ask_buy.rpc_id(1, str(loadout[i]))
+			Net.announce_buy(str(loadout[i]))
 		if i >= sent_keys.size():
 			sent_keys.append(down)
 		else:
@@ -1189,7 +1189,7 @@ func _send_state(delta: float) -> void:
 	if net_acc < 0.05:
 		return
 	net_acc = 0.0
-	Net.push_state.rpc_id(Net.guest_id, _pack_state())
+	Net.announce_state(_pack_state())
 
 
 func _pack_state() -> Array:

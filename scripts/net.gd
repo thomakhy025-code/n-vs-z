@@ -1,7 +1,8 @@
 extends Node
 
+const WebPair = preload("res://scripts/web_pair.gd")
+
 const PORT := 3001
-const STUN := "stun:stun.l.google.com:19302"
 
 signal lobby_changed
 signal linked
@@ -24,33 +25,25 @@ var waiting_answer: bool = false
 
 var _wired: bool = false
 var _closing: bool = false
-var _link: WebRTCPeerConnection
-var _rtc: WebRTCMultiplayerPeer
-var _ice: Array = []
-var _ice_done: bool = false
-var _ice_wait: float = 0.0
-var _gathering: bool = false
-var _published: bool = false
-var _local_sdp: String = ""
-var _local_type: String = ""
+var _browser: bool = false
+var _browser_note: String = ""
 
 
 func _ready() -> void:
 	_wire()
+	if OS.has_feature("web"):
+		status = "Press Find opponent. The game looks for one other ninja and connects."
 
 
-func _process(delta: float) -> void:
-	if not _gathering or _published:
-		return
-	_ice_wait += delta
-	if _local_sdp != "" and (_ice_done or _ice_wait >= 1.6):
-		_publish_local()
+func _process(_delta: float) -> void:
+	if _browser:
+		_poll_browser()
 
 
 func host_match() -> void:
 	close_match()
 	if OS.has_feature("web"):
-		_web_host()
+		find_opponent()
 		return
 	if not ClassDB.class_exists("ENetMultiplayerPeer"):
 		status = "This build cannot host a match."
@@ -89,27 +82,24 @@ func join_address(address: String) -> void:
 	lobby_changed.emit()
 
 
-func apply_code(text: String) -> void:
-	var data := _open(text)
-	if data.is_empty():
-		status = "That code could not be read."
+func find_opponent() -> void:
+	close_match()
+	if not OS.has_feature("web"):
+		status = "On this computer, press Host, then Join with the address."
 		lobby_changed.emit()
 		return
-	var kind := str(data.get("kind", ""))
-	if role == "host" and waiting_answer and kind == "answer":
-		_accept_remote(data)
-		status = "Connecting."
-		lobby_changed.emit()
-		return
-	if role == "" and kind == "offer":
-		_web_join(data)
-		return
-	status = "That code does not fit this side."
+	_browser = true
+	_browser_note = ""
+	status = "Looking for an opponent..."
 	lobby_changed.emit()
+	WebPair.start()
 
 
 func close_match() -> void:
 	_closing = true
+	_browser = false
+	_browser_note = ""
+	WebPair.stop()
 	_shutdown_peer()
 	role = ""
 	live = false
@@ -168,6 +158,8 @@ func _on_server_gone() -> void:
 func _drop(message: String) -> void:
 	status = message
 	_closing = true
+	_browser = false
+	WebPair.stop()
 	_shutdown_peer()
 	role = ""
 	live = false
@@ -178,120 +170,163 @@ func _drop(message: String) -> void:
 
 
 func _shutdown_peer() -> void:
-	if _link != null:
-		_link.close()
-		_link = null
-	_rtc = null
-	_ice.clear()
-	_ice_done = false
-	_ice_wait = 0.0
-	_gathering = false
-	_published = false
-	_local_sdp = ""
-	_local_type = ""
 	guest_id = 0
 	if multiplayer.multiplayer_peer != null:
 		multiplayer.multiplayer_peer.close()
 	multiplayer.multiplayer_peer = OfflineMultiplayerPeer.new()
 
 
-func _web_host() -> void:
-	if not ClassDB.class_exists("WebRTCMultiplayerPeer"):
-		status = "This page cannot open a match."
-		lobby_changed.emit()
+func _poll_browser() -> void:
+	var state := WebPair.poll()
+	var js_status := str(state.get("status", ""))
+	var js_role := str(state.get("role", ""))
+	var open := bool(state.get("open", false))
+	if not live:
+		if js_status == "closed":
+			_browser = false
+			WebPair.stop()
+			_note("Could not reach an opponent. Press Find opponent to try again.")
+		elif js_status == "busy":
+			_note("Matches are full right now. Press Find opponent to try again.")
+		elif js_status == "missing":
+			_note("The match service did not load. Refresh the page and press Find opponent again.")
+		elif js_status == "error":
+			_note("Could not reach the match service. Press Find opponent to try again.")
+		elif open and (js_role == "host" or js_role == "guest"):
+			role = "guest" if js_role == "guest" else "host"
+			guest_id = 2 if role == "host" else 0
+			live = true
+			status = "Both ninjas are here. Choose 6."
+			WebPair.mark_busy()
+			linked.emit()
+			lobby_changed.emit()
+		elif js_status == "host":
+			_note("Waiting for one opponent.")
+		elif js_status == "search":
+			_note("Looking for an opponent...")
+	elif js_status == "closed":
+		_drop("The other ninja left.")
 		return
-	var conn := _make_link()
-	if conn == null:
+	var lines: Array = state.get("lines", [])
+	for line in lines:
+		_browser_line(str(line))
+
+
+func _note(message: String) -> void:
+	if message == _browser_note:
 		return
-	_rtc = WebRTCMultiplayerPeer.new()
-	_rtc.create_server()
-	if _rtc.add_peer(conn, 2) != OK:
-		status = "Could not open the match."
-		lobby_changed.emit()
-		return
-	multiplayer.multiplayer_peer = _rtc
-	role = "host"
-	_gathering = true
-	conn.create_offer()
-	status = "Making a code."
+	_browser_note = message
+	status = message
 	lobby_changed.emit()
 
 
-func _web_join(data: Dictionary) -> void:
-	var conn := _make_link()
-	if conn == null:
+func _browser_line(line: String) -> void:
+	var parsed: Variant = JSON.parse_string(line)
+	if typeof(parsed) != TYPE_DICTIONARY:
 		return
-	_rtc = WebRTCMultiplayerPeer.new()
-	_rtc.create_client(2)
-	if _rtc.add_peer(conn, 1) != OK:
-		status = "Could not join."
-		lobby_changed.emit()
+	var msg: Dictionary = parsed
+	var kind := str(msg.get("t", ""))
+	if kind == "loadout":
+		var ids: Variant = msg.get("ids", [])
+		var sheets: Variant = msg.get("sheets", [])
+		var id_list: Array = ids if ids is Array else []
+		var sheet_list: Array = sheets if sheets is Array else []
+		loadout_got.emit(int(msg.get("side", 1)), id_list, sheet_list, bool(msg.get("navy", false)))
+	elif kind == "start" and role == "guest":
+		var left: Variant = msg.get("left", [])
+		var right: Variant = msg.get("right", [])
+		var skins: Variant = msg.get("skins", {})
+		var left_list: Array = left if left is Array else []
+		var right_list: Array = right if right is Array else []
+		var skin_map: Dictionary = skins if skins is Dictionary else {}
+		begin_match.emit(left_list, right_list, skin_map)
+	elif kind == "hand" and role == "host":
+		input_got.emit(float(msg.get("x", 0.0)), float(msg.get("y", 0.0)), bool(msg.get("dragging", false)), bool(msg.get("sword", false)), bool(msg.get("shoot", false)))
+	elif kind == "buy" and role == "host":
+		buy_got.emit(str(msg.get("id", "")))
+	elif kind == "state" and role == "guest":
+		var packet: Variant = msg.get("p", [])
+		if packet is Array:
+			state_got.emit(packet)
+	elif kind == "pause" and role == "host":
+		pause_got.emit()
+	elif kind == "reselect":
+		reselect_got.emit()
+	elif kind == "rematch":
+		rematch_got.emit()
+
+
+func _send(msg: Dictionary) -> void:
+	WebPair.send_text(JSON.stringify(msg))
+
+
+func announce_loadout(ids: Array, sheets: Array, navy: bool) -> void:
+	if _browser:
+		var side := 0 if role == "host" else 1
+		loadout_got.emit(side, ids, sheets, navy)
+		_send({"t": "loadout", "side": side, "ids": ids, "sheets": sheets, "navy": navy})
 		return
-	multiplayer.multiplayer_peer = _rtc
-	role = "guest"
-	_accept_remote(data)
-	conn.poll()
-	conn.create_answer()
-	_gathering = true
-	status = "Making the code to send back."
-	lobby_changed.emit()
+	share_loadout.rpc(ids, sheets, navy)
 
 
-func _make_link() -> WebRTCPeerConnection:
-	var conn := WebRTCPeerConnection.new()
-	var err: Error = conn.initialize({
-		"iceServers": [{"urls": [STUN, "stun:stun.cloudflare.com:3478"]}],
-	})
-	if err != OK:
-		status = "Could not open a link."
-		lobby_changed.emit()
-		return null
-	conn.session_description_created.connect(_on_description)
-	conn.ice_candidate_created.connect(_on_ice)
-	_link = conn
-	return conn
-
-
-func _on_description(kind: String, sdp: String) -> void:
-	if _link == null:
+func announce_start(left: Array, right: Array, skins: Dictionary) -> void:
+	if _browser:
+		begin_match.emit(left, right, skins)
+		_send({"t": "start", "left": left, "right": right, "skins": skins})
 		return
-	_link.set_local_description(kind, sdp)
-	_local_type = kind
-	_local_sdp = sdp
-	_ice_wait = 0.0
+	start_duel.rpc(left, right, skins)
 
 
-func _on_ice(media: String, index: int, name: String) -> void:
-	if name == "":
-		_ice_done = true
+func announce_hand(x: float, y: float, dragging: bool, sword: bool, shoot: bool) -> void:
+	if role != "guest":
 		return
-	_ice.append([media, index, name])
-	_ice_wait = 0.0
-
-
-func _publish_local() -> void:
-	if _published or _local_sdp == "":
+	if _browser:
+		_send({"t": "hand", "x": x, "y": y, "dragging": dragging, "sword": sword, "shoot": shoot})
 		return
-	_published = true
-	_gathering = false
-	code = _seal({"kind": _local_type, "sdp": _local_sdp, "ice": _ice})
-	if _local_type == "offer":
-		waiting_answer = true
-		status = "Send this code to the other ninja. When a code comes back, paste it here and apply it."
-	else:
-		status = "Send this code back to the host."
-	lobby_changed.emit()
+	push_hand.rpc_id(1, x, y, dragging, sword, shoot)
 
 
-func _accept_remote(data: Dictionary) -> void:
-	if _link == null:
+func announce_buy(unit_id: String) -> void:
+	if role != "guest":
 		return
-	_link.set_remote_description(str(data.get("kind", "")), str(data.get("sdp", "")))
-	var rows: Array = data.get("ice", [])
-	for row in rows:
-		if row is Array and (row as Array).size() >= 3:
-			var ice_row: Array = row
-			_link.add_ice_candidate(str(ice_row[0]), int(ice_row[1]), str(ice_row[2]))
+	if _browser:
+		_send({"t": "buy", "id": unit_id})
+		return
+	ask_buy.rpc_id(1, unit_id)
+
+
+func announce_state(packet: Array) -> void:
+	if role != "host":
+		return
+	if _browser:
+		_send({"t": "state", "p": packet})
+		return
+	if guest_id < 2:
+		return
+	push_state.rpc_id(guest_id, packet)
+
+
+func announce_pause() -> void:
+	if _browser:
+		_send({"t": "pause"})
+		return
+	ask_pause.rpc_id(1)
+
+
+func announce_reselect() -> void:
+	if _browser:
+		reselect_got.emit()
+		_send({"t": "reselect"})
+		return
+	reselect.rpc()
+
+
+func announce_rematch() -> void:
+	if _browser:
+		rematch_got.emit()
+		_send({"t": "rematch"})
+		return
+	rematch.rpc()
 
 
 func _lan_hint() -> String:
@@ -301,38 +336,6 @@ func _lan_hint() -> String:
 		if ip.begins_with("192.168.") or ip.begins_with("10.") or ip.begins_with("172."):
 			return ip
 	return "127.0.0.1"
-
-
-func _seal(data: Dictionary) -> String:
-	var raw := JSON.stringify(data).to_utf8_buffer()
-	var zipped := raw.compress(FileAccess.COMPRESSION_DEFLATE)
-	var head := PackedByteArray()
-	head.resize(4)
-	head.encode_u32(0, raw.size())
-	return Marshalls.raw_to_base64(head + zipped)
-
-
-func _open(text: String) -> Dictionary:
-	var clean := ""
-	for i in text.length():
-		var ch := text.substr(i, 1)
-		if ch != " " and ch != "\n" and ch != "\r" and ch != "\t":
-			clean += ch
-	if clean == "":
-		return {}
-	var raw := Marshalls.base64_to_raw(clean)
-	if raw.size() < 5:
-		return {}
-	var size := int(raw.decode_u32(0))
-	if size <= 0 or size > 200000:
-		return {}
-	var unzipped := raw.slice(4).decompress(size, FileAccess.COMPRESSION_DEFLATE)
-	if unzipped.is_empty():
-		return {}
-	var parsed: Variant = JSON.parse_string(unzipped.get_string_from_utf8())
-	if typeof(parsed) != TYPE_DICTIONARY:
-		return {}
-	return parsed
 
 
 @rpc("any_peer", "reliable", "call_local")

@@ -27,7 +27,7 @@ Each road you open pays 100 diamonds. Home is the night gate: Shop, Skin, the ro
 
 The shop sells one new skin for the hero and one for each soldier. A skin costs 200 diamonds. Buying it does not put it on. Wear it from Skin, and Nothing puts the old clothes back. The navy saber is a separate skin, also 200 diamonds.
 
-1 vs 1 is two clans. Each side chooses 6 of the 11. Both have the same value, the same calls, the same roads, the same wind, and a hero. On this page, Host makes a code. Send it to the other ninja, paste the code they send back, and apply it. On a computer build, Host opens port 3001 and the other ninja joins the address.
+1 vs 1 is two clans. Each side chooses 6 of the 11. Both have the same value, the same calls, the same roads, the same wind, and a hero. On this page, press Find opponent. The game looks for one other ninja and connects. You do not type an address or a code. On a computer build, Host opens port 3001 and the other ninja joins the address.
 
 Escape or Back returns to the title."
 
@@ -914,7 +914,7 @@ func _start_battle(chosen: Array, mode: String = "", level_index: int = 0) -> vo
 func rematch() -> void:
 	Engine.time_scale = 1.0
 	if Net.role != "":
-		Net.rematch.rpc()
+		Net.announce_rematch()
 		return
 	_start_battle(loadout, "")
 
@@ -922,7 +922,7 @@ func rematch() -> void:
 func change_squad() -> void:
 	Engine.time_scale = 1.0
 	if Net.role != "":
-		Net.reselect.rpc()
+		Net.announce_reselect()
 		return
 	_drop_battle()
 	_show_select()
@@ -1106,7 +1106,10 @@ func _show_duel() -> void:
 	duel_code = null
 	duel_address = null
 	var box := _open_page("1 vs 1")
-	var lead := UiSkin.label("Both sides are the clan. Each ninja chooses 6. Value, calls, roads, wind, and the hero are the same on both sides.", 16, Color("3a2a22"))
+	var lead_text := "Both sides are the clan. Each ninja chooses 6. Value, calls, roads, wind, and the hero are the same on both sides."
+	if OS.has_feature("web"):
+		lead_text = "Press Find opponent. The game looks for one other ninja and connects. Each ninja then chooses 6."
+	var lead := UiSkin.label(lead_text, 16, Color("3a2a22"))
 	lead.autowrap_mode = TextServer.AUTOWRAP_WORD
 	lead.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(lead)
@@ -1119,18 +1122,7 @@ func _show_duel() -> void:
 		box.add_child(_menu_button("Leave", Color("6b3a32"), show_title, 220, 18))
 		return
 	if OS.has_feature("web"):
-		box.add_child(_menu_button("Host", Color("7d9a6a"), Net.host_match, 420))
-		duel_code = TextEdit.new()
-		duel_code.placeholder_text = "Match code"
-		duel_code.custom_minimum_size = Vector2(0, 120)
-		duel_code.wrap_mode = TextEdit.LINE_WRAPPING_BOUNDARY
-		box.add_child(duel_code)
-		var tools := HBoxContainer.new()
-		tools.alignment = BoxContainer.ALIGNMENT_CENTER
-		tools.add_theme_constant_override("separation", 12)
-		box.add_child(tools)
-		tools.add_child(_menu_button("Copy code", Color("e6c36a"), _copy_duel_code, 200, 18))
-		tools.add_child(_menu_button("Apply code", Color("c44536"), _apply_duel_code, 200, 18))
+		box.add_child(_menu_button("Find opponent", Color("7d9a6a"), Net.find_opponent, 420))
 	else:
 		box.add_child(_menu_button("Host", Color("7d9a6a"), Net.host_match, 420))
 		duel_address = LineEdit.new()
@@ -1141,20 +1133,6 @@ func _show_duel() -> void:
 		box.add_child(duel_address)
 		box.add_child(_menu_button("Join", Color("c44536"), _join_duel, 420))
 	box.add_child(_menu_button("Back", Color("f3e6c8"), show_title, 220, 18))
-
-
-func _copy_duel_code() -> void:
-	if duel_code == null:
-		return
-	DisplayServer.clipboard_set(duel_code.text)
-	if duel_status != null:
-		duel_status.text = "Copied. Send it to the other ninja."
-
-
-func _apply_duel_code() -> void:
-	if duel_code == null:
-		return
-	Net.apply_code(duel_code.text)
 
 
 func _join_duel() -> void:
@@ -1196,7 +1174,7 @@ func _ready_duel() -> void:
 		start_button.disabled = true
 	if count_label != null:
 		count_label.text = "Waiting for the other ninja."
-	Net.share_loadout.rpc(loadout.duplicate(), _worn_ids(), saber_worn == "navy")
+	Net.announce_loadout(loadout.duplicate(), _worn_ids(), saber_worn == "navy")
 
 
 func _worn_ids() -> Array:
@@ -1208,7 +1186,7 @@ func _worn_ids() -> Array:
 
 
 func _on_loadout_got(side: int, ids: Array, sheets: Array, navy: bool) -> void:
-	if not multiplayer.is_server() or duel_started:
+	if Net.role != "host" or duel_started:
 		return
 	var skin := {"sheets": sheets.duplicate(), "navy": navy}
 	if side == 0:
@@ -1219,7 +1197,7 @@ func _on_loadout_got(side: int, ids: Array, sheets: Array, navy: bool) -> void:
 		right_skin = skin
 	if left_ids.size() == 6 and right_ids.size() == 6:
 		duel_started = true
-		Net.start_duel.rpc(left_ids, right_ids, {"left": left_skin, "right": right_skin})
+		Net.announce_start(left_ids, right_ids, {"left": left_skin, "right": right_skin})
 
 
 func _on_begin_match(left: Array, right: Array, skins: Dictionary) -> void:
