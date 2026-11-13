@@ -168,14 +168,22 @@ func _move(delta: float) -> void:
 		lane = battle.lane_index(position.y)
 		stepping = net_step
 		return
-	var axis := Vector2.ZERO
+	var stick := Vector2.ZERO
+	if battle != null and not bot:
+		stick = battle.stick_axis
+	var keys := Vector2.ZERO
 	if bot:
-		axis = bot_axis
-	else:
-		axis = Vector2(Input.get_axis("move_left", "move_right"), Input.get_axis("move_up", "move_down"))
-	if axis.length() > 0.15:
+		keys = bot_axis
+	elif stick.length() <= 0.12:
+		keys = Vector2(Input.get_axis("move_left", "move_right"), Input.get_axis("move_up", "move_down"))
+	var step := Vector2.ZERO
+	if stick.length() > 0.12:
+		step = stick.limit_length(1.0)
+	elif keys.length() > 0.15:
+		step = keys.normalized()
+	if step.length() > 0.12:
 		dragging = false
-		position += axis.normalized() * speed * delta
+		position += step * speed * delta
 		bob_time += delta
 	elif dragging:
 		var delta_to: Vector2 = target - position
@@ -187,7 +195,7 @@ func _move(delta: float) -> void:
 	position.x = clampf(position.x, min_x, max_x)
 	position.y = clampf(position.y, min_y, max_y)
 	lane = battle.lane_index(position.y)
-	stepping = dragging or axis.length() > 0.15
+	stepping = dragging or step.length() > 0.12
 
 
 func _combat(delta: float) -> void:

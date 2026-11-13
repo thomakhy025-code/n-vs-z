@@ -11,9 +11,9 @@ const SAVE_PATH := "user://progress.cfg"
 
 const HOW_TO := "This is a side-view gate battle. Your clan gate is on the left. The cursed gate is on the right. Both have 1000 blood.
 
-Choose 6 of the 11 soldiers. Value builds by itself. The buttons at the bottom left spend it. Each soldier has a cost and a call time before that soldier can be called again.
+Choose 6 of the 11 soldiers. Value builds by itself. Hold the phone or iPad sideways. A stick at the bottom left moves the hero. The six call buttons sit to the right of that stick, and Sword and Shoot sit at the bottom right, so the left thumb can stay on the stick.
 
-There are three roads. Soldiers only march forward on the road where you called them, and they fight only that road. The Berserker stands across all three roads, hits every road at once, and enemies on every road can hit the Berserker. The first time a house falls to half blood, a wind helps that side: fighters of the other team who have crossed the middle are blown back to the center and lose half of the blood they still have. You move the hero onto any road. Drag, or use WASD. Sword and Shoot are the two large buttons at the bottom right. J and K do the same. Number keys 1 through 6 call the six you brought onto the hero's road.
+There are three roads. Soldiers only march forward on the road where you called them, and they fight only that road. The Berserker stands across all three roads, hits every road at once, and enemies on every road can hit the Berserker. The first time a house falls to half blood, a wind helps that side: fighters of the other team who have crossed the middle are blown back to the center and lose half of the blood they still have. You move the hero onto any road with the stick, by dragging on the field, or with WASD. J and K match Sword and Shoot. Number keys 1 through 6 call the six you brought onto the hero's road.
 
 If a runner slips past the line, you are the one who runs back. If your gate breaks, you lose. Break the cursed gate to win. On Night march that gate is not the end. When it falls, a war boss walks slowly across all three roads. Each hit strikes two people for 200, and it has 1000 blood. People on every road can hit it, and it can hit every road. You win when the boss dies. While it walks, the dead still come at +1 each second.
 

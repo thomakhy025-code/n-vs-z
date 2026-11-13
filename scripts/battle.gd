@@ -10,6 +10,8 @@ const ArrowScript = preload("res://scripts/projectile.gd")
 const FloatScript = preload("res://scripts/float_text.gd")
 const PoofScript = preload("res://scripts/poof.gd")
 const FieldScript = preload("res://scripts/field_input.gd")
+const TouchLayout = preload("res://scripts/touch_layout.gd")
+const JoyScript = preload("res://scripts/joystick.gd")
 const UiSkin = preload("res://scripts/ui_skin.gd")
 const Levels = preload("res://scripts/levels.gd")
 
@@ -78,6 +80,8 @@ var auto_lock: float = 0.15
 var texts_this_frame: int = 0
 var harness_done: bool = false
 var sword_hold: bool = false
+var stick_axis: Vector2 = Vector2.ZERO
+var stick: Control = null
 var shoot_hold: bool = false
 var purse_paid: Dictionary = {}
 var boss_up: bool = false
@@ -228,7 +232,7 @@ func _build_hud() -> void:
 	level_label = _plain("Level %d  ·  %s" % [level_no, str(rules["name"])], 18, Color("f3e6c8"))
 	level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	level_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	hint = _plain("Drag between the three roads to move. WASD works too. Soldiers you call join the hero's road. Sword and Shoot are on the right. J and K match those buttons. Keys 1-6 call the six you chose.", 16, Color("f3e6c8"))
+	hint = _plain("Hold the phone sideways. The stick at the bottom left moves the hero. The six calls sit beside it. Sword and Shoot are on the right.", 16, Color("f3e6c8"))
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	down_label = _plain("", 20, Color("ffb4a8"))
@@ -283,11 +287,25 @@ func _build_hud() -> void:
 		slot_hold.append(false)
 		btn.button_down.connect(_set_hold.bind(slot_index, true))
 		btn.button_up.connect(_set_hold.bind(slot_index, false))
+		btn.clip_text = true
 		hud.add_child(btn)
 		slot_buttons.append(btn)
+	stick = JoyScript.new()
+	stick.moved.connect(_on_stick)
+	hud.add_child(stick)
 	_layout_hud()
 	if not get_viewport().size_changed.is_connected(_layout_hud):
 		get_viewport().size_changed.connect(_layout_hud)
+
+
+func _on_stick(axis: Vector2) -> void:
+	stick_axis = axis
+
+
+func _release_stick() -> void:
+	stick_axis = Vector2.ZERO
+	if stick != null and is_instance_valid(stick) and stick.has_method("release_stick"):
+		stick.release_stick()
 
 
 func _set_hold(index: int, held: bool) -> void:
@@ -319,51 +337,68 @@ func _bar_fill(color: Color) -> ColorRect:
 
 
 func _layout_hud() -> void:
-	var size := get_viewport_rect().size
-	if size.x < 200.0:
-		size = vp
-	var side_len := sqrt(size.x * size.y / 20.0)
-	var margin := 14.0
+	var size := TouchLayout.view_of(self)
+	var box := TouchLayout.measure(size, TouchLayout.insets_of(self))
+	var pad: Vector4 = box["pad"]
+	var action := Vector2(float(box["action"]), float(box["action"]))
+	var top := pad.y
 	if sword_btn != null:
-		sword_btn.size = Vector2(side_len, side_len)
-		shoot_btn.size = Vector2(side_len, side_len)
-		sword_btn.custom_minimum_size = sword_btn.size
-		shoot_btn.custom_minimum_size = shoot_btn.size
-		sword_btn.position = Vector2(size.x - margin - side_len, size.y - margin - side_len)
-		shoot_btn.position = Vector2(size.x - margin - side_len * 2.0 - 10.0, size.y - margin - side_len)
-	var count := maxi(slot_buttons.size(), 1)
-	var cards_w := size.x - (side_len * 2.0 + 48.0) - 20.0
-	var card_w := maxf(78.0, (cards_w - 8.0 * float(count - 1)) / float(count))
-	var card_h := minf(side_len * 0.56, 118.0)
+		sword_btn.size = action
+		shoot_btn.size = action
+		sword_btn.custom_minimum_size = action
+		shoot_btn.custom_minimum_size = action
+		sword_btn.position = box["sword_pos"]
+		shoot_btn.position = box["shoot_pos"]
+		sword_btn.add_theme_font_size_override("font_size", 24)
+		shoot_btn.add_theme_font_size_override("font_size", 24)
+	var slot_w := float(box["slot_w"])
+	var slot_h := float(box["slot_h"])
+	var slot_gap := float(box["slot_gap"])
+	var slots_left := float(box["slots_left"])
+	var slot_y := float(box["slot_y"])
+	var slot_font := 18 if slot_w >= 112.0 else 15
 	for i in slot_buttons.size():
 		var btn: Button = slot_buttons[i]
-		btn.size = Vector2(card_w, card_h)
+		btn.size = Vector2(slot_w, slot_h)
 		btn.custom_minimum_size = btn.size
-		btn.position = Vector2(16.0 + float(i) * (card_w + 8.0), size.y - margin - card_h)
-	player_hp_label.position = Vector2(24, 14)
-	player_hp_label.size = Vector2(240, 30)
-	enemy_hp_label.position = Vector2(size.x - 264, 14)
-	enemy_hp_label.size = Vector2(240, 30)
-	value_label.position = Vector2(size.x * 0.5 - 140, 8)
-	value_label.size = Vector2(280, 36)
-	income_label.position = Vector2(size.x * 0.5 - 140, 42)
-	income_label.size = Vector2(280, 22)
+		btn.position = Vector2(slots_left + float(i) * (slot_w + slot_gap), slot_y)
+		btn.add_theme_font_size_override("font_size", slot_font)
+	if stick != null:
+		var stick_size := float(box["stick"])
+		stick.size = Vector2(stick_size, stick_size)
+		stick.custom_minimum_size = stick.size
+		stick.position = box["stick_pos"]
+		stick.queue_redraw()
+	player_hp_label.position = Vector2(pad.x + 16.0, top + 8.0)
+	player_hp_label.size = Vector2(250, 30)
+	enemy_hp_label.position = Vector2(size.x - pad.z - 266.0, top + 8.0)
+	enemy_hp_label.size = Vector2(250, 30)
+	value_label.position = Vector2(size.x * 0.5 - 170.0, top + 4.0)
+	value_label.size = Vector2(340, 46)
+	value_label.add_theme_font_size_override("font_size", 40)
+	income_label.position = Vector2(size.x * 0.5 - 170.0, top + 50.0)
+	income_label.size = Vector2(340, 24)
 	if level_label != null:
-		level_label.position = Vector2(size.x * 0.5 - 260, 104)
-		level_label.size = Vector2(520, 26)
-	hint.position = Vector2(size.x * 0.5 - 340, 132)
-	hint.size = Vector2(680, 72)
-	down_label.position = Vector2(size.x * 0.5 - 180, size.y - side_len - 42)
+		level_label.position = Vector2(size.x * 0.5 - 240.0, top + 76.0)
+		level_label.size = Vector2(480, 26)
+	hint.position = Vector2(size.x * 0.5 - 280.0, top + 104.0)
+	hint.size = Vector2(560, 48)
+	down_label.position = Vector2(size.x * 0.5 - 180.0, top + 156.0)
 	down_label.size = Vector2(360, 28)
 	if player_track != null:
-		player_track.position = Vector2(24, 48)
-		enemy_track.position = Vector2(size.x - 244, 48)
+		player_track.position = Vector2(pad.x + 16.0, top + 40.0)
+		enemy_track.position = Vector2(size.x - pad.z - 236.0, top + 40.0)
+	var chrome := Vector2(148, 76)
 	if pause_btn != null:
-		pause_btn.position = Vector2(size.x * 0.5 + 6.0, 66)
-		pause_btn.size = Vector2(92, 36)
+		pause_btn.size = chrome
+		pause_btn.custom_minimum_size = chrome
+		pause_btn.position = Vector2(size.x - pad.z - 164.0, top + 56.0)
+		pause_btn.add_theme_font_size_override("font_size", 22)
 	if home_btn != null:
-		home_btn.position = Vector2(size.x * 0.5 - 98.0, 66)
-		home_btn.size = Vector2(92, 36)
+		home_btn.size = chrome
+		home_btn.custom_minimum_size = chrome
+		home_btn.position = Vector2(pad.x + 16.0, top + 56.0)
+		home_btn.add_theme_font_size_override("font_size", 22)
 
 
 func _process(delta: float) -> void:
@@ -899,6 +934,7 @@ func _toggle_pause() -> void:
 	if duel and puppet:
 		Net.announce_pause()
 		return
+	_release_stick()
 	if paused:
 		_close_pause()
 		return
