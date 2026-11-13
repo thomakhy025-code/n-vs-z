@@ -12,6 +12,7 @@ signal begin_match(left: Array, right: Array, skins: Dictionary)
 signal input_got(x: float, y: float, dragging: bool, sword: bool, shoot: bool)
 signal buy_got(unit_id: String)
 signal state_got(packet: Array)
+signal arrow_got(payload: Array)
 signal pause_got
 signal reselect_got
 signal rematch_got
@@ -248,6 +249,10 @@ func _browser_line(line: String) -> void:
 		var packet: Variant = msg.get("p", [])
 		if packet is Array:
 			state_got.emit(packet)
+	elif kind == "arrow" and role == "guest":
+		var shot: Variant = msg.get("p", [])
+		if shot is Array:
+			arrow_got.emit(shot)
 	elif kind == "pause" and role == "host":
 		pause_got.emit()
 	elif kind == "reselect":
@@ -293,6 +298,17 @@ func announce_buy(unit_id: String) -> void:
 		_send({"t": "buy", "id": unit_id})
 		return
 	ask_buy.rpc_id(1, unit_id)
+
+
+func announce_arrow(payload: Array) -> void:
+	if role != "host":
+		return
+	if _browser:
+		_send({"t": "arrow", "p": payload})
+		return
+	if guest_id < 2:
+		return
+	show_arrow.rpc_id(guest_id, payload)
 
 
 func announce_state(packet: Array) -> void:
@@ -368,6 +384,11 @@ func ask_buy(unit_id: String) -> void:
 @rpc("authority", "unreliable")
 func push_state(packet: Array) -> void:
 	state_got.emit(packet)
+
+
+@rpc("authority", "reliable")
+func show_arrow(payload: Array) -> void:
+	arrow_got.emit(payload)
 
 
 @rpc("any_peer", "reliable")

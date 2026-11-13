@@ -50,10 +50,73 @@ var sheet_worn: Dictionary = {}
 var diamond_paid: int = 1
 var code_paid: bool = false
 var code_lock: bool = false
+var code_note: Label = null
 const ROAD_DIAMONDS := 100
 const SKIN_COST := 200
 const VIP_CODE := "tomissogood0205"
 const VIP_DIAMONDS := 100000000
+const WEB_CODE_OPEN := """
+(function(){
+  document.body.style.touchAction = 'manipulation';
+  var old = document.getElementById('nvsz-code');
+  if (old) { old.focus(); return; }
+  var canvas = document.querySelector('canvas');
+  var rect = canvas ? canvas.getBoundingClientRect() : {left:0, top:0, width:window.innerWidth, height:window.innerHeight};
+  var input = document.createElement('input');
+  input.id = 'nvsz-code';
+  input.type = 'text';
+  input.maxLength = 32;
+  input.autocomplete = 'off';
+  input.autocapitalize = 'none';
+  input.autocorrect = 'off';
+  input.spellcheck = false;
+  input.enterKeyHint = 'done';
+  input.placeholder = 'Code';
+  input.setAttribute('aria-label', 'Code');
+  var css = input.style;
+  css.position = 'fixed';
+  css.zIndex = '40';
+  css.boxSizing = 'border-box';
+  css.left = (rect.left + rect.width * 0.12) + 'px';
+  css.top = (rect.top + Math.max(88, Math.min(rect.height * 0.2, 150))) + 'px';
+  css.width = (rect.width * 0.76) + 'px';
+  css.height = '52px';
+  css.fontSize = '16px';
+  css.textAlign = 'center';
+  css.color = '#1c140e';
+  css.background = '#fff8ea';
+  css.border = '3px solid #e6c36a';
+  css.borderRadius = '12px';
+  css.outline = 'none';
+  css.padding = '8px 12px';
+  css.touchAction = 'manipulation';
+  window.__nvCode = '';
+  window.__nvCodeDone = 0;
+  input.addEventListener('input', function(){
+    var clean = input.value.replace(/[^0-9A-Za-z]/g, '').slice(0, 32);
+    if (clean !== input.value) input.value = clean;
+    window.__nvCode = clean;
+  });
+  input.addEventListener('keydown', function(ev){
+    if (ev.key === 'Enter') {
+      window.__nvCode = input.value.replace(/[^0-9A-Za-z]/g, '');
+      window.__nvCodeDone = 1;
+      input.blur();
+    }
+  });
+  document.body.appendChild(input);
+  input.focus();
+})();
+"""
+const WEB_CODE_CLOSE := """
+(function(){
+  var old = document.getElementById('nvsz-code');
+  if (old) old.remove();
+  document.body.style.touchAction = 'none';
+  window.__nvCode = '';
+  window.__nvCodeDone = 0;
+})();
+"""
 var chosen_level: int = 1
 var screen: String = "menu"
 var picking_duel: bool = false
@@ -141,6 +204,7 @@ func _bind(action: String, keys: Array) -> void:
 
 
 func _clear_screens() -> void:
+	_close_web_code()
 	var doomed: Array = []
 	for child in get_children():
 		if child is Control:
@@ -351,6 +415,28 @@ func _show_code() -> void:
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(hint)
+	var note := UiSkin.label("", 18, Color("1c140e"))
+	note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	note.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if _web_touch():
+		hint.text = "Tap the white box, type letters and numbers, then press Redeem."
+		var gap := Control.new()
+		gap.custom_minimum_size = Vector2(0, 64)
+		gap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		box.add_child(gap)
+		box.add_child(note)
+		code_note = note
+		var redeem_touch := _menu_button("Redeem", Color("c44536"), func() -> void: _apply_typed_code(_web_code_text(), note), 220, 18)
+		redeem_touch.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		box.add_child(redeem_touch)
+		var again := _menu_button("Type", Color("e6c36a"), _open_web_code, 220, 18)
+		again.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		box.add_child(again)
+		var back_touch := _menu_button("Back", Color("c4a574"), _show_menu)
+		back_touch.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		box.add_child(back_touch)
+		_open_web_code()
+		return
 	var field := LineEdit.new()
 	field.placeholder_text = "Code"
 	field.max_length = 32
@@ -364,9 +450,6 @@ func _show_code() -> void:
 	field.add_theme_stylebox_override("focus", UiSkin.panel(Color("fff8ea"), Color("c44536"), 12, 3))
 	field.text_changed.connect(_keep_code_text.bind(field))
 	box.add_child(field)
-	var note := UiSkin.label("", 18, Color("1c140e"))
-	note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	note.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(note)
 	var redeem := _menu_button("Redeem", Color("c44536"), func() -> void: _redeem_code(field, note), 220, 18)
 	redeem.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
@@ -376,6 +459,43 @@ func _show_code() -> void:
 	back.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	box.add_child(back)
 	field.grab_focus()
+
+
+func _process(_delta: float) -> void:
+	if screen != "code" or code_note == null or not OS.has_feature("web"):
+		return
+	var flag: Variant = JavaScriptBridge.eval("window.__nvCodeDone||0", true)
+	if int(flag) != 1:
+		return
+	JavaScriptBridge.eval("window.__nvCodeDone=0", true)
+	_apply_typed_code(_web_code_text(), code_note)
+
+
+func _web_touch() -> bool:
+	if not OS.has_feature("web"):
+		return false
+	var touch: Variant = JavaScriptBridge.eval("((navigator.maxTouchPoints||0)>0||('ontouchstart' in window))?1:0", true)
+	return int(touch) == 1
+
+
+func _open_web_code() -> void:
+	if not OS.has_feature("web"):
+		return
+	JavaScriptBridge.eval(WEB_CODE_OPEN, true)
+
+
+func _close_web_code() -> void:
+	code_note = null
+	if not OS.has_feature("web"):
+		return
+	JavaScriptBridge.eval(WEB_CODE_CLOSE, true)
+
+
+func _web_code_text() -> String:
+	if not OS.has_feature("web"):
+		return ""
+	var raw: Variant = JavaScriptBridge.eval("(document.getElementById('nvsz-code')&&document.getElementById('nvsz-code').value)||window.__nvCode||''", true)
+	return str(raw)
 
 
 func _keep_code_text(text: String, field: LineEdit) -> void:
@@ -398,21 +518,28 @@ func _keep_code_text(text: String, field: LineEdit) -> void:
 
 
 func _redeem_code(field: LineEdit, note: Label) -> void:
-	var typed := field.text.strip_edges().to_lower()
+	if _apply_typed_code(field.text, note):
+		field.text = ""
+
+
+func _apply_typed_code(raw: String, note: Label) -> bool:
+	var typed := raw.strip_edges().to_lower()
 	if typed != VIP_CODE:
 		note.text = "That code does not pay."
 		note.add_theme_color_override("font_color", Color("8a2e28"))
-		return
+		return false
 	if code_paid:
 		note.text = "That code is already used."
 		note.add_theme_color_override("font_color", Color("8a2e28"))
-		return
+		return false
 	code_paid = true
 	diamonds += VIP_DIAMONDS
 	_save_progress()
 	note.text = "◆  %d diamonds added." % VIP_DIAMONDS
 	note.add_theme_color_override("font_color", Color("1c140e"))
-	field.text = ""
+	if OS.has_feature("web"):
+		JavaScriptBridge.eval("var el=document.getElementById('nvsz-code');if(el){el.value='';}window.__nvCode='';", true)
+	return true
 
 
 func _show_shop() -> void:

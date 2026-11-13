@@ -726,6 +726,13 @@ func fire_arrow(from: Vector2, aim: Vector2, amount: float, side: int, color: Co
 	var arrow = ArrowScript.new()
 	arrow.setup(from, aim, amount, side, color, reach, road, self, bold, hits_gate, homing)
 	world.add_child(arrow)
+	if duel and Net.role == "host":
+		var start := _to_norm(from)
+		var end := _to_norm(aim)
+		Net.announce_arrow([
+			start.x, start.y, end.x, end.y, side, reach, road,
+			1 if bold else 0, 1 if homing else 0, color.to_html(false),
+		])
 
 
 func lane_y(index: int) -> float:
@@ -1184,6 +1191,8 @@ func _bind_duel_signals() -> void:
 		Net.state_got.connect(_on_state)
 	if not Net.pause_got.is_connected(_on_pause_ask):
 		Net.pause_got.connect(_on_pause_ask)
+	if not Net.arrow_got.is_connected(_on_arrow):
+		Net.arrow_got.connect(_on_arrow)
 
 
 func _exit_tree() -> void:
@@ -1195,16 +1204,20 @@ func _exit_tree() -> void:
 		Net.state_got.disconnect(_on_state)
 	if Net.pause_got.is_connected(_on_pause_ask):
 		Net.pause_got.disconnect(_on_pause_ask)
+	if Net.arrow_got.is_connected(_on_arrow):
+		Net.arrow_got.disconnect(_on_arrow)
 
 
 func _on_hand(x: float, y: float, dragging: bool, sword: bool, shoot: bool) -> void:
-	if puppet or foe == null:
+	if puppet or foe == null or not foe.alive:
 		return
-	foe.net_pos = _from_norm(x, y)
-	foe.net_step = dragging
 	foe.pointer_sword = sword
 	foe.pointer_shoot = shoot
 	hand_seen = battle_time
+	if foe.home_lock > 0.0:
+		return
+	foe.net_pos = _from_norm(x, y)
+	foe.net_step = dragging
 
 
 func _on_net_buy(unit_id: String) -> void:
@@ -1223,7 +1236,7 @@ func _on_pause_ask() -> void:
 
 
 func _send_hand() -> void:
-	if Net.role != "guest" or controlled == null:
+	if Net.role != "guest" or controlled == null or not controlled.alive:
 		return
 	var sword := sword_hold or Input.is_action_pressed("sword")
 	var shoot := shoot_hold or Input.is_action_pressed("shoot")
@@ -1355,18 +1368,23 @@ func _apply_hero(who, blob: Variant, local_control: bool) -> void:
 	var at := _from_norm(float(row[0]), float(row[1]))
 	var hx := at.x
 	var hy := at.y
+	var was_alive := bool(who.alive)
 	who.hp = float(row[2])
 	who.alive = int(row[3]) == 1
-	who.visible = who.alive or float(row[7]) > 0.0
+	who.visible = who.alive
 	who.facing = float(row[4])
 	who.act = float(row[5])
 	who.act_tool = str(row[6])
 	who.down_timer = float(row[7])
 	who.hurt = float(row[8])
 	who.winding = int(row[9]) == 1
-	if not local_control or not who.alive or absf(who.position.x - hx) > 140.0:
+	var returned: bool = bool(who.alive) and not was_alive
+	if returned or not local_control or not who.alive or absf(who.position.x - hx) > 140.0:
 		who.position = Vector2(hx, hy)
 		who.net_pos = who.position
+		who.dragging = false
+	if returned:
+		who.home_lock = 0.55
 	who.lane = lane_index(who.position.y)
 
 
@@ -1402,6 +1420,17 @@ func _apply_units(blob: Variant) -> void:
 	for unit in stale:
 		units.erase(unit)
 		unit.queue_free()
+
+
+func _on_arrow(payload: Array) -> void:
+	if not puppet or world == null or payload.size() < 10:
+		return
+	var start := _from_norm(float(payload[0]), float(payload[1]))
+	var aim := _from_norm(float(payload[2]), float(payload[3]))
+	var arrow = ArrowScript.new()
+	arrow.cosmetic = true
+	arrow.setup(start, aim, 0.0, int(payload[4]), Color(str(payload[9])), float(payload[5]), int(payload[6]), self, int(payload[7]) == 1, false, int(payload[8]) == 1)
+	world.add_child(arrow)
 
 
 func _unit_by_net(nid: int):

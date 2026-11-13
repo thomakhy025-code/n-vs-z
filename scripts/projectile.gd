@@ -13,6 +13,7 @@ var road_y: float = 0.0
 var bold: bool = false
 var hits_gate: bool = true
 var homing: bool = false
+var cosmetic: bool = false
 
 
 func setup(from: Vector2, aim: Vector2, amount: float, side: int, color: Color, reach: float, road: int, field, heavy: bool = false, may_hit_gate: bool = true, seek_cross: bool = false) -> void:
@@ -45,6 +46,8 @@ func _process(delta: float) -> void:
 	queue_redraw()
 	if traveled >= max_dist:
 		queue_free()
+		return
+	if cosmetic:
 		return
 	for foe in battle.hostile_targets(shooter_side):
 		if _hits(foe):

@@ -35,6 +35,7 @@ var lane: int = 1
 var bob_time: float = 0.0
 var stepping: bool = false
 var down_timer: float = 0.0
+var home_lock: float = 0.0
 var invuln: float = 0.0
 var look: Dictionary = {}
 var min_x: float = 80.0
@@ -121,6 +122,7 @@ func _go_down() -> void:
 	hp = 0.0
 	down_timer = RESPAWN
 	dragging = false
+	home_lock = 0.0
 	visible = false
 	battle.float_text(position + Vector2(-10, -20), "DOWN", Color("ff8d7a"))
 
@@ -133,14 +135,18 @@ func _process(delta: float) -> void:
 	slash = maxf(0.0, slash - delta)
 	muzzle = maxf(0.0, muzzle - delta)
 	invuln = maxf(0.0, invuln - delta)
+	home_lock = maxf(0.0, home_lock - delta)
 	if battle != null and battle.puppet:
-		if self == battle.controlled and alive and not battle.finished and not battle.paused:
+		if not alive:
+			visible = false
+		elif self == battle.controlled and not battle.finished and not battle.paused:
 			_move(delta)
 		if act <= 0.0:
 			winding = false
 		queue_redraw()
 		return
 	if not alive:
+		visible = false
 		winding = false
 		act = 0.0
 		down_timer -= delta
@@ -163,10 +169,11 @@ func _process(delta: float) -> void:
 
 func _move(delta: float) -> void:
 	if driven:
-		position.x = clampf(net_pos.x, min_x, max_x)
-		position.y = clampf(net_pos.y, min_y, max_y)
+		if home_lock <= 0.0:
+			position.x = clampf(net_pos.x, min_x, max_x)
+			position.y = clampf(net_pos.y, min_y, max_y)
 		lane = battle.lane_index(position.y)
-		stepping = net_step
+		stepping = false if home_lock > 0.0 else net_step
 		return
 	var stick := Vector2.ZERO
 	if battle != null and not bot:
@@ -306,11 +313,16 @@ func _revive() -> void:
 	hp = max_hp
 	invuln = 1.1
 	visible = true
+	down_timer = 0.0
+	dragging = false
+	winding = false
+	act = 0.0
 	var revive_y: float = battle.lane_y(1)
 	lane = 1
 	var home_x: float = float(battle.player_rear) if side == 0 else float(battle.enemy_rear)
 	position = Vector2(home_x, revive_y)
 	net_pos = position
+	home_lock = 0.55 if battle.duel else 0.0
 	battle.float_text(position + Vector2(-16, -40), "RETURN", Color("f3e6c8"))
 
 
