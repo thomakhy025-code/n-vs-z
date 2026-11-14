@@ -1314,6 +1314,44 @@ static func _motion(phase: String, t: float, clock: float, cycle: String, beat: 
 			rear = rear.lerp(Vector2(-4.0, 14.0), t)
 			front = front.lerp(Vector2(10.0, 12.0), t)
 			tip = tip.lerp(Vector2(16.0, 14.0), t)
+		"model":
+			lean = -0.5
+			squat = 0.0
+			step = 0.18
+			breath = 0.0
+			rise = 0.0
+			tilt = -0.06
+			rear = Vector2(3.0, 10.0)
+			front = Vector2(8.0, 3.0)
+			tip = Vector2(8.0, 20.0)
+			if cycle == "bow" or cycle == "crossbow":
+				rear = Vector2(6.0, 2.0)
+				front = Vector2(10.0, 1.0)
+				tip = Vector2(10.0, 1.0)
+			elif cycle == "staff" or cycle == "polearm":
+				rear = Vector2(2.0, 8.0)
+				front = Vector2(5.0, 2.0)
+				tip = Vector2(4.0, -22.0)
+			elif cycle == "spear":
+				rear = Vector2(2.0, 6.0)
+				front = Vector2(8.0, 4.0)
+				tip = Vector2(6.0, -24.0)
+			elif cycle == "axe" or cycle == "hammer":
+				rear = Vector2(2.0, 8.0)
+				front = Vector2(8.0, 3.0)
+				tip = Vector2(4.0, -20.0)
+			elif cycle == "shield":
+				rear = Vector2(2.0, 10.0)
+				front = Vector2(6.0, 2.0)
+				tip = Vector2(6.0, 2.0)
+			elif cycle == "scroll":
+				rear = Vector2(4.0, 2.0)
+				front = Vector2(8.0, 1.0)
+				tip = Vector2(8.0, 1.0)
+			elif cycle == "bomb_dive" or cycle == "bomb_throw":
+				rear = Vector2(3.0, 8.0)
+				front = Vector2(8.0, 4.0)
+				tip = Vector2(10.0, 2.0)
 	return {
 		"lean": lean,
 		"squat": squat,

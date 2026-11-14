@@ -1765,23 +1765,21 @@ func _pick_favorite(id: String) -> void:
 
 func _add_portrait(parent: Node, kind: String, sheet: bool, navy: bool, caption: String) -> void:
 	var column := VBoxContainer.new()
-	column.custom_minimum_size = Vector2(200, 240)
 	column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var title := UiSkin.label(caption, 16, Color("6b3a32"))
+	column.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	column.add_theme_constant_override("separation", 4)
+	var title := UiSkin.label(caption, 18, Color("6b3a32"))
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	column.add_child(title)
-	var frame := Control.new()
-	frame.custom_minimum_size = Vector2(200, 200)
-	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	column.add_child(frame)
 	var pic := Portrait.new()
 	pic.kind = kind
 	pic.sheet = sheet
 	pic.navy = navy
-	pic.drawn_scale = 1.15
-	pic.position = Vector2(100, 176)
-	frame.add_child(pic)
+	pic.custom_minimum_size = Vector2(180, 280)
+	pic.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	pic.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	column.add_child(pic)
 	parent.add_child(column)
 
 
@@ -2386,20 +2384,37 @@ func _menu_button(text: String, color: Color, action: Callable, wide: float = 28
 
 
 class Portrait:
-	extends Node2D
+	extends Control
 
 	const Painter = preload("res://scripts/painter.gd")
 
 	var kind: String = "sword"
 	var sheet: bool = false
 	var navy: bool = false
-	var drawn_scale: float = 1.15
+
+	func _ready() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		resized.connect(queue_redraw)
 
 	func _draw() -> void:
-		var look := Painter.look_as(kind, sheet, navy)
-		draw_set_transform(Vector2.ZERO, 0.0, Vector2(drawn_scale, drawn_scale))
+		var head_y := -34.0
+		var foot_y := 24.0
+		var span_x := 78.0
+		if kind == "horse":
+			head_y = -42.0
+			foot_y = 26.0
+			span_x = 104.0
+		var span_y := foot_y - head_y
+		var zoom := minf((size.x - 12.0) / span_x, (size.y - 8.0) / span_y)
+		zoom = clampf(zoom, 3.2, 8.2)
+		var origin_y := 4.0 - head_y * zoom
+		if origin_y + foot_y * zoom > size.y - 4.0:
+			origin_y = size.y - 4.0 - foot_y * zoom
+		var origin := Vector2(size.x * 0.46, origin_y)
+		var look: Dictionary = Painter.look_as(kind, sheet, navy)
+		draw_set_transform(origin, 0.0, Vector2(zoom, zoom))
 		Painter.paint_local(self, look, {
-			"phase": "idle",
+			"phase": "model",
 			"t": 0.0,
 			"clock": 0.0,
 			"flash": 0.0,
