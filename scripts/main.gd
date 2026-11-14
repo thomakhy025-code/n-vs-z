@@ -29,7 +29,7 @@ Each road you open pays 100 diamonds. Home is the night gate: Shop, Skin, the ro
 
 The shop sells one new skin for the hero and one for each soldier. A skin costs 200 diamonds. Buying it does not put it on. Wear it from Skin, and Nothing puts the old clothes back. The navy saber is a separate skin, also 200 diamonds.
 
-On the website you can keep playing as a guest. That progress stays on the device. Sign in with Google and the roads you have opened, your diamonds, and your skins stay with that account, so a phone, a tablet, and a computer can share them.
+On the website you can keep playing as a guest. That progress stays on the device. Sign in with Google and the roads you have opened, your diamonds, and your skins stay with that account, so a phone, a tablet, and a computer can share them. The first sign-in asks for a name. Ranking lists signed-in players: a higher road cleared ranks above a lower one, and the same road ranks the shorter clear time first. A profile shows that name, the best tag, the hero, and a favourite character.
 
 1 vs 1 is two clans. Each side chooses 6 of the 11. Both have the same value, the same calls, the same roads, the same wind, and a hero. On this page, press Find opponent. The game looks for one other ninja and connects. The match runs until a gate falls. You do not type an address or a code. On a computer build, Host opens port 3001 and the other ninja joins the address.
 
@@ -53,6 +53,19 @@ var diamond_paid: int = 1
 var code_paid: bool = false
 var code_lock: bool = false
 var code_note: Label = null
+var name_note: Label = null
+var rank_cleared: int = 0
+var rank_time: float = 0.0
+var game_name: String = ""
+var favorite: String = ""
+var favorite_skin: String = ""
+var best_rank: int = 0
+var rank_rows: Array = []
+var viewing: Dictionary = {}
+var rank_wait: bool = false
+var profile_from_rank: bool = false
+var profile_own: bool = false
+var was_cloud_signed: bool = false
 const ROAD_DIAMONDS := 100
 const SKIN_COST := 200
 const VIP_CODE := "tomissogood0205"
@@ -117,6 +130,78 @@ const WEB_CODE_CLOSE := """
   document.body.style.touchAction = 'none';
   window.__nvCode = '';
   window.__nvCodeDone = 0;
+})();
+"""
+const WEB_NAME_OPEN := """
+(function(){
+  document.body.style.touchAction = 'manipulation';
+  function keep(raw) {
+    var out = '';
+    var text = String(raw || '');
+    for (var i = 0; i < text.length; i++) {
+      var c = text.charAt(i);
+      var ok = (c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
+      if (ok && out.length < 16) out += c;
+    }
+    return out;
+  }
+  var old = document.getElementById('nvsz-name');
+  if (old) { old.focus(); return; }
+  var canvas = document.querySelector('canvas');
+  var rect = canvas ? canvas.getBoundingClientRect() : {left:0, top:0, width:window.innerWidth, height:window.innerHeight};
+  var input = document.createElement('input');
+  input.id = 'nvsz-name';
+  input.type = 'text';
+  input.maxLength = 16;
+  input.autocomplete = 'off';
+  input.autocapitalize = 'none';
+  input.autocorrect = 'off';
+  input.spellcheck = false;
+  input.enterKeyHint = 'done';
+  input.placeholder = 'Name';
+  input.setAttribute('aria-label', 'Name');
+  var css = input.style;
+  css.position = 'fixed';
+  css.zIndex = '40';
+  css.boxSizing = 'border-box';
+  css.left = (rect.left + rect.width * 0.12) + 'px';
+  css.top = (rect.top + Math.max(88, Math.min(rect.height * 0.2, 150))) + 'px';
+  css.width = (rect.width * 0.76) + 'px';
+  css.height = '52px';
+  css.fontSize = '16px';
+  css.textAlign = 'center';
+  css.color = '#1c140e';
+  css.background = '#fff8ea';
+  css.border = '3px solid #e6c36a';
+  css.borderRadius = '12px';
+  css.outline = 'none';
+  css.padding = '8px 12px';
+  css.touchAction = 'manipulation';
+  window.__nvName = '';
+  window.__nvNameDone = 0;
+  input.addEventListener('input', function(){
+    var clean = keep(input.value);
+    if (clean !== input.value) input.value = clean;
+    window.__nvName = clean;
+  });
+  input.addEventListener('keydown', function(ev){
+    if (ev.key === 'Enter') {
+      window.__nvName = keep(input.value);
+      window.__nvNameDone = 1;
+      input.blur();
+    }
+  });
+  document.body.appendChild(input);
+  input.focus();
+})();
+"""
+const WEB_NAME_CLOSE := """
+(function(){
+  var old = document.getElementById('nvsz-name');
+  if (old) old.remove();
+  document.body.style.touchAction = 'none';
+  window.__nvName = '';
+  window.__nvNameDone = 0;
 })();
 """
 var chosen_level: int = 1
@@ -209,6 +294,7 @@ func _bind(action: String, keys: Array) -> void:
 
 func _clear_screens() -> void:
 	_close_web_code()
+	_close_web_name()
 	var doomed: Array = []
 	for child in get_children():
 		if child is Control:
@@ -236,6 +322,12 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _show_menu() -> void:
+	if OS.has_feature("web") and Cloud.signed_in and not Cloud.profile_ready:
+		_show_opening()
+		return
+	if _needs_name():
+		_show_name()
+		return
 	screen = "menu"
 	_clear_screens()
 	var root := Control.new()
@@ -285,9 +377,15 @@ func _show_menu() -> void:
 		account.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		account.custom_minimum_size = Vector2(420, 0)
 		box.add_child(account)
-		var account_text := "Sign out" if Cloud.signed_in else "Sign in with Google"
-		var account_color := Color("8d6a45") if Cloud.signed_in else Color("fff8ea")
-		box.add_child(_menu_button(account_text, account_color, _on_account_button, 420, 18))
+		if Cloud.signed_in and game_name.length() >= 2:
+			box.add_child(_home_pair(
+				"Profile", Color("f3e6c8"), _show_own_profile,
+				"Sign out", Color("8d6a45"), _on_account_button
+			))
+		else:
+			var account_text := "Sign out" if Cloud.signed_in else "Sign in with Google"
+			var account_color := Color("8d6a45") if Cloud.signed_in else Color("fff8ea")
+			box.add_child(_menu_button(account_text, account_color, _on_account_button, 420, 18))
 	var nxt := _next_index()
 	if nxt >= 1:
 		var road: Dictionary = Levels.level(nxt)
@@ -303,7 +401,13 @@ func _show_menu() -> void:
 		"Shop", Color("7ec8b3"), _show_shop,
 		"Skin", Color("1e3f8f"), _show_skin
 	))
-	box.add_child(_menu_button("Code", Color("c4a574"), _show_code, 420, 18))
+	if _wants_account_row():
+		box.add_child(_home_pair(
+			"Code", Color("c4a574"), _show_code,
+			"Ranking", Color("e7c07a"), _show_rank
+		))
+	else:
+		box.add_child(_menu_button("Code", Color("c4a574"), _show_code, 420, 18))
 	var quit := _menu_button("Quit", Color("6b3a32"), func() -> void: get_tree().quit(), 180, 18)
 	quit.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	box.add_child(quit)
@@ -476,13 +580,18 @@ func _show_code() -> void:
 
 
 func _process(_delta: float) -> void:
-	if screen != "code" or code_note == null or not OS.has_feature("web"):
+	if not OS.has_feature("web"):
 		return
-	var flag: Variant = JavaScriptBridge.eval("window.__nvCodeDone||0", true)
-	if int(flag) != 1:
-		return
-	JavaScriptBridge.eval("window.__nvCodeDone=0", true)
-	_apply_typed_code(_web_code_text(), code_note)
+	if screen == "code" and code_note != null:
+		var flag: Variant = JavaScriptBridge.eval("window.__nvCodeDone||0", true)
+		if int(flag) == 1:
+			JavaScriptBridge.eval("window.__nvCodeDone=0", true)
+			_apply_typed_code(_web_code_text(), code_note)
+	if screen == "name" and name_note != null:
+		var named: Variant = JavaScriptBridge.eval("window.__nvNameDone||0", true)
+		if int(named) == 1:
+			JavaScriptBridge.eval("window.__nvNameDone=0", true)
+			_commit_name(_web_name_text(), name_note)
 
 
 func _web_touch() -> bool:
@@ -503,6 +612,26 @@ func _close_web_code() -> void:
 	if not OS.has_feature("web"):
 		return
 	JavaScriptBridge.eval(WEB_CODE_CLOSE, true)
+
+
+func _open_web_name() -> void:
+	if not OS.has_feature("web"):
+		return
+	JavaScriptBridge.eval(WEB_NAME_OPEN, true)
+
+
+func _close_web_name() -> void:
+	name_note = null
+	if not OS.has_feature("web"):
+		return
+	JavaScriptBridge.eval(WEB_NAME_CLOSE, true)
+
+
+func _web_name_text() -> String:
+	if not OS.has_feature("web"):
+		return ""
+	var raw: Variant = JavaScriptBridge.eval("(document.getElementById('nvsz-name')&&document.getElementById('nvsz-name').value)||window.__nvName||''", true)
+	return str(raw)
 
 
 func _web_code_text() -> String:
@@ -1112,7 +1241,7 @@ func _next_index() -> int:
 	return cleared + 1
 
 
-func note_clear(level_index: int) -> void:
+func note_clear(level_index: int, elapsed: float = 0.0) -> void:
 	var opened := mini(Levels.count(), level_index + 1)
 	var changed := false
 	if level_index > cleared:
@@ -1122,6 +1251,8 @@ func note_clear(level_index: int) -> void:
 		unlocked = opened
 		changed = true
 	if _take_road_pay():
+		changed = true
+	if _note_rank(level_index, elapsed):
 		changed = true
 	if changed:
 		_save_progress()
@@ -1166,6 +1297,12 @@ func _load_progress() -> void:
 		code_paid = bool(cfg.get_value("progress", "code_paid", false))
 		sheet_owned = _unpack_keys(str(cfg.get_value("progress", "sheet_owned", "")))
 		sheet_worn = _unpack_keys(str(cfg.get_value("progress", "sheet_worn", "")))
+		rank_cleared = clampi(int(cfg.get_value("progress", "rank_cleared", 0)), 0, Levels.count())
+		rank_time = float(cfg.get_value("progress", "rank_time", 0.0))
+		game_name = _clean_name(str(cfg.get_value("progress", "game_name", "")))
+		favorite = str(cfg.get_value("progress", "favorite", ""))
+		favorite_skin = str(cfg.get_value("progress", "favorite_skin", ""))
+		best_rank = clampi(int(cfg.get_value("progress", "best_rank", 0)), 0, 100000)
 	_normalize_progress()
 	var paid := _take_road_pay()
 	_apply_skins()
@@ -1203,8 +1340,15 @@ func _save_progress() -> void:
 	cfg.set_value("progress", "sheet_worn", _pack_keys(sheet_worn))
 	cfg.set_value("progress", "diamond_paid", diamond_paid)
 	cfg.set_value("progress", "code_paid", code_paid)
+	cfg.set_value("progress", "rank_cleared", rank_cleared)
+	cfg.set_value("progress", "rank_time", rank_time)
+	cfg.set_value("progress", "game_name", game_name)
+	cfg.set_value("progress", "favorite", favorite)
+	cfg.set_value("progress", "favorite_skin", favorite_skin)
+	cfg.set_value("progress", "best_rank", best_rank)
 	cfg.save(SAVE_PATH)
 	Cloud.push(_snapshot())
+	_push_profile()
 
 
 func _snapshot() -> Dictionary:
@@ -1231,7 +1375,9 @@ func _account_line() -> String:
 	if Cloud.last_error != "":
 		return Cloud.last_error
 	if Cloud.signed_in:
-		var who := Cloud.display_name
+		var who := game_name
+		if who == "":
+			who = Cloud.display_name
 		if who == "":
 			who = Cloud.email
 		if who == "":
@@ -1252,10 +1398,28 @@ func _bind_cloud() -> void:
 		return
 	Cloud.account_changed.connect(_on_account)
 	Cloud.save_arrived.connect(_on_cloud_save)
+	Cloud.profile_arrived.connect(_on_profile)
+	Cloud.board_arrived.connect(_on_board)
 
 
 func _on_account() -> void:
-	if screen == "menu":
+	var signed_out := was_cloud_signed and not Cloud.signed_in
+	was_cloud_signed = Cloud.signed_in
+	if signed_out:
+		game_name = ""
+		favorite = ""
+		favorite_skin = ""
+		best_rank = 0
+		_save_progress()
+		if profile_own and screen == "profile":
+			profile_own = false
+			_show_menu()
+			return
+	if screen == "rank":
+		rank_wait = false
+		_paint_rank(false)
+		return
+	if screen == "menu" or screen == "name" or screen == "opening":
 		_show_menu()
 
 
@@ -1312,6 +1476,541 @@ func _merge_from_cloud(data: Dictionary) -> void:
 		_show_shop()
 	elif screen == "skin":
 		_show_skin()
+
+
+func _needs_name() -> bool:
+	return OS.has_feature("web") and Cloud.signed_in and Cloud.profile_ready and game_name.length() < 2
+
+
+func _show_opening() -> void:
+	screen = "opening"
+	var box := _open_page("Your account")
+	var waiting := "Opening your account."
+	if Cloud.last_error != "":
+		waiting = Cloud.last_error
+	var hint := UiSkin.label(waiting, 18, Color("1c140e"))
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(hint)
+	var guest := _menu_button("Play as guest", Color("f3e6c8"), _play_guest, 420, 18)
+	guest.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	box.add_child(guest)
+
+
+func _play_guest() -> void:
+	Cloud.sign_out()
+
+
+func _show_name() -> void:
+	screen = "name"
+	var box := _open_page("Your name")
+	var hint := UiSkin.label("Choose a name of 2 to 16 letters and numbers.", 16, Color("6b3a32"))
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(hint)
+	var note := UiSkin.label("", 18, Color("1c140e"))
+	note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	note.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(note)
+	name_note = note
+	if _web_touch():
+		hint.text = "Tap the white box, type 2 to 16 letters and numbers, then press Set name."
+		var gap := Control.new()
+		gap.custom_minimum_size = Vector2(0, 64)
+		gap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		box.add_child(gap)
+		var web_set := _menu_button("Set name", Color("e6c36a"), func() -> void:
+			_commit_name(_web_name_text(), note)
+		, 420, 18)
+		web_set.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		box.add_child(web_set)
+		var again := _menu_button("Type", Color("f3e6c8"), _open_web_name, 420, 18)
+		again.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		box.add_child(again)
+	else:
+		var field := LineEdit.new()
+		field.placeholder_text = "Name"
+		field.max_length = 16
+		field.custom_minimum_size = Vector2(420, 52)
+		field.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		field.text_changed.connect(func(text: String) -> void:
+			_keep_name_text(text, field)
+		)
+		field.text_submitted.connect(func(text: String) -> void:
+			_commit_name(text, note)
+		)
+		box.add_child(field)
+		var desk_set := _menu_button("Set name", Color("e6c36a"), func() -> void:
+			_commit_name(field.text, note)
+		, 420, 18)
+		desk_set.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		box.add_child(desk_set)
+	var guest := _menu_button("Play as guest", Color("8d6a45"), _play_guest, 420, 18)
+	guest.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	box.add_child(guest)
+	if _web_touch():
+		_open_web_name()
+
+
+func _keep_name_text(text: String, field: LineEdit) -> void:
+	var clean := _clean_name(text)
+	if clean == text:
+		return
+	field.text = clean
+	field.caret_column = clean.length()
+
+
+func _commit_name(raw: String, note: Label) -> void:
+	var clean := _clean_name(raw)
+	if clean.length() < 2:
+		note.text = "Use 2 to 16 letters and numbers."
+		return
+	game_name = clean
+	if cleared > rank_cleared:
+		rank_cleared = cleared
+		rank_time = 0.0
+	_save_progress()
+	_close_web_name()
+	_show_menu()
+
+
+func _clean_name(raw: String) -> String:
+	var clean := ""
+	var text := raw.strip_edges()
+	for i in text.length():
+		var ch := text.substr(i, 1)
+		var code := ch.unicode_at(0)
+		var letter := (code >= 65 and code <= 90) or (code >= 97 and code <= 122)
+		var digit := code >= 48 and code <= 57
+		if (letter or digit) and clean.length() < 16:
+			clean += ch
+	return clean
+
+
+func _show_rank() -> void:
+	rank_wait = true
+	profile_own = false
+	_paint_rank(true)
+
+
+func _paint_rank(fetch: bool) -> void:
+	screen = "rank"
+	var box := _open_page("Ranking")
+	var hint := UiSkin.label("A higher road ranks first. The same road ranks the shorter time first.", 16, Color("6b3a32"))
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(hint)
+	var list := _page_list(box)
+	if rank_rows.is_empty():
+		var message := "No names yet."
+		if rank_wait or fetch:
+			message = "Loading the ranking."
+		elif Cloud.last_error != "":
+			message = Cloud.last_error
+		var empty := UiSkin.label(message, 18, Color("1c140e"))
+		empty.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		empty.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		empty.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		list.add_child(empty)
+	else:
+		for item in rank_rows:
+			if not (item is Dictionary):
+				continue
+			var row: Dictionary = item
+			var place := _whole(row.get("place", 0), 0)
+			var tag := _rank_tag(_whole(row.get("best_rank", 0), 0))
+			var line := "%d   %s" % [place, str(row.get("name", ""))]
+			if tag != "":
+				line += "   " + tag
+			line += "\n%s   %s" % [_road_name(_whole(row.get("cleared", 0), 0)), _format_time(_seconds(row.get("clear_time", 0.0)))]
+			var entry := _menu_button(line, Color("f3e6c8"), _open_ranked.bind(row.duplicate(true)), 420, 16)
+			entry.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			entry.clip_text = false
+			entry.custom_minimum_size = Vector2(0, 78)
+			entry.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			list.add_child(entry)
+	var back := _menu_button("Back", Color("e6c36a"), _show_menu)
+	back.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	box.add_child(back)
+	if fetch:
+		Cloud.load_board()
+
+
+func _open_ranked(row: Dictionary) -> void:
+	profile_from_rank = true
+	var own := Cloud.signed_in and str(row.get("uid", "")) == Cloud.uid()
+	if own and favorite == "":
+		_show_picker()
+		return
+	_show_profile(row, true)
+
+
+func _show_own_profile() -> void:
+	profile_from_rank = false
+	if favorite == "":
+		_show_picker()
+		return
+	_show_profile(_self_view(), false)
+
+
+func _show_profile(row: Dictionary, from_rank: bool) -> void:
+	profile_from_rank = from_rank
+	var own := Cloud.signed_in and str(row.get("uid", "")) == Cloud.uid()
+	if own:
+		if favorite == "":
+			_show_picker()
+			return
+		row = _self_view()
+	profile_own = own
+	viewing = row.duplicate(true)
+	screen = "profile"
+	var title := _clean_name(str(viewing.get("name", "")))
+	if title == "":
+		title = "Profile"
+	var box := _open_page(title)
+	var tag := _rank_tag(_whole(viewing.get("best_rank", 0), 0))
+	var place := _whole(viewing.get("place", 0), 0)
+	var line := tag
+	if place > 0:
+		var place_text: String = "Place %d" % place
+		line = place_text if line == "" else line + "   " + place_text
+	elif line == "":
+		line = "Not ranked yet"
+	var rank_label := UiSkin.label(line, 22, Color("6b3a32"))
+	rank_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	rank_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(rank_label)
+	var road := UiSkin.label(_road_name(_whole(viewing.get("cleared", 0), 0)) + "   " + _format_time(_seconds(viewing.get("clear_time", 0.0))), 16, Color("1c140e"))
+	road.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	road.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(road)
+	var portraits := HBoxContainer.new()
+	portraits.alignment = BoxContainer.ALIGNMENT_CENTER
+	portraits.add_theme_constant_override("separation", 18)
+	portraits.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	box.add_child(portraits)
+	_add_portrait(portraits, "hero", bool(viewing.get("hero_sheet", false)), false, "Hero")
+	var fav := str(viewing.get("favorite", ""))
+	if _roster_known(fav):
+		var skin := _draw_skin(fav, str(viewing.get("favorite_skin", "")), own)
+		_add_portrait(portraits, fav, skin == "sheet", skin == "navy", "Favourite")
+	else:
+		var missing := UiSkin.label("No favourite yet.", 16, Color("6b3a32"))
+		missing.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		missing.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		portraits.add_child(missing)
+	if own:
+		var change := _menu_button("Change favourite", Color("e6c36a"), _show_picker, 420, 18)
+		change.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		box.add_child(change)
+	var back := _menu_button("Back", Color("f3e6c8"), _back_profile)
+	back.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	box.add_child(back)
+
+
+func _back_profile() -> void:
+	profile_own = false
+	if profile_from_rank:
+		_show_rank()
+	else:
+		_show_menu()
+
+
+func _show_picker() -> void:
+	screen = "profile"
+	profile_own = true
+	var box := _open_page("Favourite")
+	var hint := UiSkin.label("Choose a favourite. If you own its skin, the profile wears it.", 16, Color("6b3a32"))
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(hint)
+	var list := _page_list(box)
+	for entry in roster:
+		if not (entry is Dictionary):
+			continue
+		var unit: Dictionary = entry
+		var id := str(unit.get("id", ""))
+		if not _roster_known(id):
+			continue
+		list.add_child(_menu_button(str(unit.get("short", id)), Color("e6c36a"), _pick_favorite.bind(id), 420, 18))
+	var back := _menu_button("Back", Color("f3e6c8"), _back_from_picker)
+	back.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	box.add_child(back)
+
+
+func _back_from_picker() -> void:
+	if favorite != "":
+		_show_profile(_self_view(), profile_from_rank)
+		return
+	profile_own = false
+	if profile_from_rank:
+		_show_rank()
+	else:
+		_show_menu()
+
+
+func _pick_favorite(id: String) -> void:
+	if not _roster_known(id):
+		return
+	favorite = id
+	favorite_skin = _favorite_skin_for(id)
+	_save_progress()
+	_show_profile(_self_view(), profile_from_rank)
+
+
+func _add_portrait(parent: Node, kind: String, sheet: bool, navy: bool, caption: String) -> void:
+	var column := VBoxContainer.new()
+	column.custom_minimum_size = Vector2(200, 240)
+	column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var title := UiSkin.label(caption, 16, Color("6b3a32"))
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	column.add_child(title)
+	var frame := Control.new()
+	frame.custom_minimum_size = Vector2(200, 200)
+	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	column.add_child(frame)
+	var pic := Portrait.new()
+	pic.kind = kind
+	pic.sheet = sheet
+	pic.navy = navy
+	pic.drawn_scale = 1.15
+	pic.position = Vector2(100, 176)
+	frame.add_child(pic)
+	parent.add_child(column)
+
+
+func _self_view() -> Dictionary:
+	var place := 0
+	for item in rank_rows:
+		if item is Dictionary and str(item.get("uid", "")) == Cloud.uid():
+			place = _whole(item.get("place", 0), 0)
+			break
+	return {
+		"uid": Cloud.uid(),
+		"name": game_name,
+		"cleared": rank_cleared,
+		"clear_time": rank_time,
+		"favorite": favorite,
+		"favorite_skin": favorite_skin,
+		"hero_sheet": bool(sheet_worn.get("hero", false)),
+		"saber_worn": "navy" if saber_worn == "navy" else "none",
+		"best_rank": best_rank,
+		"place": place,
+	}
+
+
+func _on_board(rows: Array) -> void:
+	rank_wait = false
+	var kept: Array = []
+	for item in rows:
+		if not (item is Dictionary):
+			continue
+		var source: Dictionary = item
+		var named := _clean_name(str(source.get("name", "")))
+		if named.length() < 2:
+			continue
+		source["name"] = named
+		kept.append(source)
+	kept.sort_custom(_rank_before)
+	var raised := false
+	for i in kept.size():
+		var placed: Dictionary = kept[i]
+		var place := i + 1
+		placed["place"] = place
+		if Cloud.signed_in and str(placed.get("uid", "")) == Cloud.uid():
+			var stored := clampi(_whole(placed.get("best_rank", 0), 0), 0, 100000)
+			var history := stored
+			if best_rank > 0 and (history == 0 or best_rank < history):
+				history = best_rank
+			if history == 0 or place < history:
+				best_rank = place
+				raised = true
+			else:
+				best_rank = history
+			placed["best_rank"] = best_rank
+		kept[i] = placed
+	rank_rows = kept
+	if raised:
+		_save_progress()
+	if screen == "rank":
+		_paint_rank(false)
+	elif screen == "profile" and profile_own:
+		_show_profile(_self_view(), profile_from_rank)
+
+
+func _rank_before(a: Variant, b: Variant) -> bool:
+	var left: Dictionary = {}
+	var right: Dictionary = {}
+	if a is Dictionary:
+		left = a
+	if b is Dictionary:
+		right = b
+	var left_level := _whole(left.get("cleared", 0), 0)
+	var right_level := _whole(right.get("cleared", 0), 0)
+	if left_level != right_level:
+		return left_level > right_level
+	var left_time := _seconds(left.get("clear_time", 0.0))
+	var right_time := _seconds(right.get("clear_time", 0.0))
+	var left_real := left_time > 0.0
+	var right_real := right_time > 0.0
+	if left_real != right_real:
+		return left_real
+	if left_real and right_real and not is_equal_approx(left_time, right_time):
+		return left_time < right_time
+	return str(left.get("name", "")) < str(right.get("name", ""))
+
+
+func _on_profile(data: Dictionary) -> void:
+	_apply_profile(data)
+	if screen == "opening" or screen == "name" or screen == "menu":
+		_show_menu()
+
+
+func _apply_profile(data: Dictionary) -> void:
+	var cloud_name := _clean_name(str(data.get("name", "")))
+	var cloud_level := clampi(_whole(data.get("cleared", 0), 0), 0, Levels.count())
+	var cloud_time := _seconds(data.get("clear_time", 0.0))
+	if cloud_name.length() >= 2:
+		game_name = cloud_name
+		if _better_record(cloud_level, cloud_time, rank_cleared, rank_time):
+			rank_cleared = cloud_level
+			rank_time = cloud_time
+		var fav := str(data.get("favorite", ""))
+		favorite = fav if _roster_known(fav) else ""
+		favorite_skin = _draw_skin(favorite, str(data.get("favorite_skin", "")), false)
+		var cloud_best := clampi(_whole(data.get("best_rank", 0), 0), 0, 100000)
+		if cloud_best > 0 and (best_rank == 0 or cloud_best < best_rank):
+			best_rank = cloud_best
+	else:
+		game_name = ""
+		favorite = ""
+		favorite_skin = ""
+		best_rank = 0
+	if cleared > rank_cleared:
+		rank_cleared = cleared
+		rank_time = 0.0
+	_save_progress()
+
+
+func _push_profile() -> void:
+	if game_name.length() < 2:
+		return
+	Cloud.push_profile(_profile_body())
+
+
+func _profile_body() -> Dictionary:
+	var skin := _draw_skin(favorite, favorite_skin, false)
+	return {
+		"name": game_name,
+		"cleared": rank_cleared,
+		"clear_time": rank_time,
+		"favorite": favorite if _roster_known(favorite) else "",
+		"favorite_skin": skin,
+		"hero_sheet": bool(sheet_worn.get("hero", false)),
+		"saber_worn": "navy" if saber_worn == "navy" else "none",
+		"best_rank": best_rank,
+	}
+
+
+func _note_rank(level_index: int, elapsed: float) -> bool:
+	var used := clampf(elapsed, 0.0, 86400.0)
+	if level_index > rank_cleared:
+		rank_cleared = level_index
+		rank_time = used
+		return true
+	if level_index == rank_cleared and used > 0.0 and (rank_time <= 0.0 or used < rank_time):
+		rank_time = used
+		return true
+	return false
+
+
+func _better_record(level_a: int, time_a: float, level_b: int, time_b: float) -> bool:
+	if level_a != level_b:
+		return level_a > level_b
+	if time_a > 0.0 and time_b <= 0.0:
+		return true
+	if time_a > 0.0 and time_b > 0.0 and time_a < time_b:
+		return true
+	return false
+
+
+func _roster_known(id: String) -> bool:
+	if id == "":
+		return false
+	for entry in roster:
+		if entry is Dictionary and str(entry.get("id", "")) == id:
+			return true
+	return false
+
+
+func _favorite_skin_for(id: String) -> String:
+	if bool(sheet_owned.get(id, false)):
+		return "sheet"
+	if id == "saber" and saber_skin:
+		return "navy"
+	return ""
+
+
+func _draw_skin(id: String, stored: String, own: bool) -> String:
+	var skin := stored
+	if skin != "sheet" and skin != "navy":
+		skin = ""
+	if id != "saber" and skin == "navy":
+		skin = ""
+	if id == "":
+		return ""
+	if own:
+		if skin == "sheet" and not bool(sheet_owned.get(id, false)):
+			skin = ""
+		if skin == "navy" and not saber_skin:
+			skin = ""
+	return skin
+
+
+func _rank_tag(rank: int) -> String:
+	if rank == 1:
+		return "No.1"
+	if rank == 2:
+		return "No.2"
+	if rank == 3:
+		return "No.3"
+	if rank >= 4 and rank <= 5:
+		return "Top 5"
+	if rank >= 6 and rank <= 10:
+		return "Top 10"
+	return ""
+
+
+func _road_name(level_index: int) -> String:
+	if level_index < 1:
+		return "No road yet"
+	var row: Dictionary = Levels.level(level_index)
+	return str(row.get("name", "Road %d" % level_index))
+
+
+func _format_time(seconds: float) -> String:
+	if seconds <= 0.0:
+		return "no time"
+	var whole := int(seconds)
+	var mins := int(whole / 60.0)
+	var secs := whole % 60
+	if mins > 0:
+		return "%d:%02d" % [mins, secs]
+	return "%d s" % secs
+
+
+func _seconds(value: Variant) -> float:
+	if value is int or value is float:
+		return clampf(float(value), 0.0, 86400.0)
+	if str(value).is_valid_float():
+		return clampf(float(str(value)), 0.0, 86400.0)
+	return 0.0
 
 
 func _pack_keys(bag: Dictionary) -> String:
@@ -1683,6 +2382,29 @@ func _menu_button(text: String, color: Color, action: Callable, wide: float = 28
 		action.call()
 	)
 	return button
+
+
+class Portrait:
+	extends Node2D
+
+	const Painter = preload("res://scripts/painter.gd")
+
+	var kind: String = "sword"
+	var sheet: bool = false
+	var navy: bool = false
+	var drawn_scale: float = 1.15
+
+	func _draw() -> void:
+		var look := Painter.look_as(kind, sheet, navy)
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2(drawn_scale, drawn_scale))
+		Painter.paint_local(self, look, {
+			"phase": "idle",
+			"t": 0.0,
+			"clock": 0.0,
+			"flash": 0.0,
+			"beat": 0,
+		})
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
 class HomeYard:

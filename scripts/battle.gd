@@ -937,7 +937,7 @@ func _finish_battle(defender_side: int) -> void:
 	elif won:
 		var host := get_parent()
 		if host != null and host.has_method("note_clear"):
-			host.note_clear(level_no)
+			host.note_clear(level_no, battle_time)
 		if boss_up:
 			title = "The war boss falls"
 			body = "The last road is clear."
