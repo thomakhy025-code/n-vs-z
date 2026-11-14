@@ -23,7 +23,7 @@ When the cursed gate is down to a quarter of its blood, the dead immediately gai
 
 The cursed gate calls its own dead: walkers, runners, brutes, spitters, bombers, and later an oni.
 
-Play lists ten roads. The first is open. Winning a road opens the next one. Your purse stays the same on every road. Theirs gets heavier.
+Play lists ten roads. The first is open. Winning a road opens the next one. Your purse stays the same on every road. Theirs gets heavier: the first road pays them +3 each second, and each later road adds 0.3.
 
 Each road you open pays 100 diamonds. Home is the night gate: Shop, Skin, the roads, and How to play are there, and the diamond count hangs by the lantern. During a fight, Home at the top returns you there.
 
@@ -2264,7 +2264,8 @@ func _layout_check() -> void:
 			first_open = true
 		if b.text.find("Night march") >= 0:
 			saw_night = true
-		print("LEVEL ", b.disabled, " ", b.text.replace("\n", " / "))
+		var road_rules: Dictionary = Levels.level(roads)
+		print("LEVEL ", b.disabled, " ", b.text.replace("\n", " / "), " +", float(road_rules["income"]))
 	var win := play_ok and quit_ok and duel_ok and how_ok and back_ok and roads == 10 and first_open and saw_night and body_h > scroll_h and scroll_h > 40.0
 	print("LAYOUT ", "OK" if win else "FAIL")
 	get_tree().quit(0 if win else 1)

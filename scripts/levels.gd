@@ -16,16 +16,16 @@ static func level(index: int) -> Dictionary:
 
 static func _all() -> Array:
 	return [
-		_row(1, "First road", "+0.8 each second, starts at 22.", 0.8, 22.0, 0.0, 12.0, 24.0, 50.0, 3, 8, 22.0, 1.5, 3.3, 0.012, 0.42, 1.0, 1.0, false),
-		_row(2, "Open purse", "+0.9 each second, starts at 28.", 0.9, 28.0, 0.0, 12.0, 24.0, 50.0, 3, 8, 22.0, 1.5, 3.3, 0.012, 0.42, 1.0, 1.0, false),
-		_row(3, "Early spit", "Spitters and bombers from the first wave. +1.0 each second, starts at 34.", 1.0, 34.0, 0.0, 0.0, 24.0, 50.0, 3, 8, 22.0, 1.5, 3.3, 0.012, 0.42, 1.0, 1.0, false),
-		_row(4, "Short breath", "Shorter lulls, and each wave is one body larger. +1.05 each second, starts at 40.", 1.05, 40.0, 0.0, 12.0, 24.0, 50.0, 4, 9, 22.0, 0.95, 2.1, 0.016, 0.42, 1.0, 1.0, false),
-		_row(5, "Thick hide", "15% more blood. Brutes from 16s. +1.1 each second, starts at 46.", 1.1, 46.0, 0.0, 12.0, 16.0, 50.0, 3, 8, 22.0, 1.5, 3.3, 0.012, 0.42, 1.15, 1.0, false),
-		_row(6, "Rising curse", "+1.15 each second, starts at 52.", 1.15, 52.0, 0.0, 12.0, 24.0, 50.0, 3, 8, 22.0, 1.5, 3.3, 0.012, 0.42, 1.0, 1.0, false),
-		_row(7, "Oni early", "The oni can be called from 28s. +1.2 each second, starts at 58.", 1.2, 58.0, 0.0, 12.0, 24.0, 28.0, 3, 8, 22.0, 1.5, 3.3, 0.012, 0.42, 1.0, 1.0, false),
-		_row(8, "Paired muster", "Two dead in one beat, on two roads. +1.25 each second, starts at 64.", 1.25, 64.0, 0.0, 12.0, 24.0, 50.0, 3, 8, 22.0, 1.5, 3.3, 0.012, 0.42, 1.0, 1.0, true),
-		_row(9, "Fast muster", "Faster calls, waves up to 11, tougher dead. +1.3 each second, starts at 70.", 1.3, 70.0, 0.0, 12.0, 24.0, 50.0, 4, 11, 16.0, 1.1, 2.4, 0.015, 0.30, 1.25, 1.1, false),
-		_row(10, "Night march", "Early oni, paired calls, fast waves, tougher dead. +1.4 each second, starts at 76. A war boss walks when the gate falls.", 1.4, 76.0, 0.0, 12.0, 24.0, 28.0, 4, 11, 16.0, 1.1, 2.4, 0.015, 0.30, 1.25, 1.1, true),
+		_row(1, "First road", "+3.0 each second, starts at 22.", 3.0, 22.0, 0.0, 12.0, 24.0, 50.0, 3, 8, 22.0, 1.5, 3.3, 0.012, 0.42, 1.0, 1.0, false),
+		_row(2, "Open purse", "+3.3 each second, starts at 28.", 3.3, 28.0, 0.0, 12.0, 24.0, 50.0, 3, 8, 22.0, 1.5, 3.3, 0.012, 0.42, 1.0, 1.0, false),
+		_row(3, "Early spit", "Spitters and bombers from the first wave. +3.6 each second, starts at 34.", 3.6, 34.0, 0.0, 0.0, 24.0, 50.0, 3, 8, 22.0, 1.5, 3.3, 0.012, 0.42, 1.0, 1.0, false),
+		_row(4, "Short breath", "Shorter lulls, and each wave is one body larger. +3.9 each second, starts at 40.", 3.9, 40.0, 0.0, 12.0, 24.0, 50.0, 4, 9, 22.0, 0.95, 2.1, 0.016, 0.42, 1.0, 1.0, false),
+		_row(5, "Thick hide", "15% more blood. Brutes from 16s. +4.2 each second, starts at 46.", 4.2, 46.0, 0.0, 12.0, 16.0, 50.0, 3, 8, 22.0, 1.5, 3.3, 0.012, 0.42, 1.15, 1.0, false),
+		_row(6, "Rising curse", "+4.5 each second, starts at 52.", 4.5, 52.0, 0.0, 12.0, 24.0, 50.0, 3, 8, 22.0, 1.5, 3.3, 0.012, 0.42, 1.0, 1.0, false),
+		_row(7, "Oni early", "The oni can be called from 28s. +4.8 each second, starts at 58.", 4.8, 58.0, 0.0, 12.0, 24.0, 28.0, 3, 8, 22.0, 1.5, 3.3, 0.012, 0.42, 1.0, 1.0, false),
+		_row(8, "Paired muster", "Two dead in one beat, on two roads. +5.1 each second, starts at 64.", 5.1, 64.0, 0.0, 12.0, 24.0, 50.0, 3, 8, 22.0, 1.5, 3.3, 0.012, 0.42, 1.0, 1.0, true),
+		_row(9, "Fast muster", "Faster calls, waves up to 11, tougher dead. +5.4 each second, starts at 70.", 5.4, 70.0, 0.0, 12.0, 24.0, 50.0, 4, 11, 16.0, 1.1, 2.4, 0.015, 0.30, 1.25, 1.1, false),
+		_row(10, "Night march", "Early oni, paired calls, fast waves, tougher dead. +5.7 each second, starts at 76. A war boss walks when the gate falls.", 5.7, 76.0, 0.0, 12.0, 24.0, 28.0, 4, 11, 16.0, 1.1, 2.4, 0.015, 0.30, 1.25, 1.1, true),
 	]
 
 
