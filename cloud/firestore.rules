@@ -1,0 +1,39 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function whole(n) {
+      return n is int || (n is float && n == int(n));
+    }
+    match /saves/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow create, update: if request.auth != null
+        && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly([
+          'unlocked', 'cleared', 'diamonds', 'saber_skin', 'saber_worn',
+          'sheet_owned', 'sheet_worn', 'diamond_paid', 'code_paid', 'updated'
+        ])
+        && whole(request.resource.data.unlocked)
+        && request.resource.data.unlocked >= 1
+        && request.resource.data.unlocked <= 10
+        && whole(request.resource.data.cleared)
+        && request.resource.data.cleared >= 0
+        && request.resource.data.cleared <= 10
+        && whole(request.resource.data.diamonds)
+        && request.resource.data.diamonds >= 0
+        && request.resource.data.diamonds <= 200000000
+        && whole(request.resource.data.diamond_paid)
+        && request.resource.data.diamond_paid >= 1
+        && request.resource.data.diamond_paid <= 10
+        && request.resource.data.saber_skin is bool
+        && request.resource.data.code_paid is bool
+        && request.resource.data.saber_worn is string
+        && request.resource.data.saber_worn.size() <= 16
+        && request.resource.data.sheet_owned is string
+        && request.resource.data.sheet_owned.size() <= 240
+        && request.resource.data.sheet_worn is string
+        && request.resource.data.sheet_worn.size() <= 240
+        && request.resource.data.updated is timestamp;
+      allow delete: if false;
+    }
+  }
+}

@@ -29,6 +29,8 @@ Each road you open pays 100 diamonds. Home is the night gate: Shop, Skin, the ro
 
 The shop sells one new skin for the hero and one for each soldier. A skin costs 200 diamonds. Buying it does not put it on. Wear it from Skin, and Nothing puts the old clothes back. The navy saber is a separate skin, also 200 diamonds.
 
+On the website you can keep playing as a guest. That progress stays on the device. Sign in with Google and the roads you have opened, your diamonds, and your skins stay with that account, so a phone, a tablet, and a computer can share them.
+
 1 vs 1 is two clans. Each side chooses 6 of the 11. Both have the same value, the same calls, the same roads, the same wind, and a hero. On this page, press Find opponent. The game looks for one other ninja and connects. The match runs until a gate falls. You do not type an address or a code. On a computer build, Host opens port 3001 and the other ninja joins the address.
 
 Escape or Back returns to the title."
@@ -119,6 +121,7 @@ const WEB_CODE_CLOSE := """
 """
 var chosen_level: int = 1
 var screen: String = "menu"
+var layout_account: bool = false
 var picking_duel: bool = false
 var duel_sent: bool = false
 var duel_started: bool = false
@@ -141,6 +144,7 @@ func _ready() -> void:
 	_bind_inputs()
 	_load_progress()
 	_bind_net()
+	_bind_cloud()
 	if _has_arg("--layout"):
 		_layout_check()
 	elif _has_arg("--unlock-check"):
@@ -251,8 +255,8 @@ func _show_menu() -> void:
 	panel.set_anchors_preset(Control.PRESET_CENTER)
 	panel.offset_left = 70
 	panel.offset_right = 560
-	panel.offset_top = -300
-	panel.offset_bottom = 350
+	panel.offset_top = -348
+	panel.offset_bottom = 360
 	panel.add_theme_stylebox_override("panel", UiSkin.panel(Color("1a1614"), Color("e6c36a"), 22, 4))
 	root.add_child(panel)
 	var box := VBoxContainer.new()
@@ -274,6 +278,16 @@ func _show_menu() -> void:
 	diamonds_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	diamonds_name.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(diamonds_name)
+	if _wants_account_row():
+		var account := UiSkin.label(_account_line(), 15, Color("c4a574"))
+		account.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		account.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		account.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		account.custom_minimum_size = Vector2(420, 0)
+		box.add_child(account)
+		var account_text := "Sign out" if Cloud.signed_in else "Sign in with Google"
+		var account_color := Color("8d6a45") if Cloud.signed_in else Color("fff8ea")
+		box.add_child(_menu_button(account_text, account_color, _on_account_button, 420, 18))
 	var nxt := _next_index()
 	if nxt >= 1:
 		var road: Dictionary = Levels.level(nxt)
@@ -1152,6 +1166,18 @@ func _load_progress() -> void:
 		code_paid = bool(cfg.get_value("progress", "code_paid", false))
 		sheet_owned = _unpack_keys(str(cfg.get_value("progress", "sheet_owned", "")))
 		sheet_worn = _unpack_keys(str(cfg.get_value("progress", "sheet_worn", "")))
+	_normalize_progress()
+	var paid := _take_road_pay()
+	_apply_skins()
+	if paid:
+		_save_progress()
+
+
+func _normalize_progress() -> void:
+	unlocked = clampi(unlocked, 1, Levels.count())
+	cleared = clampi(cleared, 0, Levels.count())
+	diamonds = clampi(diamonds, 0, 200000000)
+	diamond_paid = clampi(diamond_paid, 1, Levels.count())
 	if saber_worn != "navy" or not saber_skin:
 		saber_worn = "none"
 	var keep: Dictionary = {}
@@ -1164,10 +1190,6 @@ func _load_progress() -> void:
 		saber_worn = "none"
 	elif saber_worn == "navy":
 		sheet_worn.erase("saber")
-	var paid := _take_road_pay()
-	_apply_skins()
-	if paid:
-		_save_progress()
 
 
 func _save_progress() -> void:
@@ -1182,6 +1204,114 @@ func _save_progress() -> void:
 	cfg.set_value("progress", "diamond_paid", diamond_paid)
 	cfg.set_value("progress", "code_paid", code_paid)
 	cfg.save(SAVE_PATH)
+	Cloud.push(_snapshot())
+
+
+func _snapshot() -> Dictionary:
+	return {
+		"unlocked": unlocked,
+		"cleared": cleared,
+		"diamonds": diamonds,
+		"saber_skin": saber_skin,
+		"saber_worn": saber_worn,
+		"sheet_owned": _pack_keys(sheet_owned),
+		"sheet_worn": _pack_keys(sheet_worn),
+		"diamond_paid": diamond_paid,
+		"code_paid": code_paid,
+	}
+
+
+func _wants_account_row() -> bool:
+	if layout_account:
+		return true
+	return OS.has_feature("web") and Cloud.configured()
+
+
+func _account_line() -> String:
+	if Cloud.last_error != "":
+		return Cloud.last_error
+	if Cloud.signed_in:
+		var who := Cloud.display_name
+		if who == "":
+			who = Cloud.email
+		if who == "":
+			who = "Google"
+		return "Saved to Google · " + who
+	return "Playing as guest. Progress stays on this device."
+
+
+func _on_account_button() -> void:
+	if Cloud.signed_in:
+		Cloud.sign_out()
+	else:
+		Cloud.sign_in()
+
+
+func _bind_cloud() -> void:
+	if Cloud.account_changed.is_connected(_on_account):
+		return
+	Cloud.account_changed.connect(_on_account)
+	Cloud.save_arrived.connect(_on_cloud_save)
+
+
+func _on_account() -> void:
+	if screen == "menu":
+		_show_menu()
+
+
+func _on_cloud_save(data: Dictionary) -> void:
+	_merge_from_cloud(data)
+
+
+func _flag(value: Variant) -> bool:
+	if value is bool:
+		return value
+	if value is int or value is float:
+		return int(value) != 0
+	var text := str(value).strip_edges().to_lower()
+	return text == "true" or text == "1"
+
+
+func _whole(value: Variant, fallback: int) -> int:
+	if value is int:
+		return value
+	if value is float:
+		return int(value)
+	if str(value).is_valid_int():
+		return int(str(value))
+	return fallback
+
+
+func _merge_from_cloud(data: Dictionary) -> void:
+	if data.is_empty() or not data.has("diamonds"):
+		_save_progress()
+		return
+	unlocked = maxi(unlocked, clampi(_whole(data.get("unlocked", 1), 1), 1, Levels.count()))
+	cleared = maxi(cleared, clampi(_whole(data.get("cleared", 0), 0), 0, Levels.count()))
+	diamonds = maxi(diamonds, clampi(_whole(data.get("diamonds", 0), 0), 0, 200000000))
+	diamond_paid = maxi(diamond_paid, clampi(_whole(data.get("diamond_paid", 1), 1), 1, Levels.count()))
+	saber_skin = saber_skin or _flag(data.get("saber_skin", false))
+	code_paid = code_paid or _flag(data.get("code_paid", false))
+	var cloud_owned := _unpack_keys(str(data.get("sheet_owned", "")))
+	for key in cloud_owned.keys():
+		sheet_owned[str(key)] = true
+	var cloud_worn := _unpack_keys(str(data.get("sheet_worn", "")))
+	var cloud_saber := str(data.get("saber_worn", "none"))
+	if cloud_saber == "navy" and (saber_skin or _flag(data.get("saber_skin", false))):
+		sheet_worn.erase("saber")
+		saber_worn = "navy"
+	elif not cloud_worn.is_empty():
+		sheet_worn = cloud_worn
+	_normalize_progress()
+	_take_road_pay()
+	_apply_skins()
+	_save_progress()
+	if screen == "menu":
+		_show_menu()
+	elif screen == "shop":
+		_show_shop()
+	elif screen == "skin":
+		_show_skin()
 
 
 func _pack_keys(bag: Dictionary) -> String:
@@ -1368,6 +1498,7 @@ func _on_rematch() -> void:
 
 
 func _layout_check() -> void:
+	layout_account = true
 	get_window().size = Vector2i(1280, 720)
 	for _i in 2:
 		await get_tree().process_frame

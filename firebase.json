@@ -1,0 +1,29 @@
+{
+  "firestore": {
+    "rules": "cloud/firestore.rules"
+  },
+  "auth": {
+    "providers": {
+      "googleSignIn": {
+        "oAuthBrandDisplayName": "N-vs-Z",
+        "supportEmail": "thomakhy025@gmail.com",
+        "authorizedRedirectUris": [
+          "https://n-vs-z-saves.firebaseapp.com/__/auth/handler",
+          "https://n-vs-z-saves.web.app/__/auth/handler",
+          "https://thomakhy025-code.github.io/n-vs-z/",
+          "https://thomakhy025-code.github.io/n-vs-z/index.html"
+        ]
+      }
+    }
+  },
+  "hosting": {
+    "public": "docs",
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "headers": [
+      {
+        "source": "**/*.pck",
+        "headers": [{ "key": "Cache-Control", "value": "public, max-age=600" }]
+      }
+    ]
+  }
+}
