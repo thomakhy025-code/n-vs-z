@@ -15,11 +15,6 @@ static func look(kind: String) -> Dictionary:
 static func look_as(kind: String, sheet: bool, navy: bool) -> Dictionary:
 	var row := _painted(kind)
 	row["paint"] = kind
-	if kind == "saber" and navy:
-		row["skin"] = Color("f0c14a")
-		row["cloth"] = Color("1e3f8f")
-		row["trim"] = Color("e2b034")
-		return row
 	if sheet:
 		var pal := _sheet_row(kind)
 		if not pal.is_empty():
@@ -1007,7 +1002,7 @@ static func paint_local(ci: CanvasItem, look: Dictionary, pose: Dictionary) -> v
 	var snap := 0.0
 	if phase == "act":
 		snap = tip.x - chest.x
-	if paint == "hero":
+	if paint == "hero" and bool(look.get("sheet", false)):
 		_paint_hero(ci, chest, rear, front, tip, step, ground, phase, beat, t, cycle, snap, flash)
 		if phase == "act" and beat == contact_beat(weapon) and t > 0.35 and not _is_quiet(cycle):
 			_arc(ci, front, 16.0 + t * 12.0, -1.15, 0.95, 14, Color(0.82, 0.23, 0.2, (1.0 - t) * 0.85), 3.0)
@@ -1230,8 +1225,6 @@ static func _is_quiet(cycle: String) -> bool:
 static func _cycle_id(paint: String, weapon: String) -> String:
 	if weapon == "bow" or weapon == "crossbow":
 		return weapon
-	if paint == "saber" and saber_navy:
-		return "saber_navy"
 	match paint:
 		"horse":
 			return "horse"

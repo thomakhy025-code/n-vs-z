@@ -253,10 +253,8 @@ const BOOT := """
     var fav = String(data.favorite || '');
     if (!known[fav]) fav = '';
     var skin = String(data.favorite_skin || '');
-    if (skin !== 'sheet' && skin !== 'navy') skin = '';
-    if (fav !== 'saber' && skin === 'navy') skin = '';
-    var saber = String(data.saber_worn || 'none');
-    if (saber !== 'navy') saber = 'none';
+    if (skin !== 'sheet') skin = '';
+    var saber = 'none';
     var body = {
       name: name,
       cleared: Math.min(10, whole(data.cleared)),

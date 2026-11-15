@@ -1176,8 +1176,7 @@ func _worn_look(which: int, kind: String) -> Dictionary:
 		if str(item) == kind:
 			sheet = true
 			break
-	var navy := bool(pack.get("navy", false)) and kind == "saber"
-	return Painter.look_as(kind, sheet, navy)
+	return Painter.look_as(kind, sheet, false)
 
 
 func _bind_duel_signals() -> void:

@@ -27,7 +27,7 @@ Play lists ten roads. The first is open. Winning a road opens the next one. Your
 
 Each road you open pays 100 diamonds. Home is the night gate: Shop, Skin, the roads, and How to play are there, and the diamond count hangs by the lantern. During a fight, Home at the top returns you there.
 
-The shop sells one new skin for the hero and one for each soldier. A skin costs 200 diamonds. Buying it does not put it on. Wear it from Skin, and Nothing puts the old clothes back. The navy saber is a separate skin, also 200 diamonds.
+The shop sells one new skin for the hero and one for each soldier. A skin costs 200 diamonds. Buying it does not put it on. Wear it from Skin, and Nothing puts the old clothes back.
 
 On the website you can keep playing as a guest. That progress stays on the device. Sign in with Google and the roads you have opened, your diamonds, and your skins stay with that account, so a phone, a tablet, and a computer can share them. The first sign-in asks for a name. Ranking lists signed-in players: a higher road cleared ranks above a lower one, and the same road ranks the shorter clear time first. A profile shows that name, the best tag, the hero, and a favourite character.
 
@@ -47,6 +47,12 @@ var cleared: int = 0
 var diamonds: int = 0
 var saber_skin: bool = false
 var saber_worn: String = "none"
+var navy_settled: bool = false
+var _navy_dirty: bool = false
+var _navy_checked: bool = false
+var _navy_was_settled: bool = false
+var _navy_local_paid: bool = false
+var _navy_grant_amount: int = 0
 var sheet_owned: Dictionary = {}
 var sheet_worn: Dictionary = {}
 var diamond_paid: int = 1
@@ -698,43 +704,11 @@ func _show_shop() -> void:
 	pay.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(pay)
 	var list := _page_list(box)
-	list.add_child(_shop_navy())
 	for id in _skin_ids():
 		list.add_child(_shop_sheet(str(id)))
 	var back := _menu_button("Back", Color("e6c36a"), _show_menu)
 	back.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	box.add_child(back)
-
-
-func _shop_navy() -> HBoxContainer:
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 16)
-	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	var stage := SkinPreview.new()
-	stage.kind = "saber"
-	stage.navy = true
-	stage.custom_minimum_size = Vector2(180, 150)
-	row.add_child(stage)
-	var text := VBoxContainer.new()
-	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	text.add_theme_constant_override("separation", 6)
-	row.add_child(text)
-	var name := UiSkin.label("Navy saber", 22, Color("1c140e"))
-	name.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	text.add_child(name)
-	var blurb := UiSkin.label("Navy hood, gold trim, red scarf, and the long grey sword.", 15, Color("2c2118"))
-	blurb.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	blurb.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	text.add_child(blurb)
-	var caption := "Owned"
-	var color := Color("e6c36a")
-	if not saber_skin:
-		caption = "Unlock for %d diamonds" % SKIN_COST
-		color = Color("1e3f8f")
-	var buy := _menu_button(caption, color, _buy_saber_skin, 220, 16)
-	buy.disabled = saber_skin or diamonds < SKIN_COST
-	text.add_child(buy)
-	return row
 
 
 func _shop_sheet(id: String) -> HBoxContainer:
@@ -767,15 +741,6 @@ func _shop_sheet(id: String) -> HBoxContainer:
 	buy.disabled = owned or diamonds < SKIN_COST
 	text.add_child(buy)
 	return row
-
-
-func _buy_saber_skin() -> void:
-	if saber_skin or diamonds < SKIN_COST:
-		return
-	diamonds -= SKIN_COST
-	saber_skin = true
-	_save_progress()
-	_show_shop()
 
 
 func _buy_sheet(id: String) -> void:
@@ -819,8 +784,6 @@ func _skin_block(id: String) -> VBoxContainer:
 	block.add_child(row)
 	row.add_child(_wear_column(id, false, false))
 	row.add_child(_wear_column(id, true, false))
-	if id == "saber":
-		row.add_child(_wear_column(id, false, true))
 	return block
 
 
@@ -834,27 +797,18 @@ func _wear_column(id: String, sheet: bool, navy: bool) -> VBoxContainer:
 	stage.navy = navy
 	stage.custom_minimum_size = Vector2(210, 150)
 	column.add_child(stage)
-	var heading := "Nothing"
-	if navy:
-		heading = "Navy skin"
-	elif sheet:
-		heading = "New skin"
+	var heading := "New skin" if sheet else "Nothing"
 	var label := UiSkin.label(heading, 16, Color("1c140e"))
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	column.add_child(label)
 	var owned := true
 	var wearing := false
-	if navy:
-		owned = saber_skin
-		wearing = saber_worn == "navy"
-	elif sheet:
+	if sheet:
 		owned = bool(sheet_owned.get(id, false))
 		wearing = bool(sheet_worn.get(id, false))
 	else:
 		wearing = not bool(sheet_worn.get(id, false))
-		if id == "saber" and saber_worn == "navy":
-			wearing = false
 	var caption := "Wearing this"
 	var color := Color("e6c36a")
 	if not owned:
@@ -863,7 +817,7 @@ func _wear_column(id: String, sheet: bool, navy: bool) -> VBoxContainer:
 		wearing = false
 	elif not wearing:
 		caption = "Wear this"
-		color = Color("1e3f8f") if sheet or navy else Color("1a1216")
+		color = Color("1e3f8f") if sheet else Color("1a1216")
 	var button := _menu_button(caption, color, _wear_choice.bind(id, sheet, navy), 200, 16)
 	button.disabled = wearing or not owned
 	column.add_child(button)
@@ -872,11 +826,8 @@ func _wear_column(id: String, sheet: bool, navy: bool) -> VBoxContainer:
 
 func _wear_choice(id: String, sheet: bool, navy: bool) -> void:
 	if navy:
-		if not saber_skin:
-			return
-		saber_worn = "navy"
-		sheet_worn.erase("saber")
-	elif sheet:
+		return
+	if sheet:
 		if not bool(sheet_owned.get(id, false)):
 			return
 		sheet_worn[id] = true
@@ -892,7 +843,7 @@ func _wear_choice(id: String, sheet: bool, navy: bool) -> void:
 
 
 func _apply_skins() -> void:
-	Painter.saber_navy = saber_worn == "navy"
+	Painter.saber_navy = false
 	Painter.sheet_on.clear()
 	for key in sheet_worn.keys():
 		Painter.sheet_on[str(key)] = true
@@ -1295,6 +1246,7 @@ func _load_progress() -> void:
 		else:
 			diamond_paid = 1
 		code_paid = bool(cfg.get_value("progress", "code_paid", false))
+		navy_settled = bool(cfg.get_value("progress", "navy_settled", false))
 		sheet_owned = _unpack_keys(str(cfg.get_value("progress", "sheet_owned", "")))
 		sheet_worn = _unpack_keys(str(cfg.get_value("progress", "sheet_worn", "")))
 		rank_cleared = clampi(int(cfg.get_value("progress", "rank_cleared", 0)), 0, Levels.count())
@@ -1306,7 +1258,7 @@ func _load_progress() -> void:
 	_normalize_progress()
 	var paid := _take_road_pay()
 	_apply_skins()
-	if paid:
+	if paid or _navy_dirty:
 		_save_progress()
 
 
@@ -1315,7 +1267,23 @@ func _normalize_progress() -> void:
 	cleared = clampi(cleared, 0, Levels.count())
 	diamonds = clampi(diamonds, 0, 200000000)
 	diamond_paid = clampi(diamond_paid, 1, Levels.count())
-	if saber_worn != "navy" or not saber_skin:
+	if not _navy_checked:
+		_navy_was_settled = navy_settled
+		_navy_checked = true
+	var own_saber_sheet := bool(sheet_owned.get("saber", false))
+	var paid_navy := saber_skin
+	if paid_navy or saber_worn == "navy":
+		if paid_navy and not own_saber_sheet and not _navy_was_settled and _navy_grant_amount == 0:
+			var before := diamonds
+			diamonds = mini(200000000, diamonds + SKIN_COST)
+			_navy_grant_amount = diamonds - before
+		if paid_navy:
+			_navy_local_paid = true
+		saber_skin = false
+		saber_worn = "none"
+		navy_settled = true
+		_navy_dirty = true
+	elif saber_worn != "none":
 		saber_worn = "none"
 	var keep: Dictionary = {}
 	for key in sheet_worn.keys():
@@ -1323,10 +1291,7 @@ func _normalize_progress() -> void:
 		if bool(sheet_owned.get(id, false)):
 			keep[id] = true
 	sheet_worn = keep
-	if sheet_worn.has("saber"):
-		saber_worn = "none"
-	elif saber_worn == "navy":
-		sheet_worn.erase("saber")
+	saber_worn = "none"
 
 
 func _save_progress() -> void:
@@ -1340,6 +1305,7 @@ func _save_progress() -> void:
 	cfg.set_value("progress", "sheet_worn", _pack_keys(sheet_worn))
 	cfg.set_value("progress", "diamond_paid", diamond_paid)
 	cfg.set_value("progress", "code_paid", code_paid)
+	cfg.set_value("progress", "navy_settled", navy_settled)
 	cfg.set_value("progress", "rank_cleared", rank_cleared)
 	cfg.set_value("progress", "rank_time", rank_time)
 	cfg.set_value("progress", "game_name", game_name)
@@ -1452,19 +1418,30 @@ func _merge_from_cloud(data: Dictionary) -> void:
 		return
 	unlocked = maxi(unlocked, clampi(_whole(data.get("unlocked", 1), 1), 1, Levels.count()))
 	cleared = maxi(cleared, clampi(_whole(data.get("cleared", 0), 0), 0, Levels.count()))
-	diamonds = maxi(diamonds, clampi(_whole(data.get("diamonds", 0), 0), 0, 200000000))
+	var cloud_diamonds := clampi(_whole(data.get("diamonds", 0), 0), 0, 200000000)
+	var base_diamonds := diamonds - _navy_grant_amount
+	if base_diamonds < 0:
+		base_diamonds = 0
+	diamonds = maxi(base_diamonds, cloud_diamonds)
 	diamond_paid = maxi(diamond_paid, clampi(_whole(data.get("diamond_paid", 1), 1), 1, Levels.count()))
-	saber_skin = saber_skin or _flag(data.get("saber_skin", false))
 	code_paid = code_paid or _flag(data.get("code_paid", false))
 	var cloud_owned := _unpack_keys(str(data.get("sheet_owned", "")))
 	for key in cloud_owned.keys():
 		sheet_owned[str(key)] = true
+	var cloud_paid := _flag(data.get("saber_skin", false))
+	var own_sheet := bool(sheet_owned.get("saber", false))
+	if not _navy_was_settled and not own_sheet:
+		if cloud_paid or (_navy_local_paid and cloud_diamonds <= base_diamonds):
+			diamonds = mini(200000000, diamonds + SKIN_COST)
+	if cloud_paid or _navy_local_paid or str(data.get("saber_worn", "none")) == "navy":
+		navy_settled = true
+		_navy_dirty = true
+	saber_skin = false
+	saber_worn = "none"
+	_navy_was_settled = true
+	_navy_grant_amount = 0
 	var cloud_worn := _unpack_keys(str(data.get("sheet_worn", "")))
-	var cloud_saber := str(data.get("saber_worn", "none"))
-	if cloud_saber == "navy" and (saber_skin or _flag(data.get("saber_skin", false))):
-		sheet_worn.erase("saber")
-		saber_worn = "navy"
-	elif not cloud_worn.is_empty():
+	if not cloud_worn.is_empty():
 		sheet_worn = cloud_worn
 	_normalize_progress()
 	_take_road_pay()
@@ -1797,7 +1774,7 @@ func _self_view() -> Dictionary:
 		"favorite": favorite,
 		"favorite_skin": favorite_skin,
 		"hero_sheet": bool(sheet_worn.get("hero", false)),
-		"saber_worn": "navy" if saber_worn == "navy" else "none",
+		"saber_worn": "none",
 		"best_rank": best_rank,
 		"place": place,
 	}
@@ -1911,7 +1888,7 @@ func _profile_body() -> Dictionary:
 		"favorite": favorite if _roster_known(favorite) else "",
 		"favorite_skin": skin,
 		"hero_sheet": bool(sheet_worn.get("hero", false)),
-		"saber_worn": "navy" if saber_worn == "navy" else "none",
+		"saber_worn": "none",
 		"best_rank": best_rank,
 	}
 
@@ -1950,24 +1927,17 @@ func _roster_known(id: String) -> bool:
 func _favorite_skin_for(id: String) -> String:
 	if bool(sheet_owned.get(id, false)):
 		return "sheet"
-	if id == "saber" and saber_skin:
-		return "navy"
 	return ""
 
 
 func _draw_skin(id: String, stored: String, own: bool) -> String:
 	var skin := stored
-	if skin != "sheet" and skin != "navy":
-		skin = ""
-	if id != "saber" and skin == "navy":
+	if skin != "sheet":
 		skin = ""
 	if id == "":
 		return ""
-	if own:
-		if skin == "sheet" and not bool(sheet_owned.get(id, false)):
-			skin = ""
-		if skin == "navy" and not saber_skin:
-			skin = ""
+	if own and skin == "sheet" and not bool(sheet_owned.get(id, false)):
+		skin = ""
 	return skin
 
 
@@ -2411,7 +2381,7 @@ class Portrait:
 		if origin_y + foot_y * zoom > size.y - 4.0:
 			origin_y = size.y - 4.0 - foot_y * zoom
 		var origin := Vector2(size.x * 0.46, origin_y)
-		var look: Dictionary = Painter.look_as(kind, sheet, navy)
+		var look: Dictionary = Painter.look_as(kind, sheet, false)
 		draw_set_transform(origin, 0.0, Vector2(zoom, zoom))
 		Painter.paint_local(self, look, {
 			"phase": "model",
@@ -2492,37 +2462,20 @@ class SkinPreview:
 			zoom = 1.65
 			origin.y = size.y * 0.8
 		draw_set_transform(origin, 0.0, Vector2(zoom, zoom))
-		if navy:
-			Painter.paint_saber_front(self, true)
+		var look: Dictionary = Painter.look_as(kind, sheet, false)
+		var span := fmod(clock, 2.2)
+		var phase := "march"
+		var beat := 0
+		var along := 0.0
+		if span < 0.7:
+			along = span / 0.7
 		else:
-			var look: Dictionary = Painter.look_as(kind, sheet, false)
-			var span := fmod(clock, 2.2)
-			var phase := "march"
-			var beat := 0
-			var along := 0.0
-			if span < 0.7:
-				along = span / 0.7
-			else:
-				phase = "act"
-				var act := (span - 0.7) / 1.5
-				beat = mini(3, int(act * 4.0))
-				along = clampf(act * 4.0 - float(beat), 0.0, 1.0)
-			var pose := {"phase": phase, "t": along, "clock": clock, "beat": beat}
-			Painter.paint_local(self, look, pose)
+			phase = "act"
+			var act := (span - 0.7) / 1.5
+			beat = mini(3, int(act * 4.0))
+			along = clampf(act * 4.0 - float(beat), 0.0, 1.0)
+		var pose := {"phase": phase, "t": along, "clock": clock, "beat": beat}
+		Painter.paint_local(self, look, pose)
 		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
-class SaberPreview:
-	extends Control
-
-	const Painter = preload("res://scripts/painter.gd")
-	var navy: bool = true
-
-	func _ready() -> void:
-		resized.connect(queue_redraw)
-
-	func _draw() -> void:
-		var origin := Vector2(size.x * 0.5, size.y * 0.62)
-		draw_set_transform(origin, 0.0, Vector2(2.55, 2.55))
-		Painter.paint_saber_front(self, navy)
-		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
