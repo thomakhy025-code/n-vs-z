@@ -107,22 +107,32 @@ static func _painted(kind: String) -> Dictionary:
 
 static func call_id(paint: String) -> String:
 	match paint:
+		"sword":
+			return "call_say_sword"
 		"archer":
-			return "call_bow"
+			return "call_say_archer"
 		"shield":
-			return "call_shield"
+			return "call_say_shield"
+		"saber":
+			return "call_say_saber"
 		"lancer":
-			return "call_spear"
-		"berserker", "brute":
+			return "call_say_lancer"
+		"berserker":
+			return "call_say_berserker"
+		"brute":
 			return "call_heavy"
 		"horse":
-			return "call_horse"
-		"suicide", "bomber":
+			return "call_say_rider"
+		"suicide":
+			return "call_say_bomb"
+		"bomber":
 			return "call_bomb"
 		"assassin":
-			return "call_dagger"
-		"heal", "level":
-			return "call_magic"
+			return "call_say_assassin"
+		"heal":
+			return "call_say_heal"
+		"level":
+			return "call_say_level"
 		"walker", "runner", "spitter":
 			return "call_dead"
 		"spear":
@@ -186,8 +196,8 @@ static func cycle_time(paint: String) -> float:
 
 static func call_pitch(paint: String) -> float:
 	match paint:
-		"saber":
-			return 0.9
+		"sword", "archer", "shield", "saber", "lancer", "berserker", "horse", "suicide", "assassin", "heal", "level":
+			return 1.0
 		"runner":
 			return 1.16
 		"spitter":

@@ -1452,11 +1452,21 @@ func _show_upgrade() -> void:
 	purse.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	purse.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(purse)
-	var lead := UiSkin.label("Each rank adds 5% blood and damage. Rank 20 is the last.", 15, Color("6b3a32"))
+	var lead := UiSkin.label("Each rank adds 5% blood and damage. Rank 20 is the last. Every fighter pays the coins below.", 15, Color("6b3a32"))
 	lead.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lead.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	lead.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(lead)
+	var prices := GridContainer.new()
+	prices.columns = 2
+	prices.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	prices.add_theme_constant_override("h_separation", 24)
+	prices.add_theme_constant_override("v_separation", 2)
+	for rank in range(1, 20):
+		var price := UiSkin.label("Rank %d · %d coins" % [rank + 1, _rank_cost(rank)], 15, Color("6b3a32"))
+		price.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		prices.add_child(price)
+	box.add_child(prices)
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -1482,20 +1492,25 @@ func _upgrade_row(id: String) -> HBoxContainer:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 12)
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	var text := "%s    rank %d" % [who, rank]
-	if rank >= 20:
-		text += "    full"
-	else:
-		text += "    next %d" % _rank_cost(rank)
-	var label := UiSkin.label(text, 16, Color("1c140e"))
-	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	row.add_child(label)
-	var button := _menu_button("Rank up", Color("c44536"), _buy_rank.bind(id), 150, 16)
-	button.custom_minimum_size = Vector2(150, 44)
-	button.disabled = rank >= 20 or coins < _rank_cost(rank)
-	if rank >= 20:
-		button.text = "Full"
+	var words := VBoxContainer.new()
+	words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	words.add_theme_constant_override("separation", 0)
+	var title := UiSkin.label("%s    rank %d of 20" % [who, rank], 16, Color("1c140e"))
+	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	words.add_child(title)
+	var cost := 0
+	var pay := "Rank 20. Nothing left to pay."
+	if rank < 20:
+		cost = _rank_cost(rank)
+		pay = "Rank %d costs %d coins" % [rank + 1, cost]
+	var price := UiSkin.label(pay, 15, Color("8d2f28"))
+	price.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	words.add_child(price)
+	row.add_child(words)
+	var button := _menu_button("Rank up", Color("c44536"), _buy_rank.bind(id), 168, 16)
+	button.custom_minimum_size = Vector2(168, 48)
+	button.disabled = rank >= 20 or coins < cost
+	button.text = "Full" if rank >= 20 else "%d coins" % cost
 	row.add_child(button)
 	return row
 

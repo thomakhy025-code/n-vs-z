@@ -729,7 +729,7 @@ func _spawn(entry: Dictionary, side: int, forced_road: int = -1, back: float = 0
 	if side == 0:
 		spawned_player += 1
 	var paint := str(entry.get("paint", "sword"))
-	Sfx.play(Painter.call_id(paint), Painter.call_pitch(paint) * randf_range(0.97, 1.04), -5.0 if side == 0 else -9.0)
+	Sfx.play(Painter.call_id(paint), Painter.call_pitch(paint) * randf_range(0.99, 1.01), -2.0 if side == 0 else -9.0)
 	poof(unit.position, Color("f3e6c8") if side == 0 else Color("c6e38a"))
 
 
@@ -1584,7 +1584,7 @@ func _make_puppet(which: int, kind: String, nid: int):
 	unit.position = Vector2(player_front if which == 0 else enemy_front, lane_y(1))
 	world.add_child(unit)
 	units.append(unit)
-	Sfx.play(Painter.call_id(str(entry.get("paint", kind))), Painter.call_pitch(str(entry.get("paint", kind))), -8.0)
+	Sfx.play(Painter.call_id(str(entry.get("paint", kind))), Painter.call_pitch(str(entry.get("paint", kind))), -4.0)
 	return unit
 
 
