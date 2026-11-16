@@ -17,7 +17,7 @@ Fighters and the hero are born on the ground behind their own gate, so a new cal
 
 You start with one call, the sword ninja. A lesson ends when their gate breaks and nine of that monster come out, three on each road. Kill all nine and that soldier is yours. Until you know six, bring who you have. After that, choose 6. Value builds by itself. Hold the phone or iPad sideways. A stick at the bottom left moves the hero. The call buttons sit to the right of that stick, and Sword and Shoot sit at the bottom right, so the left thumb can stay on the stick.
 
-There are three roads. Soldiers only march forward on the road where you called them, and they fight only that road. The Berserker stands across all three roads, hits every road at once, and enemies on every road can hit the Berserker. The first time a house falls to half blood, a wind helps that side: fighters of the other team who have crossed the middle are blown back to the center and lose half of the blood they still have. You move the hero onto any road with the stick, by dragging on the field, or with WASD. J and K match Sword and Shoot. Number keys call the soldiers you brought, in order, onto the hero's road.
+There are three roads. Soldiers only march forward on the road where you called them, and they fight only that road. The Berserker stands across all three roads, hits every road at once, and enemies on every road can hit the Berserker. The assassin blinks past every other fighter and crosses roads to kill an archer, a leveling caster, or a healing caster. She cuts no one else. The first time a house falls to half blood, a wind helps that side: fighters of the other team who have crossed the middle are blown back to the center and lose half of the blood they still have. You move the hero onto any road with the stick, by dragging on the field, or with WASD. J and K match Sword and Shoot. Number keys call the soldiers you brought, in order, onto the hero's road.
 
 If a runner slips past the line, you are the one who runs back. If your gate breaks, you lose. On a lesson, breaking their gate is not the end: nine of that monster walk out, and you win when those nine are dead. On level 40, a general walks out after their gate falls, and you win when the general dies. Every other level ends when their gate breaks.
 
@@ -1068,7 +1068,7 @@ func _reach_line(entry: Dictionary) -> String:
 		"suicide":
 			return "Rushes, then blasts short range"
 		"assassin":
-			return "Blinks behind the first threat"
+			return "Blinks past the line. Kills archers, healers, and level casters"
 		"heal":
 			return "Heals the weakest ally in front"
 		"buff":

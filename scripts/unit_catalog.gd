@@ -21,7 +21,7 @@ static func player_roster() -> Array:
 		_u("berserker", "Berserker", "Berserk", 50, 20.0, 600, 80, 3.0, MID, SHORT, "aoe", 62, 1.48, "Rushes in from mid distance and stands across all three roads. Every 3 seconds, every enemy in short range on every road takes 80. Enemies on every road can strike back."),
 		_u("horse", "Horse Rider", "Rider", 20, 10.0, 100, 30, 1.0, SHORT, SHORT, "melee", 128, 1.35, "Fast. Hits one enemy for 30 every second."),
 		_u("suicide", "Suicide Squad", "Bomb", 20, 10.0, 40, 100, 1.0, MID, SHORT, "suicide", 108, 1.15, "Rushes from mid distance. The blast hits everyone in short range for 100, and 40 of that blood is their own."),
-		_u("assassin", "Assassin", "Assassin", 15, 8.0, 100, 50, 1.0, SHORT, SHORT, "assassin", 116, 1.12, "The first time an enemy could hit her, she blinks behind that enemy. The trick happens once. Then she cuts for 50."),
+		_u("assassin", "Assassin", "Assassin", 15, 8.0, 100, 50, 1.0, SHORT, SHORT, "assassin", 116, 1.12, "She blinks past every other enemy, as many times as she needs, and crosses roads to reach her mark. She only kills an archer, a leveling caster, or a healing caster. The cut is 50."),
 		_u("heal", "Healing Caster", "Heal", 20, 10.0, 50, 0, 1.0, SHORT, LONG, "heal", 64, 1.12, "Heals the ally in front of her with the least blood, 40 blood each second, at long range."),
 		_u("level", "Leveling Caster", "Level", 20, 10.0, 50, 0, 1.0, SHORT, LONG, "buff", 64, 1.12, "The ally in front with the highest damage gains 20% damage and 20% blood. A second caster can add another 20%. The same caster does not stack twice."),
 	]

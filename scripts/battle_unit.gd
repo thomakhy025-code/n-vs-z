@@ -37,6 +37,7 @@ var lane: int = 1
 var strike_to: Vector2 = Vector2.ZERO
 var show_strike: bool = false
 var gust_lock: float = 0.0
+var blink_wait: float = 0.0
 var winding: bool = false
 var strike_sent: bool = false
 var support_pulse: bool = false
@@ -157,6 +158,7 @@ func _process(delta: float) -> void:
 		queue_redraw()
 		return
 	attack_timer -= delta
+	blink_wait = maxf(0.0, blink_wait - delta)
 	bob_time += delta
 	if gust_lock > 0.0:
 		moving = false
@@ -173,7 +175,8 @@ func _process(delta: float) -> void:
 
 func _fight(delta: float) -> void:
 	if role == "assassin":
-		_try_blink()
+		_hunt(delta)
+		return
 	var foe = _nearest_foe()
 	var gate = battle.gate_for_attacker(side)
 	var reach := float(data["reach"])
@@ -221,28 +224,79 @@ func _support(delta: float) -> void:
 	_clamp_x()
 
 
-func _try_blink() -> void:
-	if data.get("blink_used", false):
+func _hunt(delta: float) -> void:
+	_try_blink()
+	var prey = _closest_prey()
+	var gate = battle.gate_for_attacker(side)
+	var reach := float(data["reach"])
+	var siege := minf(reach, 150.0)
+	moving = false
+	if prey != null:
+		if int(prey.lane) != lane:
+			moving = true
+			_step_toward_lane(int(prey.lane), delta)
+			if _along(prey) > reach:
+				position.x += facing * float(data["speed"]) * delta
+				_clamp_x()
+			return
+		if _along(prey) <= reach:
+			_try_strike(prey, gate)
+			return
+		moving = true
+		position.x += facing * float(data["speed"]) * delta
+		_clamp_x()
 		return
+	if gate != null and abs(position.x - gate.front_x) <= siege + 6.0:
+		_try_strike(null, gate)
+		return
+	moving = true
+	position.x += facing * float(data["speed"]) * delta
+	_clamp_x()
+
+
+func _step_toward_lane(index: int, delta: float) -> void:
+	var goal_y: float = battle.lane_y(index)
+	var gap: float = goal_y - position.y
+	var step := float(data["speed"]) * delta
+	if absf(gap) <= step:
+		position.y = goal_y
+		lane = index
+	else:
+		position.y += signf(gap) * step
+
+
+func _try_blink() -> void:
+	if blink_wait > 0.0:
+		return
+	var blocker = null
+	var blocker_along := 100000.0
 	for foe in battle.hostile_targets(side):
-		if not foe.alive or int(foe.lane) != lane:
+		if not foe.alive or int(foe.lane) != lane or _is_prey(foe):
 			continue
 		var foe_facing: float = foe.facing
 		var forward_gap: float = (position.x - foe.position.x) * foe_facing
 		var foe_reach: float = float(foe.attack_reach)
 		if forward_gap < -6.0 or forward_gap > foe_reach:
 			continue
-		var dest: float = foe.position.x - foe_facing * 38.0
-		dest = clampf(dest, battle.player_front + 8.0, battle.enemy_front - 8.0)
-		if dest <= foe.position.x + 10.0:
-			continue
-		var old: Vector2 = position
-		position.x = dest
-		data["blink_used"] = true
-		battle.poof(old, Color("d7c4ff"))
-		battle.poof(position, Color("f3e6c8"))
-		Sfx.play("blink", 1.0, -4.0)
+		var along := _along(foe)
+		if along < blocker_along:
+			blocker_along = along
+			blocker = foe
+	if blocker == null:
 		return
+	var dest: float = blocker.position.x - float(blocker.facing) * 38.0
+	dest = clampf(dest, battle.player_front + 8.0, battle.enemy_front - 8.0)
+	if (dest - blocker.position.x) * facing < 10.0:
+		return
+	var prey = _closest_prey()
+	if prey != null and (dest - position.x) * facing > _along(prey) - 16.0:
+		return
+	var old: Vector2 = position
+	position.x = dest
+	blink_wait = 0.18
+	battle.poof(old, Color("d7c4ff"))
+	battle.poof(position, Color("f3e6c8"))
+	Sfx.play("blink", 1.0, -4.0)
 
 
 func _try_strike(foe, gate) -> void:
@@ -352,6 +406,28 @@ func _nearest_foe():
 	if same != null:
 		return same
 	return _berserker_in_reach()
+
+
+func _is_prey(foe) -> bool:
+	if foe == null or not is_instance_valid(foe) or not ("data" in foe):
+		return false
+	var id := str(foe.data.get("id", ""))
+	return id == "archer" or id == "heal" or id == "level"
+
+
+func _closest_prey():
+	var best = null
+	var best_along := 100000.0
+	for foe in battle.hostile_targets(side):
+		if not _is_prey(foe):
+			continue
+		var along := _along(foe)
+		if along < -8.0:
+			continue
+		if along < best_along:
+			best_along = along
+			best = foe
+	return best
 
 
 func _closest_ahead(same_road: bool):
@@ -538,7 +614,7 @@ func _draw() -> void:
 	draw_rect(Rect2(-bar_w * 0.5, bar_y, bar_w, bar_h), Color(0, 0, 0, 0.65))
 	var fill := Color("7dce6a") if ratio > 0.35 else Color("e24b3b")
 	draw_rect(Rect2(-bar_w * 0.5, bar_y, bar_w * ratio, bar_h), fill)
-	if role == "assassin" and not data.get("blink_used", false):
+	if role == "assassin" and blink_wait <= 0.0:
 		draw_circle(Vector2(-bar_w * 0.5 - 6.0, bar_y + 2.0), 3.2, Color("c084fc"))
 	if level_stacks > 0:
 		draw_circle(Vector2(bar_w * 0.5 + 6.0, bar_y + 2.0), 3.4, Color("e6c36a"))
