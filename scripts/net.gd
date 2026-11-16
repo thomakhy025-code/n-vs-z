@@ -7,7 +7,8 @@ const PORT := 3001
 signal lobby_changed
 signal linked
 signal dropped
-signal loadout_got(side: int, ids: Array, sheets: Array, navy: bool)
+signal loadout_got(side: int, ids: Array, sheets: Array, navy: bool, ranks: String, mode: String)
+signal terms_got(mode: String)
 signal begin_match(left: Array, right: Array, skins: Dictionary)
 signal input_got(x: float, y: float, dragging: bool, sword: bool, shoot: bool)
 signal buy_got(unit_id: String)
@@ -232,7 +233,9 @@ func _browser_line(line: String) -> void:
 		var sheets: Variant = msg.get("sheets", [])
 		var id_list: Array = ids if ids is Array else []
 		var sheet_list: Array = sheets if sheets is Array else []
-		loadout_got.emit(int(msg.get("side", 1)), id_list, sheet_list, bool(msg.get("navy", false)))
+		loadout_got.emit(int(msg.get("side", 1)), id_list, sheet_list, bool(msg.get("navy", false)), str(msg.get("ranks", "")), str(msg.get("mode", "")))
+	elif kind == "terms":
+		terms_got.emit("max" if str(msg.get("mode", "")) == "max" else "own")
 	elif kind == "start" and role == "guest":
 		var left: Variant = msg.get("left", [])
 		var right: Variant = msg.get("right", [])
@@ -265,13 +268,25 @@ func _send(msg: Dictionary) -> void:
 	WebPair.send_text(JSON.stringify(msg))
 
 
-func announce_loadout(ids: Array, sheets: Array, navy: bool) -> void:
+func announce_terms(mode: String) -> void:
+	var clean := "max" if mode == "max" else "own"
+	if _browser:
+		if role != "host":
+			return
+		terms_got.emit(clean)
+		_send({"t": "terms", "mode": clean})
+		return
+	share_terms.rpc(clean)
+
+
+func announce_loadout(ids: Array, sheets: Array, navy: bool, ranks: String, mode: String) -> void:
+	var clean := "max" if mode == "max" else "own"
 	if _browser:
 		var side := 0 if role == "host" else 1
-		loadout_got.emit(side, ids, sheets, navy)
-		_send({"t": "loadout", "side": side, "ids": ids, "sheets": sheets, "navy": navy})
+		loadout_got.emit(side, ids, sheets, navy, ranks, clean)
+		_send({"t": "loadout", "side": side, "ids": ids, "sheets": sheets, "navy": navy, "ranks": ranks, "mode": clean})
 		return
-	share_loadout.rpc(ids, sheets, navy)
+	share_loadout.rpc(ids, sheets, navy, ranks, clean)
 
 
 func announce_start(left: Array, right: Array, skins: Dictionary) -> void:
@@ -355,11 +370,16 @@ func _lan_hint() -> String:
 
 
 @rpc("any_peer", "reliable", "call_local")
-func share_loadout(ids: Array, sheets: Array, navy: bool) -> void:
+func share_terms(mode: String) -> void:
+	terms_got.emit("max" if mode == "max" else "own")
+
+
+@rpc("any_peer", "reliable", "call_local")
+func share_loadout(ids: Array, sheets: Array, navy: bool, ranks: String, mode: String) -> void:
 	var who := multiplayer.get_remote_sender_id()
 	if who == 0:
 		who = multiplayer.get_unique_id()
-	loadout_got.emit(0 if who == 1 else 1, ids, sheets, navy)
+	loadout_got.emit(0 if who == 1 else 1, ids, sheets, navy, ranks, "max" if mode == "max" else "own")
 
 
 @rpc("authority", "reliable", "call_local")

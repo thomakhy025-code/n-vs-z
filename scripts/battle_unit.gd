@@ -15,6 +15,7 @@ var max_hp: float = 1.0
 var base_max_hp: float = 1.0
 var damage_multiplier: float = 1.0
 var level_stacks: int = 0
+var level_power: float = 0.0
 var alive: bool = true
 var reported: bool = false
 var down_handled: bool = false
@@ -56,6 +57,14 @@ func setup(field, entry: Dictionary, which_side: int) -> void:
 	hp = max_hp
 	attack_reach = float(entry["reach"])
 	look = Painter.look(str(entry["paint"]))
+	if battle != null and not battle.duel:
+		var faction := ""
+		if battle.rules is Dictionary:
+			faction = str(battle.rules.get("faction", ""))
+		if bool(entry.get("trial", false)) or faction == "monster":
+			look = Painter.as_monster(look)
+		elif faction == "human" and not Painter.is_human_body(str(entry.get("paint", ""))):
+			look = Painter.as_human(look)
 	attack_timer = 0.55 if role == "berserker" or role == "aoe" else 0.22
 	if role == "suicide":
 		attack_timer = 0.08
@@ -68,12 +77,12 @@ func damage_rating() -> float:
 	return float(data["damage"])
 
 
-func apply_level_buff() -> void:
-	Buff.apply(self)
+func apply_level_buff(power: float = 0.2) -> void:
+	Buff.apply(self, power)
 
 
-func remove_level_buff() -> void:
-	Buff.remove(self)
+func remove_level_buff(power: float = 0.2) -> void:
+	Buff.remove(self, power)
 
 
 func on_buff_death() -> void:
@@ -260,9 +269,10 @@ func _resolve_strike() -> void:
 		support_pulse = false
 		var ally = pending_foe
 		if ally != null and is_instance_valid(ally) and ally.alive:
-			ally.hp = minf(ally.max_hp, ally.hp + 40.0)
+			var healed := 40.0 * float(data.get("rank_factor", 1.0))
+			ally.hp = minf(ally.max_hp, ally.hp + healed)
 			heal_flash = 0.55
-			battle.float_text(ally.position + Vector2(0, -46), "+40", Color("8ee0a2"))
+			battle.float_text(ally.position + Vector2(0, -46), "+%d" % int(round(healed)), Color("8ee0a2"))
 			Sfx.play("heal", randf_range(0.96, 1.05), -8.0)
 		return
 	if role == "buff":
@@ -376,7 +386,7 @@ func _berserker_in_reach():
 
 
 func _is_berserker() -> bool:
-	return str(data.get("id", "")) == "berserker"
+	return str(data.get("id", "")) == "berserker" and not bool(data.get("trial", false))
 
 
 func _is_boss() -> bool:

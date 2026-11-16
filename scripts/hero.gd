@@ -11,6 +11,7 @@ var max_hp: float = 360.0
 var base_max_hp: float = 360.0
 var damage_multiplier: float = 1.0
 var level_stacks: int = 0
+var level_power: float = 0.0
 var alive: bool = true
 var attack_reach: float = 78.0
 var sword_damage: float = 44.0
@@ -70,6 +71,14 @@ func setup(field) -> void:
 		position = Vector2(field.enemy_rear, start_y)
 	net_pos = position
 	z_index = 80
+	var factor := 1.0
+	if battle != null and battle.has_method("rank_factor"):
+		factor = float(battle.rank_factor("hero", side))
+	base_max_hp = 360.0 * factor
+	max_hp = base_max_hp
+	hp = max_hp
+	sword_damage = 44.0 * factor
+	shoot_damage = 36.0 * factor
 
 
 func set_bounds(a: float, b: float, top: float, bottom: float) -> void:
@@ -88,12 +97,12 @@ func damage_rating() -> float:
 	return sword_damage
 
 
-func apply_level_buff() -> void:
-	Buff.apply(self)
+func apply_level_buff(power: float = 0.2) -> void:
+	Buff.apply(self, power)
 
 
-func remove_level_buff() -> void:
-	Buff.remove(self)
+func remove_level_buff(power: float = 0.2) -> void:
+	Buff.remove(self, power)
 
 
 func on_buff_death() -> void:

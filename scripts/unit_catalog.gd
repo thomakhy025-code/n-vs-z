@@ -35,8 +35,44 @@ static func enemy_roster() -> Array:
 		_e("spitter", "Spitter", 12, 5.0, 100, 18, 1.25, 330.0, 330.0, "ranged", 44, 1.12, 5),
 		_e("bomber", "Bomber", 12, 6.0, 55, 120, 0.7, 145.0, 70.0, "suicide", 102, 1.2, 5),
 		_e("oni", "Oni", 34, 16.0, 860, 42, 1.5, 150.0, 100.0, "aoe", 30, 1.8, 14),
+		_e("spear", "Spear", 6, 1.5, 161, 18, 1.0, 70.0, 70.0, "melee", 54, 1.18, 3),
+		_e("scout", "Scout", 8, 3.0, 86, 16, 0.7, 62.0, 62.0, "melee", 118, 1.05, 3),
+		_e("guard", "Guard", 16, 6.5, 437, 30, 1.2, 76.0, 76.0, "melee", 34, 1.55, 7),
+		_e("crossbow", "Crossbow", 12, 5.0, 115, 21, 1.25, 330.0, 330.0, "ranged", 44, 1.12, 5),
+		_e("satchel", "Satchel", 12, 6.0, 63, 138, 0.7, 145.0, 70.0, "suicide", 102, 1.2, 5),
+		_e("captain", "Captain", 34, 16.0, 989, 48, 1.5, 150.0, 100.0, "aoe", 30, 1.8, 14),
 		_e("boss", "War Boss", 999, 99.0, 1000, 200, 2.0, 120.0, 120.0, "boss", 18, 1.8, 0),
 	]
+
+
+static func lesson_foe(id: String, level_index: int) -> Dictionary:
+	var entry := find_in(player_roster(), id)
+	if entry.is_empty():
+		return {}
+	var copy := entry.duplicate()
+	var hp := 48 + level_index * 5
+	var damage := 8 + int(float(level_index) * 0.45)
+	match id:
+		"shield":
+			hp += 50
+			damage = maxi(6, damage - 4)
+		"berserker":
+			hp = 140
+			damage = 22
+			copy["scale"] = 1.15
+		"suicide":
+			hp = 36
+			damage = 36
+		"heal", "level":
+			hp = 64
+			damage = 0
+		"horse":
+			hp = 56 + level_index * 3
+	copy["hp"] = hp
+	copy["damage"] = damage
+	copy["trial"] = true
+	copy["bounty"] = 4
+	return copy
 
 
 static func find_in(roster: Array, id: String) -> Dictionary:

@@ -91,6 +91,8 @@ var stick: Control = null
 var shoot_hold: bool = false
 var purse_paid: Dictionary = {}
 var boss_up: bool = false
+var trial_on: bool = false
+var trial_left: int = 0
 var duel: bool = false
 var puppet: bool = false
 var local_side: int = 0
@@ -102,6 +104,10 @@ var next_net: int = 1
 var net_acc: float = 0.0
 var skin_left: Dictionary = {}
 var skin_right: Dictionary = {}
+var rank_mode: String = "own"
+var rank_left: Dictionary = {}
+var rank_right: Dictionary = {}
+var buff_power: Dictionary = {}
 var sent_keys: Array = []
 var hand_seen: float = -1.0
 var fallen_side: int = -1
@@ -139,6 +145,9 @@ func start(chosen: Array, run_mode: String, level_index: int = 1) -> void:
 
 func begin_duel(local_ids: Array, other_ids: Array, side: int, runs_world: bool, skins: Dictionary) -> void:
 	duel = true
+	rank_mode = "max" if str(skins.get("mode", "own")) == "max" else "own"
+	rank_left = _parse_ranks(str(skins.get("left_ranks", "")))
+	rank_right = _parse_ranks(str(skins.get("right_ranks", "")))
 	puppet = not runs_world
 	local_side = side
 	foe_loadout = other_ids.duplicate()
@@ -240,7 +249,7 @@ func _build_hud() -> void:
 	level_label = _plain("Level %d  ·  %s" % [level_no, str(rules["name"])], 18, Color("f3e6c8"))
 	level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	level_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	hint = _plain("Hold the phone sideways. The stick at the bottom left moves the hero. The six calls sit beside it. Sword and Shoot are on the right.", 16, Color("f3e6c8"))
+	hint = _plain("The stick moves the hero. Calls sit beside it. Sword and Shoot are on the right.", 16, Color("f3e6c8"))
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	down_label = _plain("", 20, Color("ffb4a8"))
@@ -432,7 +441,7 @@ func _process(delta: float) -> void:
 			if duel_probe and foe != null and foe.alive:
 				foe.bot_axis = Vector2(-1, 0)
 				foe.bot_sword = true
-		elif battle_time < _rule_f("warmup", 0.0):
+		elif trial_on or battle_time < _rule_f("warmup", 0.0):
 			lull = 0.0
 			wave_left = 0
 		else:
@@ -458,6 +467,8 @@ func _process(delta: float) -> void:
 
 
 func _enemy_ai(delta: float) -> void:
+	if trial_on:
+		return
 	if lull > 0.0:
 		lull -= delta
 		return
@@ -470,13 +481,14 @@ func _enemy_ai(delta: float) -> void:
 	if enemy_lock > 0.0:
 		return
 	enemy_lock = _rule_f("spawn_gap", 0.42)
-	var options: Array = ["walker", "walker", "runner"]
+	var human := str(rules.get("faction", "")) == "human"
+	var options: Array = ["spear", "spear", "scout"] if human else ["walker", "walker", "runner"]
 	if battle_time >= _rule_f("oni_at", 50.0):
-		options = ["oni", "brute", "bomber", "spitter", "walker", "runner"]
+		options = ["captain", "guard", "satchel", "crossbow", "spear", "scout"] if human else ["oni", "brute", "bomber", "spitter", "walker", "runner"]
 	elif battle_time >= _rule_f("brute_at", 24.0):
-		options = ["brute", "bomber", "spitter", "walker", "runner"]
+		options = ["guard", "satchel", "crossbow", "spear", "scout"] if human else ["brute", "bomber", "spitter", "walker", "runner"]
 	elif battle_time >= _rule_f("spitter_at", 12.0):
-		options = ["walker", "runner", "spitter", "bomber", "walker"]
+		options = ["spear", "scout", "crossbow", "satchel", "spear"] if human else ["walker", "runner", "spitter", "bomber", "walker"]
 	options.shuffle()
 	var spawned := false
 	for id in options:
@@ -636,28 +648,77 @@ func summon_foe(id: String) -> void:
 	_spawn(entry, 1)
 
 
-func _spawn(entry: Dictionary, side: int) -> void:
+func rank_factor(unit_id: String, side: int) -> float:
+	if unit_id != "hero" and Catalog.find_in(player_roster, unit_id).is_empty():
+		return 1.0
+	if rank_mode == "max":
+		return 1.95
+	var table := rank_left
+	if duel and side == 1:
+		table = rank_right
+	var rank := 1
+	if table.has(unit_id):
+		rank = clampi(int(table[unit_id]), 1, 20)
+	return 1.0 + 0.05 * float(rank - 1)
+
+
+func _parse_ranks(raw: String) -> Dictionary:
+	var known: Array = ["hero", "sword", "archer", "shield", "saber", "lancer", "berserker", "horse", "suicide", "assassin", "heal", "level"]
+	var out: Dictionary = {}
+	for piece in raw.split(",", false):
+		var bits: PackedStringArray = piece.split(":")
+		if bits.size() != 2:
+			continue
+		var unit_id := str(bits[0])
+		if not known.has(unit_id):
+			continue
+		out[unit_id] = clampi(int(bits[1]), 1, 20)
+	return out
+
+
+func _ranked(entry: Dictionary, side: int) -> Dictionary:
+	var copy := entry.duplicate()
+	var factor := rank_factor(str(copy.get("id", "")), side)
+	copy["rank_factor"] = factor
+	if factor == 1.0:
+		return copy
+	copy["hp"] = maxi(1, int(round(float(copy["hp"]) * factor)))
+	if int(copy.get("damage", 0)) > 0:
+		copy["damage"] = maxi(1, int(round(float(copy["damage"]) * factor)))
+	return copy
+
+
+func _spawn(entry: Dictionary, side: int, forced_road: int = -1, back: float = 0.0) -> void:
+	entry = _ranked(entry, side)
 	var unit = UnitScript.new()
 	unit.setup(self, entry, side)
+	var trial := bool(entry.get("trial", false))
+	var kind: String = str(entry.get("id", ""))
 	var road := 1
-	if side == 0:
+	if forced_road >= 0:
+		road = forced_road
+	elif side == 0:
 		if hero != null and is_instance_valid(hero) and hero.alive:
 			road = hero.lane
-	else:
-		if duel and foe != null and is_instance_valid(foe) and foe.alive:
-			road = foe.lane
-		else:
-			road = lane_tick % maxi(lane_ys.size(), 1)
-			lane_tick += 1
-	road = clampi(road, 0, maxi(lane_ys.size() - 1, 0))
-	var kind: String = str(entry.get("id", ""))
-	if kind == "berserker" or kind == "boss":
+	elif duel and foe != null and is_instance_valid(foe) and foe.alive:
+		road = foe.lane
+	elif not trial and (kind == "berserker" or kind == "boss"):
 		road = lane_ys.size() / 2
+	else:
+		road = lane_tick % maxi(lane_ys.size(), 1)
+		lane_tick += 1
+	road = clampi(road, 0, maxi(lane_ys.size() - 1, 0))
 	unit.lane = road
 	var y := lane_y(road)
 	var born := player_rear if side == 0 else enemy_rear
-	if kind == "boss":
+	if trial and side == 1:
+		born = enemy_front - 28.0 - back
+	elif kind == "boss":
 		born = enemy_front - 24.0
+	elif side == 1:
+		born += back
+	else:
+		born -= back
 	unit.position = Vector2(born, y)
 	unit.net_id = next_net
 	next_net += 1
@@ -753,7 +814,11 @@ func lane_index(y: float) -> int:
 
 
 func is_berserker(unit) -> bool:
-	return _unit_id(unit) == "berserker"
+	if _unit_id(unit) != "berserker":
+		return false
+	if "data" in unit and unit.data is Dictionary and bool(unit.data.get("trial", false)):
+		return false
+	return true
 
 
 func is_boss(unit) -> bool:
@@ -844,27 +909,40 @@ func on_unit_down(unit) -> void:
 			continue
 		if source == unit:
 			var target = buff_links[source]
+			var spent := float(buff_power.get(source, 0.2))
 			buff_links.erase(source)
+			buff_power.erase(source)
 			if _can_buff(target) and target != unit:
-				target.remove_level_buff()
+				target.remove_level_buff(spent)
 		elif buff_links[source] == unit:
 			buff_links[source] = null
 	if boss_up and _unit_id(unit) == "boss":
 		_finish_battle(1)
+		return
+	if trial_on and bool(unit.data.get("trial", false)):
+		trial_left = maxi(0, trial_left - 1)
+		if trial_left == 0:
+			_finish_battle(1)
 
 
 func set_buff_link(buffer, target) -> void:
+	var power := 0.2
+	if buffer != null and "data" in buffer and buffer.data is Dictionary:
+		power = 0.2 * float(buffer.data.get("rank_factor", 1.0))
 	var prev = buff_links.get(buffer, null)
 	if prev == target:
 		return
+	var prev_power := float(buff_power.get(buffer, 0.2))
 	if _can_buff(prev):
-		prev.remove_level_buff()
+		prev.remove_level_buff(prev_power)
 	if target == null:
 		buff_links.erase(buffer)
+		buff_power.erase(buffer)
 		return
 	buff_links[buffer] = target
+	buff_power[buffer] = power
 	if _can_buff(target):
-		target.apply_level_buff()
+		target.apply_level_buff(power)
 		Sfx.play("buff", 1.0, -6.0)
 
 
@@ -899,10 +977,32 @@ func on_gate_fallen(defender_side: int) -> void:
 	if duel:
 		_finish_battle(defender_side)
 		return
-	if defender_side == 1 and level_no >= 10 and not boss_up:
+	if defender_side == 1 and str(rules.get("lesson", "")) != "" and not trial_on:
+		_begin_trial()
+		return
+	if defender_side == 1 and bool(rules.get("boss", false)) and not boss_up:
 		_summon_boss()
 		return
 	_finish_battle(defender_side)
+
+
+func _begin_trial() -> void:
+	trial_on = true
+	enemy_income = 0.0
+	var lesson := str(rules.get("lesson", ""))
+	var entry := Catalog.lesson_foe(lesson, level_no)
+	if entry.is_empty():
+		_finish_battle(1)
+		return
+	trial_left = 0
+	var roads := maxi(lane_ys.size(), 1)
+	for road in roads:
+		for step in 3:
+			_spawn(entry, 1, road, float(step) * 36.0)
+			trial_left += 1
+	float_text(Vector2(enemy_front - 40.0, lane_y(1) - 78.0), "NINE", Color("7dce6a"))
+	if hint != null:
+		hint.text = "Their gate is open. Kill the nine."
 
 
 func _summon_boss() -> void:
@@ -912,8 +1012,14 @@ func _summon_boss() -> void:
 	if entry.is_empty():
 		_finish_battle(1)
 		return
+	entry = entry.duplicate()
+	if str(rules.get("faction", "")) == "human":
+		entry["paint"] = "general"
+		entry["name"] = "General"
 	_spawn(entry, 1)
-	float_text(Vector2(enemy_front - 30.0, lane_y(1) - 78.0), "BOSS", Color("e6c36a"))
+	float_text(Vector2(enemy_front - 30.0, lane_y(1) - 78.0), "GENERAL", Color("e6c36a"))
+	if hint != null:
+		hint.text = "The general walks. The level ends when the general dies."
 
 
 func _finish_battle(defender_side: int) -> void:
@@ -929,28 +1035,55 @@ func _finish_battle(defender_side: int) -> void:
 	if mode != "" and mode != "duel":
 		return
 	_close_pause()
-	var title := "The cursed gate breaks" if won else "Your gate has fallen"
-	var body := "The dead reached the clan gate. Call them again, or choose a different six."
+	if won and not duel:
+		var host := get_parent()
+		if host != null and host.has_method("note_clear"):
+			host.note_clear(level_no, battle_time)
+		if host != null and host.has_method("play_clear_story") and host.play_clear_story(level_no, _present_end.bind(defender_side)):
+			return
+	_present_end(defender_side)
+
+
+func _present_end(defender_side: int) -> void:
+	if end_layer != null and is_instance_valid(end_layer):
+		return
+	var won := defender_side == 1
+	if duel:
+		won = defender_side != local_side
+	var title := "Their gate breaks" if won else "Your gate has fallen"
+	var body := "Your gate broke. Call them again, or choose who you bring."
+	if str(rules.get("faction", "")) == "monster" and won and not duel:
+		title = "The cursed gate breaks"
 	if duel:
 		title = "Their gate falls" if won else "Your gate has fallen"
 		body = "The other clan is broken." if won else "Your gate broke. Fight the same six, or choose again."
 	elif won:
-		var host := get_parent()
-		if host != null and host.has_method("note_clear"):
-			host.note_clear(level_no, battle_time)
-		if boss_up:
-			title = "The war boss falls"
-			body = "The last road is clear."
+		var lesson := str(rules.get("lesson", ""))
+		if lesson != "":
+			var learned := Catalog.find_in(player_roster, lesson)
+			title = "The clan learns"
+			body = "%s can be called now." % str(learned.get("name", "A new soldier"))
+		elif boss_up:
+			title = "The general falls"
+			body = "The soldiers fall back."
 		elif level_no >= Levels.count():
-			body = "The last road is clear."
+			title = "The war"
+			body = "Monsters and soldiers fight each other. The road stops on the cliff."
 		else:
+			body = "The road is clear."
+		var host := get_parent()
+		if host != null and host.has_method("coin_line"):
+			var paid := str(host.coin_line())
+			if paid != "":
+				body += " " + paid
+		if level_no < Levels.count():
 			var nxt: Dictionary = Levels.level(level_no + 1)
-			body = "Level %d, %s, is open." % [int(nxt["index"]), str(nxt["name"])]
+			body += " Level %d, %s, is open." % [int(nxt["index"]), str(nxt["name"])]
 	var actions: Array = []
 	if won and not duel and level_no < Levels.count():
 		actions.append({"text": "Next level", "color": Color("c44536"), "call": Callable(get_parent(), "next_level")})
 	actions.append({"text": "Rematch", "color": Color("e6c36a"), "call": Callable(get_parent(), "rematch")})
-	actions.append({"text": "Change the six", "color": Color("d7c4a3"), "call": Callable(get_parent(), "change_squad")})
+	actions.append({"text": "Change the call", "color": Color("d7c4a3"), "call": Callable(get_parent(), "change_squad")})
 	actions.append({"text": "Home", "color": Color("f7f1df"), "call": Callable(get_parent(), "show_title")})
 	end_layer = _overlay(title, body, actions)
 	layer.add_child(end_layer)
@@ -1443,6 +1576,7 @@ func _make_puppet(which: int, kind: String, nid: int):
 	var entry := Catalog.find_in(player_roster, kind)
 	if entry.is_empty():
 		return null
+	entry = _ranked(entry, which)
 	var unit = UnitScript.new()
 	unit.setup(self, entry, which)
 	unit.net_id = nid

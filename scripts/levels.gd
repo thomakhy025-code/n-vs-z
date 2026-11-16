@@ -1,35 +1,116 @@
 extends RefCounted
 
-# Enemy purse and the extra pressure for each road. The clan purse never changes.
+# Seventy levels. The clan purse never changes. Theirs gets heavier, eases when the
+# soldiers first arrive, then climbs again. Lesson ids live in story.gd.
+
+const Story = preload("res://scripts/story.gd")
+const COUNT := 70
+
+const NAMES := [
+	"First road", "The spears", "Still they come", "The shield wall", "Thick mist",
+	"The ridge", "The riders", "Two at once", "The blink", "Night watch",
+	"A fast one", "The long cut", "Cold stone", "The blast", "Shut gate",
+	"The staff", "White cloud", "The scroll", "Last lull", "The axe",
+	"Banners", "The lower road", "Red sashes", "Shield line", "The drum",
+	"Uphill", "Crossbows", "The gate they want", "Heavy boots", "Halfway",
+	"Night banners", "Paired ranks", "Iron", "The push", "Broken steps",
+	"Their purse", "Close ranks", "The horn", "Last banner", "The general",
+	"They return", "Same horns", "The same hour", "No scatter", "Who sent them",
+	"A maker", "Ash on the road", "Counted out", "The guess", "Halfway back",
+	"No chain", "Still the soldiers", "Three roads", "A workshop", "A person could",
+	"Buried horns", "Send and break", "No new soldier", "Tired of guessing", "Long enough",
+	"The old road", "Soldiers on the path", "Horns again", "Red on the road", "The descent",
+	"A human gate", "Monsters below", "The last sash", "Above the village", "The two armies",
+]
+
+static var _rows: Array = []
 
 
 static func count() -> int:
-	return _all().size()
+	return COUNT
 
 
 static func level(index: int) -> Dictionary:
-	var all: Array = _all()
+	var all := _all()
 	var picked: int = clampi(index, 1, all.size()) - 1
-	var row: Dictionary = all[picked]
-	return row
+	return all[picked]
+
+
+static func faction_of(index: int) -> String:
+	if index >= 21 and index <= 40:
+		return "human"
+	if index >= 62 and index <= 70 and index % 2 == 0:
+		return "human"
+	return "monster"
 
 
 static func _all() -> Array:
-	return [
-		_row(1, "First road", "+3.0 each second, starts at 22.", 3.0, 22.0, 0.0, 12.0, 24.0, 50.0, 3, 8, 22.0, 1.5, 3.3, 0.012, 0.42, 1.0, 1.0, false),
-		_row(2, "Open purse", "+3.3 each second, starts at 28.", 3.3, 28.0, 0.0, 12.0, 24.0, 50.0, 3, 8, 22.0, 1.5, 3.3, 0.012, 0.42, 1.0, 1.0, false),
-		_row(3, "Early spit", "Spitters and bombers from the first wave. +3.6 each second, starts at 34.", 3.6, 34.0, 0.0, 0.0, 24.0, 50.0, 3, 8, 22.0, 1.5, 3.3, 0.012, 0.42, 1.0, 1.0, false),
-		_row(4, "Short breath", "Shorter lulls, and each wave is one body larger. +3.9 each second, starts at 40.", 3.9, 40.0, 0.0, 12.0, 24.0, 50.0, 4, 9, 22.0, 0.95, 2.1, 0.016, 0.42, 1.0, 1.0, false),
-		_row(5, "Thick hide", "15% more blood. Brutes from 16s. +4.2 each second, starts at 46.", 4.2, 46.0, 0.0, 12.0, 16.0, 50.0, 3, 8, 22.0, 1.5, 3.3, 0.012, 0.42, 1.15, 1.0, false),
-		_row(6, "Rising curse", "+4.5 each second, starts at 52.", 4.5, 52.0, 0.0, 12.0, 24.0, 50.0, 3, 8, 22.0, 1.5, 3.3, 0.012, 0.42, 1.0, 1.0, false),
-		_row(7, "Oni early", "The oni can be called from 28s. +4.8 each second, starts at 58.", 4.8, 58.0, 0.0, 12.0, 24.0, 28.0, 3, 8, 22.0, 1.5, 3.3, 0.012, 0.42, 1.0, 1.0, false),
-		_row(8, "Paired muster", "Two dead in one beat, on two roads. +5.1 each second, starts at 64.", 5.1, 64.0, 0.0, 12.0, 24.0, 50.0, 3, 8, 22.0, 1.5, 3.3, 0.012, 0.42, 1.0, 1.0, true),
-		_row(9, "Fast muster", "Faster calls, waves up to 11, tougher dead. +5.4 each second, starts at 70.", 5.4, 70.0, 0.0, 12.0, 24.0, 50.0, 4, 11, 16.0, 1.1, 2.4, 0.015, 0.30, 1.25, 1.1, false),
-		_row(10, "Night march", "Early oni, paired calls, fast waves, tougher dead. +5.7 each second, starts at 76. A war boss walks when the gate falls.", 5.7, 76.0, 0.0, 12.0, 24.0, 28.0, 4, 11, 16.0, 1.1, 2.4, 0.015, 0.30, 1.25, 1.1, true),
-	]
+	if _rows.is_empty():
+		for n in COUNT:
+			_rows.append(_make(n + 1))
+	return _rows
 
 
-static func _row(index: int, title: String, blurb: String, income: float, start_value: float, growth: float, spitter_at: float, brute_at: float, oni_at: float, wave_base: int, wave_cap: int, wave_every: float, lull_floor: float, lull_base: float, lull_shrink: float, spawn_gap: float, hp_mult: float, dmg_mult: float, paired: bool, warmup: float = 0.0) -> Dictionary:
+static func _pressure(index: int) -> float:
+	if index <= 20:
+		return float(index - 1) / 19.0 * 0.72
+	if index <= 40:
+		return 0.48 + float(index - 21) / 19.0 * 0.42
+	if index <= 60:
+		return 0.78 + float(index - 41) / 19.0 * 0.18
+	return 0.90 + float(index - 61) / 9.0 * 0.10
+
+
+static func _make(index: int) -> Dictionary:
+	var pressure := _pressure(index)
+	var lesson := Story.lesson_id(index)
+	var faction := faction_of(index)
+	var boss := index == 40
+	var ease := 1.0 - pressure
+	var name := "Road %d" % index
+	if index - 1 < NAMES.size():
+		name = NAMES[index - 1]
+	return _row(
+		index,
+		name,
+		_blurb(index, lesson, faction, boss),
+		1.6 + pressure * 6.2,
+		16.0 + pressure * 70.0,
+		0.0,
+		36.0 + ease * 40.0,
+		55.0 + ease * 50.0,
+		80.0 + ease * 70.0,
+		2 + int(pressure * 3.0),
+		4 + int(pressure * 8.0),
+		26.0 - pressure * 10.0,
+		2.2 - pressure * 1.0,
+		5.0 - pressure * 2.4,
+		0.008 + pressure * 0.008,
+		0.75 - pressure * 0.34,
+		0.85 + pressure * 0.55,
+		0.85 + pressure * 0.45,
+		pressure > 0.82,
+		faction,
+		lesson,
+		boss,
+	)
+
+
+static func _blurb(index: int, lesson: String, faction: String, boss: bool) -> String:
+	if lesson != "":
+		return "Break their gate. Nine come out, three on each road. Kill them all."
+	if boss:
+		return "Break their gate. A general walks out. The level ends when the general dies."
+	if index >= 61:
+		return "On the road to the village where they were born."
+	if index >= 41:
+		return "Monsters again. The clan still thinks the soldiers made them."
+	if faction == "human":
+		return "Human soldiers on the mountain road."
+	return "Monsters on the three roads. Hold the clan gate."
+
+
+static func _row(index: int, title: String, blurb: String, income: float, start_value: float, growth: float, spitter_at: float, brute_at: float, oni_at: float, wave_base: int, wave_cap: int, wave_every: float, lull_floor: float, lull_base: float, lull_shrink: float, spawn_gap: float, hp_mult: float, dmg_mult: float, paired: bool, faction: String, lesson: String, boss: bool) -> Dictionary:
 	return {
 		"index": index,
 		"name": title,
@@ -50,5 +131,8 @@ static func _row(index: int, title: String, blurb: String, income: float, start_
 		"hp_mult": hp_mult,
 		"dmg_mult": dmg_mult,
 		"paired": paired,
-		"warmup": warmup,
+		"warmup": 0.0,
+		"faction": faction,
+		"lesson": lesson,
+		"boss": boss,
 	}

@@ -6,6 +6,8 @@ const Painter = preload("res://scripts/painter.gd")
 const BattleScript = preload("res://scripts/battle.gd")
 const SceneryScript = preload("res://scripts/scenery.gd")
 const Levels = preload("res://scripts/levels.gd")
+const Story = preload("res://scripts/story.gd")
+const MangaScript = preload("res://scripts/manga.gd")
 
 const SAVE_PATH := "user://progress.cfg"
 
@@ -13,25 +15,27 @@ const HOW_TO := "This is a side-view gate battle. Your clan gate is on the left.
 
 Fighters and the hero are born on the ground behind their own gate, so a new call is not standing in the fight. The other side cannot walk past a gate into the ground behind it. Someone standing there can still hit a fighter in front of that gate when the attack reaches. A blow that would have hit someone behind the gate hits the gate instead.
 
-Choose 6 of the 11 soldiers. Value builds by itself. Hold the phone or iPad sideways. A stick at the bottom left moves the hero. The six call buttons sit to the right of that stick, and Sword and Shoot sit at the bottom right, so the left thumb can stay on the stick.
+You start with one call, the sword ninja. A lesson ends when their gate breaks and nine of that monster come out, three on each road. Kill all nine and that soldier is yours. Until you know six, bring who you have. After that, choose 6. Value builds by itself. Hold the phone or iPad sideways. A stick at the bottom left moves the hero. The call buttons sit to the right of that stick, and Sword and Shoot sit at the bottom right, so the left thumb can stay on the stick.
 
-There are three roads. Soldiers only march forward on the road where you called them, and they fight only that road. The Berserker stands across all three roads, hits every road at once, and enemies on every road can hit the Berserker. The first time a house falls to half blood, a wind helps that side: fighters of the other team who have crossed the middle are blown back to the center and lose half of the blood they still have. You move the hero onto any road with the stick, by dragging on the field, or with WASD. J and K match Sword and Shoot. Number keys 1 through 6 call the six you brought onto the hero's road.
+There are three roads. Soldiers only march forward on the road where you called them, and they fight only that road. The Berserker stands across all three roads, hits every road at once, and enemies on every road can hit the Berserker. The first time a house falls to half blood, a wind helps that side: fighters of the other team who have crossed the middle are blown back to the center and lose half of the blood they still have. You move the hero onto any road with the stick, by dragging on the field, or with WASD. J and K match Sword and Shoot. Number keys call the soldiers you brought, in order, onto the hero's road.
 
-If a runner slips past the line, you are the one who runs back. If your gate breaks, you lose. Break the cursed gate to win. On Night march that gate is not the end. When it falls, a war boss walks slowly across all three roads. Each hit strikes two people for 200, and it has 1000 blood. People on every road can hit it, and it can hit every road. You win when the boss dies. While it walks, the dead still come at +1 each second.
+If a runner slips past the line, you are the one who runs back. If your gate breaks, you lose. On a lesson, breaking their gate is not the end: nine of that monster walk out, and you win when those nine are dead. On level 40, a general walks out after their gate falls, and you win when the general dies. Every other level ends when their gate breaks.
 
-When the cursed gate is down to a quarter of its blood, the dead immediately gain their starting gold again. From road 5 through road 10 they also gain that gold at half blood. On Night march they gain it at 70% blood as well.
+When their gate is down to a quarter of its blood, they immediately gain their starting gold again. From level 5 on they also gain that gold at half blood. From level 10 on they gain it at 70% blood as well.
 
-The cursed gate calls its own dead: walkers, runners, brutes, spitters, bombers, and later an oni.
+The other gate calls its own fighters. On monster levels they are walkers, runners, brutes, spitters, bombers, and later an oni, and they have horns. On soldier levels they are spears, scouts, guards, crossbows, satchels, and a captain. Level 40's general is an officer.
 
-Play lists ten roads. The first is open. Winning a road opens the next one. Your purse stays the same on every road. Theirs gets heavier: the first road pays them +3 each second, and each later road adds 0.3.
+Play lists seventy levels. The first is open. Winning a level opens the next. Levels 1 to 20 are monsters, and that is where each soldier is learned. Levels 21 to 40 are human soldiers. Levels 41 to 60 are monsters again. Levels 61 to 70 alternate, monster then soldier, starting with monsters. Your purse stays the same. Theirs gets heavier as the levels climb, and it eases a little when the soldiers first arrive.
 
-Each road you open pays 100 diamonds. Home is the night gate: Shop, Skin, the roads, and How to play are there, and the diamond count hangs by the lantern. During a fight, Home at the top returns you there.
+Each level you open pays 100 diamonds. Clearing a level also pays coins. The base is 200 coins times the level. Three minutes or less doubles that, five minutes or less adds half, six minutes or less pays the base, and a longer clear pays half. Coins are not diamonds. Home has Upgrade. The hero and each soldier you have learned can be ranked 20 times. Each rank adds 5% of that character's blood and damage. Reach, cost, and speed stay the same.
+
+Home is the night gate: Shop, Skin, Upgrade, the levels, and How to play are there, and the diamond count hangs by the lantern. During a fight, Home at the top returns you there.
 
 The shop sells one new skin for the hero and one for each soldier. A skin costs 200 diamonds. Buying it does not put it on. Wear it from Skin, and Nothing puts the old clothes back.
 
-On the website you can keep playing as a guest. That progress stays on the device. Sign in with Google and the roads you have opened, your diamonds, and your skins stay with that account, so a phone, a tablet, and a computer can share them. The first sign-in asks for a name. Ranking lists signed-in players: a higher road cleared ranks above a lower one, and the same road ranks the shorter clear time first. A profile shows that name, the best tag, the hero, and a favourite character.
+On the website you can keep playing as a guest. That progress stays on the device. Sign in with Google and the levels you have opened, your diamonds, your coins, your ranks, and your skins stay with that account, so a phone, a tablet, and a computer can share them. The first sign-in asks for a name. Ranking lists signed-in players: a higher level cleared ranks above a lower one, and the same level ranks the shorter clear time first. A profile shows that name, the best tag, the hero, and a favourite character.
 
-1 vs 1 is two clans. Each side chooses 6 of the 11. Both have the same value, the same calls, the same roads, the same wind, and a hero. On this page, press Find opponent. The game looks for one other ninja and connects. The match runs until a gate falls. You do not type an address or a code. On a computer build, Host opens port 3001 and the other ninja joins the address.
+1 vs 1 opens after level 20. It is two clans. Each side chooses 6 of the 11. Both have the same value, the same calls, the same roads, the same wind, and a hero. Before the search, choose Your ranks or Maximum. Your ranks uses the ranks saved on each account. Maximum locks both sides at rank 20. The host's choice is what the match uses, and the other ninja can leave. On this page, press Find opponent. The game looks for one other ninja and connects. The match runs until a gate falls. A 1 vs 1 pays no coins. You do not type an address or a code. On a computer build, Host opens port 3001 and the other ninja joins the address.
 
 Escape or Back returns to the title."
 
@@ -44,7 +48,15 @@ var start_button: Button
 var last_id: String = ""
 var unlocked: int = 1
 var cleared: int = 0
+var story_version: int = Story.VERSION
+var story_seen: Dictionary = {}
+var story_layer: CanvasLayer = null
 var diamonds: int = 0
+var coins: int = 0
+var upgrades: Dictionary = {}
+var last_clear_time: float = 0.0
+var last_clear_coins: int = 0
+var last_clear_band: String = ""
 var saber_skin: bool = false
 var saber_worn: String = "none"
 var navy_settled: bool = false
@@ -214,12 +226,17 @@ var chosen_level: int = 1
 var screen: String = "menu"
 var layout_account: bool = false
 var picking_duel: bool = false
+var duel_choice: String = "own"
+var duel_mode: String = "own"
+var terms_known: bool = false
 var duel_sent: bool = false
 var duel_started: bool = false
 var left_ids: Array = []
 var right_ids: Array = []
 var left_skin: Dictionary = {}
 var right_skin: Dictionary = {}
+var left_rank_pack: String = ""
+var right_rank_pack: String = ""
 var duel_left: Array = []
 var duel_right: Array = []
 var duel_skins: Dictionary = {}
@@ -299,6 +316,7 @@ func _bind(action: String, keys: Array) -> void:
 
 
 func _clear_screens() -> void:
+	_drop_story()
 	_close_web_code()
 	_close_web_name()
 	var doomed: Array = []
@@ -358,7 +376,7 @@ func _show_menu() -> void:
 	panel.add_theme_stylebox_override("panel", UiSkin.panel(Color("1a1614"), Color("e6c36a"), 22, 4))
 	root.add_child(panel)
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 10)
+	box.add_theme_constant_override("separation", 6)
 	panel.add_child(box)
 	var title := UiSkin.label("Home", 40, Color("f3e6c8"))
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -376,6 +394,10 @@ func _show_menu() -> void:
 	diamonds_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	diamonds_name.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(diamonds_name)
+	var coin_purse := UiSkin.label("Coins  %d" % coins, 16, Color("e7c07a"))
+	coin_purse.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	coin_purse.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(coin_purse)
 	if _wants_account_row():
 		var account := UiSkin.label(_account_line(), 15, Color("c4a574"))
 		account.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -398,15 +420,17 @@ func _show_menu() -> void:
 		box.add_child(_menu_button("Next level · %s" % str(road["name"]), Color("c44536"), next_level, 420))
 	else:
 		box.add_child(_menu_button("Play", Color("c44536"), _show_levels, 420))
-	box.add_child(_menu_button("1 vs 1", Color("7d9a6a"), _show_duel, 420))
+	if Story.duel_open(cleared):
+		box.add_child(_menu_button("1 vs 1", Color("7d9a6a"), _show_duel, 420))
 	box.add_child(_home_pair(
-		"Choose a road", Color("e6c36a"), _show_levels,
+		"Choose a level", Color("e6c36a"), _show_levels,
 		"How to play", Color("f3e6c8"), _show_how
 	))
 	box.add_child(_home_pair(
 		"Shop", Color("7ec8b3"), _show_shop,
 		"Skin", Color("1e3f8f"), _show_skin
 	))
+	box.add_child(_menu_button("Upgrade", Color("e6c36a"), _show_upgrade, 420))
 	if _wants_account_row():
 		box.add_child(_home_pair(
 			"Code", Color("c4a574"), _show_code,
@@ -698,7 +722,7 @@ func _show_shop() -> void:
 	purse.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	purse.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(purse)
-	var pay := UiSkin.label("A new road pays %d diamonds. Each skin is %d. Wear it from the home porch." % [ROAD_DIAMONDS, SKIN_COST], 16, Color("6b3a32"))
+	var pay := UiSkin.label("A new level pays %d diamonds. Each skin is %d. Wear it from the home porch." % [ROAD_DIAMONDS, SKIN_COST], 16, Color("6b3a32"))
 	pay.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	pay.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	pay.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -851,7 +875,7 @@ func _apply_skins() -> void:
 
 func _show_levels() -> void:
 	screen = "levels"
-	var box := _open_page("Choose a road")
+	var box := _open_page("Choose a level")
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -970,10 +994,11 @@ func _show_select() -> void:
 	var title := UiSkin.label(heading, 32, Color("f3e6c8"))
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(title)
-	var choose := UiSkin.label("Choose 6 of 11", 18, Color("f3e6c8"))
+	var choose := UiSkin.label("Choose 6" if _squad_need() == 6 else "Call who you have learned", 18, Color("f3e6c8"))
 	choose.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(choose)
-	var tip := UiSkin.label("Sword and Shield hold the road. Archers and Lancers strike from behind. Bring one heavy hitter and one support.", 15, Color("f3e6c8"))
+	var tip_line := _duel_terms_line() if picking_duel else "The sword holds the road. A lesson adds the soldier you just survived."
+	var tip := UiSkin.label(tip_line, 15, Color("f3e6c8"))
 	tip.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	tip.autowrap_mode = TextServer.AUTOWRAP_WORD
 	box.add_child(tip)
@@ -983,7 +1008,8 @@ func _show_select() -> void:
 	grid.add_theme_constant_override("v_separation", 10)
 	grid.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	box.add_child(grid)
-	for entry in roster:
+	_prepare_loadout()
+	for entry in _shown_roster():
 		grid.add_child(_make_card(entry))
 	count_label = UiSkin.label("", 16, Color("f3e6c8"))
 	count_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -998,6 +1024,8 @@ func _show_select() -> void:
 	row.add_theme_constant_override("separation", 12)
 	box.add_child(row)
 	row.add_child(_menu_button("Back", Color("f3e6c8"), _leave_select))
+	if picking_duel:
+		row.add_child(_menu_button("Leave", Color("6b3a32"), show_title, 180, 18))
 	var start_text := "Ready" if picking_duel else "Start battle"
 	start_button = _menu_button(start_text, Color("c44536"), _begin_from_select)
 	row.add_child(start_button)
@@ -1082,8 +1110,11 @@ func _refresh_cards() -> void:
 		var border := Color("e6c36a") if selected else cloth.darkened(0.15)
 		card_panels[id].add_theme_stylebox_override("panel", UiSkin.panel(bg, border, 12, 5 if selected else 3))
 	if count_label != null:
-		count_label.text = "Chosen %d / 6" % loadout.size()
-		if loadout.size() == 6:
+		if _squad_need() == 6:
+			count_label.text = "Chosen %d / 6" % loadout.size()
+		else:
+			count_label.text = "Chosen %d" % loadout.size()
+		if _squad_ok() and not loadout.is_empty():
 			count_label.text += "  ·  " + _loadout_names()
 	if detail_label != null:
 		if last_id == "":
@@ -1092,7 +1123,7 @@ func _refresh_cards() -> void:
 			var entry := Catalog.find_in(roster, last_id)
 			detail_label.text = str(entry["detail"])
 	if start_button != null:
-		start_button.disabled = loadout.size() != 6 or duel_sent
+		start_button.disabled = not _squad_ok()
 	if picking_duel and duel_sent and count_label != null:
 		count_label.text = "Waiting for the other ninja."
 
@@ -1105,8 +1136,46 @@ func _loadout_names() -> String:
 	return "  ".join(names)
 
 
+func _squad_need() -> int:
+	if picking_duel:
+		return 6
+	return mini(6, Story.known_ids(cleared).size())
+
+
+func _squad_ok() -> bool:
+	if duel_sent:
+		return false
+	if _squad_need() >= 6:
+		return loadout.size() == 6
+	return loadout.size() >= 1
+
+
+func _shown_roster() -> Array:
+	var allowed: Array = Story.known_ids(cleared)
+	var out: Array = []
+	for entry in roster:
+		if allowed.has(str(entry.get("id", ""))):
+			out.append(entry)
+	return out
+
+
+func _prepare_loadout() -> void:
+	var allowed: Array = Story.known_ids(cleared)
+	var kept: Array = []
+	for id in loadout:
+		var key := str(id)
+		if allowed.has(key) and not kept.has(key):
+			kept.append(key)
+	if not picking_duel and allowed.size() <= 6:
+		loadout = allowed.duplicate()
+		return
+	loadout = kept
+	if loadout.is_empty() and allowed.has("sword"):
+		loadout.append("sword")
+
+
 func _begin_from_select() -> void:
-	if loadout.size() != 6 or duel_sent:
+	if not _squad_ok():
 		return
 	Sfx.play("click", 1.1, -4.0)
 	if picking_duel:
@@ -1125,13 +1194,83 @@ func _leave_select() -> void:
 func _start_battle(chosen: Array, mode: String = "", level_index: int = 0) -> void:
 	if level_index >= 1:
 		chosen_level = level_index
-	screen = "battle"
 	loadout = chosen.duplicate()
+	if mode == "" and _begin_intro():
+		return
+	_launch_battle(mode)
+
+
+func _launch_battle(mode: String) -> void:
+	screen = "battle"
 	_clear_screens()
 	_drop_battle()
 	var battle = BattleScript.new()
 	add_child(battle)
+	battle.rank_mode = "own"
+	battle.rank_left = _rank_dictionary()
+	battle.rank_right = {}
 	battle.start(loadout, mode, chosen_level)
+
+
+func _begin_intro() -> bool:
+	var pages: Array = Story.intro_panels(chosen_level)
+	var id := Story.intro_id(chosen_level)
+	if pages.is_empty() or _story_seen(id):
+		return false
+	_clear_screens()
+	_drop_battle()
+	screen = "story"
+	_play_manga(pages, func() -> void:
+		_mark_story(id)
+		_launch_battle("")
+	)
+	return true
+
+
+func play_clear_story(level_index: int, after: Callable) -> bool:
+	var pages: Array = Story.outro_panels(level_index)
+	var id := Story.outro_id(level_index)
+	if pages.is_empty() or _story_seen(id):
+		return false
+	screen = "story"
+	_play_manga(pages, func() -> void:
+		_mark_story(id)
+		screen = "battle"
+		after.call()
+	)
+	return true
+
+
+func _play_manga(pages: Array, after: Callable) -> void:
+	_drop_story()
+	story_layer = CanvasLayer.new()
+	story_layer.layer = 40
+	add_child(story_layer)
+	var manga = MangaScript.new()
+	manga.set_anchors_preset(Control.PRESET_FULL_RECT)
+	story_layer.add_child(manga)
+	manga.done.connect(func() -> void:
+		_drop_story()
+		after.call()
+	)
+	manga.open(pages)
+
+
+func _drop_story() -> void:
+	if story_layer != null and is_instance_valid(story_layer):
+		story_layer.queue_free()
+	story_layer = null
+
+
+func _story_seen(id: String) -> bool:
+	return id != "" and bool(story_seen.get(id, false))
+
+
+func _mark_story(id: String) -> void:
+	if id == "":
+		return
+	story_seen[id] = true
+	_save_progress()
 
 
 func rematch() -> void:
@@ -1157,6 +1296,8 @@ func show_title() -> void:
 	picking_duel = false
 	duel_sent = false
 	duel_started = false
+	terms_known = false
+	duel_mode = duel_choice
 	if Net.role != "" or Net.live:
 		Net.close_match()
 	_show_menu()
@@ -1169,7 +1310,7 @@ func next_level() -> void:
 		show_title()
 		return
 	chosen_level = nxt
-	if loadout.size() == 6:
+	if _squad_ok():
 		_start_battle(loadout, "", nxt)
 	else:
 		_drop_battle()
@@ -1198,6 +1339,8 @@ func note_clear(level_index: int, elapsed: float = 0.0) -> void:
 	if level_index > cleared:
 		cleared = level_index
 		changed = true
+		if not picking_duel and Story.known_ids(cleared).size() <= 6:
+			loadout = Story.known_ids(cleared).duplicate()
 	if opened > unlocked:
 		unlocked = opened
 		changed = true
@@ -1205,6 +1348,8 @@ func note_clear(level_index: int, elapsed: float = 0.0) -> void:
 		changed = true
 	if _note_rank(level_index, elapsed):
 		changed = true
+	_grant_coins(level_index, elapsed)
+	changed = true
 	if changed:
 		_save_progress()
 
@@ -1217,16 +1362,184 @@ func _take_road_pay() -> bool:
 	return true
 
 
+func _grant_coins(level_index: int, elapsed: float) -> void:
+	var base := 200 * maxi(1, level_index)
+	var paid := base
+	var band := "Within 6 minutes: the base amount"
+	if elapsed <= 180.0:
+		paid = base * 2
+		band = "Within 3 minutes: double"
+	elif elapsed <= 300.0:
+		paid = int(round(float(base) * 1.5))
+		band = "Within 5 minutes: half again"
+	elif elapsed > 360.0:
+		paid = int(base / 2)
+		band = "Over 6 minutes: half"
+	last_clear_time = elapsed
+	last_clear_band = band
+	last_clear_coins = paid
+	coins = mini(20000000, coins + paid)
+
+
+func coin_line() -> String:
+	if last_clear_coins <= 0:
+		return ""
+	return "Time %s. %s. +%d coins." % [_format_time(last_clear_time), last_clear_band, last_clear_coins]
+
+
+func _rank_ids() -> Array:
+	var ids: Array = ["hero"]
+	for id in Story.known_ids(cleared):
+		ids.append(str(id))
+	return ids
+
+
+func _rank_of(id: String) -> int:
+	return clampi(int(upgrades.get(id, 1)), 1, 20)
+
+
+func _rank_cost(rank: int) -> int:
+	return 50 * rank * rank
+
+
+func _pack_ranks() -> String:
+	var parts: PackedStringArray = PackedStringArray()
+	for id in _rank_ids():
+		var rank := _rank_of(str(id))
+		if rank > 1:
+			parts.append("%s:%d" % [str(id), rank])
+	return ",".join(parts)
+
+
+func _unpack_ranks(raw: String) -> Dictionary:
+	var out: Dictionary = {}
+	var known: Array = ["hero", "sword", "archer", "shield", "saber", "lancer", "berserker", "horse", "suicide", "assassin", "heal", "level"]
+	for piece in raw.split(",", false):
+		var bits: PackedStringArray = piece.split(":")
+		if bits.size() != 2:
+			continue
+		var id := str(bits[0])
+		if not known.has(id):
+			continue
+		out[id] = clampi(int(bits[1]), 1, 20)
+	return out
+
+
+func _trim_ranks() -> void:
+	var allowed: Array = _rank_ids()
+	var keep: Dictionary = {}
+	for key in upgrades.keys():
+		var id := str(key)
+		if allowed.has(id):
+			keep[id] = clampi(int(upgrades[key]), 1, 20)
+	upgrades = keep
+
+
+func _rank_dictionary() -> Dictionary:
+	var out: Dictionary = {}
+	for id in _rank_ids():
+		var rank := _rank_of(str(id))
+		if rank > 1:
+			out[str(id)] = rank
+	return out
+
+
+func _show_upgrade() -> void:
+	screen = "upgrade"
+	var box := _open_page("Upgrade")
+	var purse := UiSkin.label("Coins  %d" % coins, 22, Color("1c140e"))
+	purse.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	purse.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(purse)
+	var lead := UiSkin.label("Each rank adds 5% blood and damage. Rank 20 is the last.", 15, Color("6b3a32"))
+	lead.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lead.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	lead.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(lead)
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	box.add_child(scroll)
+	var list := VBoxContainer.new()
+	list.add_theme_constant_override("separation", 8)
+	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(list)
+	for id in _rank_ids():
+		list.add_child(_upgrade_row(str(id)))
+	var back := _menu_button("Back", Color("e6c36a"), _show_menu)
+	back.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	box.add_child(back)
+
+
+func _upgrade_row(id: String) -> HBoxContainer:
+	var rank := _rank_of(id)
+	var who := "Hero"
+	if id != "hero":
+		var entry: Dictionary = Catalog.find_in(roster, id)
+		who = str(entry.get("name", id))
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	var text := "%s    rank %d" % [who, rank]
+	if rank >= 20:
+		text += "    full"
+	else:
+		text += "    next %d" % _rank_cost(rank)
+	var label := UiSkin.label(text, 16, Color("1c140e"))
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(label)
+	var button := _menu_button("Rank up", Color("c44536"), _buy_rank.bind(id), 150, 16)
+	button.custom_minimum_size = Vector2(150, 44)
+	button.disabled = rank >= 20 or coins < _rank_cost(rank)
+	if rank >= 20:
+		button.text = "Full"
+	row.add_child(button)
+	return row
+
+
+func _buy_rank(id: String) -> void:
+	if not _rank_ids().has(id):
+		return
+	var rank := _rank_of(id)
+	if rank >= 20:
+		return
+	var cost := _rank_cost(rank)
+	if coins < cost:
+		return
+	coins -= cost
+	upgrades[id] = rank + 1
+	_save_progress()
+	_show_upgrade()
+
+
+func _duel_terms_line() -> String:
+	if not terms_known and Net.role == "guest":
+		return "The host chooses your ranks or maximum. You can leave."
+	if duel_mode == "max":
+		return "Maximum. Both sides fight at rank 20. You can leave."
+	return "Your ranks. Each side uses the ranks saved on that account. You can leave."
+
+
+func _set_duel_choice(mode: String) -> void:
+	duel_choice = "max" if mode == "max" else "own"
+	_show_duel()
+
+
 func _load_progress() -> void:
 	unlocked = 1
 	cleared = 0
 	diamonds = 0
+	coins = 0
+	upgrades = {}
 	saber_skin = false
 	saber_worn = "none"
 	sheet_owned = {}
 	sheet_worn = {}
 	diamond_paid = 1
 	code_paid = false
+	var migrated := false
 	var cfg: ConfigFile = ConfigFile.new()
 	if cfg.load(SAVE_PATH) == OK:
 		unlocked = clampi(int(cfg.get_value("progress", "unlocked", 1)), 1, Levels.count())
@@ -1236,6 +1549,8 @@ func _load_progress() -> void:
 		else:
 			cleared = clampi(stored, 0, Levels.count())
 		diamonds = maxi(0, int(cfg.get_value("progress", "diamonds", 0)))
+		coins = maxi(0, int(cfg.get_value("progress", "coins", 0)))
+		upgrades = _unpack_ranks(str(cfg.get_value("progress", "upgrades", "")))
 		saber_skin = bool(cfg.get_value("progress", "saber_skin", false))
 		if cfg.has_section_key("progress", "saber_worn"):
 			saber_worn = str(cfg.get_value("progress", "saber_worn", "none"))
@@ -1255,10 +1570,20 @@ func _load_progress() -> void:
 		favorite = str(cfg.get_value("progress", "favorite", ""))
 		favorite_skin = str(cfg.get_value("progress", "favorite_skin", ""))
 		best_rank = clampi(int(cfg.get_value("progress", "best_rank", 0)), 0, 100000)
+		story_version = int(cfg.get_value("progress", "story_version", 0))
+		story_seen = _unpack_seen(str(cfg.get_value("progress", "story_seen", "")))
+		if story_version < Story.VERSION:
+			unlocked = 1
+			cleared = 0
+			rank_cleared = 0
+			rank_time = 0.0
+			story_seen = {}
+			story_version = Story.VERSION
+			migrated = true
 	_normalize_progress()
 	var paid := _take_road_pay()
 	_apply_skins()
-	if paid or _navy_dirty:
+	if paid or _navy_dirty or migrated:
 		_save_progress()
 
 
@@ -1292,6 +1617,11 @@ func _normalize_progress() -> void:
 			keep[id] = true
 	sheet_worn = keep
 	saber_worn = "none"
+	if favorite != "" and not Story.known_ids(cleared).has(favorite):
+		favorite = ""
+		favorite_skin = ""
+	coins = clampi(coins, 0, 20000000)
+	_trim_ranks()
 
 
 func _save_progress() -> void:
@@ -1299,6 +1629,8 @@ func _save_progress() -> void:
 	cfg.set_value("progress", "unlocked", unlocked)
 	cfg.set_value("progress", "cleared", cleared)
 	cfg.set_value("progress", "diamonds", diamonds)
+	cfg.set_value("progress", "coins", coins)
+	cfg.set_value("progress", "upgrades", _pack_ranks())
 	cfg.set_value("progress", "saber_skin", saber_skin)
 	cfg.set_value("progress", "saber_worn", saber_worn)
 	cfg.set_value("progress", "sheet_owned", _pack_keys(sheet_owned))
@@ -1312,6 +1644,8 @@ func _save_progress() -> void:
 	cfg.set_value("progress", "favorite", favorite)
 	cfg.set_value("progress", "favorite_skin", favorite_skin)
 	cfg.set_value("progress", "best_rank", best_rank)
+	cfg.set_value("progress", "story_version", story_version)
+	cfg.set_value("progress", "story_seen", _pack_seen(story_seen))
 	cfg.save(SAVE_PATH)
 	Cloud.push(_snapshot())
 	_push_profile()
@@ -1322,12 +1656,16 @@ func _snapshot() -> Dictionary:
 		"unlocked": unlocked,
 		"cleared": cleared,
 		"diamonds": diamonds,
+		"coins": coins,
+		"upgrades": _pack_ranks(),
 		"saber_skin": saber_skin,
 		"saber_worn": saber_worn,
 		"sheet_owned": _pack_keys(sheet_owned),
 		"sheet_worn": _pack_keys(sheet_worn),
 		"diamond_paid": diamond_paid,
 		"code_paid": code_paid,
+		"story_version": story_version,
+		"story_seen": _pack_seen(story_seen),
 	}
 
 
@@ -1416,14 +1754,24 @@ func _merge_from_cloud(data: Dictionary) -> void:
 	if data.is_empty() or not data.has("diamonds"):
 		_save_progress()
 		return
-	unlocked = maxi(unlocked, clampi(_whole(data.get("unlocked", 1), 1), 1, Levels.count()))
-	cleared = maxi(cleared, clampi(_whole(data.get("cleared", 0), 0), 0, Levels.count()))
+	var cloud_version := _whole(data.get("story_version", 0), 0)
+	if cloud_version >= Story.VERSION:
+		unlocked = maxi(unlocked, clampi(_whole(data.get("unlocked", 1), 1), 1, Levels.count()))
+		cleared = maxi(cleared, clampi(_whole(data.get("cleared", 0), 0), 0, Levels.count()))
+		for key in _unpack_seen(str(data.get("story_seen", ""))).keys():
+			story_seen[str(key)] = true
+	diamond_paid = maxi(diamond_paid, clampi(_whole(data.get("diamond_paid", 1), 1), 1, Levels.count()))
+	story_version = Story.VERSION
 	var cloud_diamonds := clampi(_whole(data.get("diamonds", 0), 0), 0, 200000000)
 	var base_diamonds := diamonds - _navy_grant_amount
 	if base_diamonds < 0:
 		base_diamonds = 0
 	diamonds = maxi(base_diamonds, cloud_diamonds)
-	diamond_paid = maxi(diamond_paid, clampi(_whole(data.get("diamond_paid", 1), 1), 1, Levels.count()))
+	coins = maxi(coins, clampi(_whole(data.get("coins", 0), 0), 0, 20000000))
+	var cloud_ranks := _unpack_ranks(str(data.get("upgrades", "")))
+	for key in cloud_ranks.keys():
+		var rank_id := str(key)
+		upgrades[rank_id] = maxi(_rank_of(rank_id), int(cloud_ranks[rank_id]))
 	code_paid = code_paid or _flag(data.get("code_paid", false))
 	var cloud_owned := _unpack_keys(str(data.get("sheet_owned", "")))
 	for key in cloud_owned.keys():
@@ -1453,6 +1801,8 @@ func _merge_from_cloud(data: Dictionary) -> void:
 		_show_shop()
 	elif screen == "skin":
 		_show_skin()
+	elif screen == "upgrade":
+		_show_upgrade()
 
 
 func _needs_name() -> bool:
@@ -1576,7 +1926,7 @@ func _show_rank() -> void:
 func _paint_rank(fetch: bool) -> void:
 	screen = "rank"
 	var box := _open_page("Ranking")
-	var hint := UiSkin.label("A higher road ranks first. The same road ranks the shorter time first.", 16, Color("6b3a32"))
+	var hint := UiSkin.label("A higher level ranks first. The same level ranks the shorter time first.", 16, Color("6b3a32"))
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1648,6 +1998,8 @@ func _show_profile(row: Dictionary, from_rank: bool) -> void:
 	var title := _clean_name(str(viewing.get("name", "")))
 	if title == "":
 		title = "Profile"
+	if own:
+		title += "   ·   Hero rank %d" % _rank_of("hero")
 	var box := _open_page(title)
 	var tag := _rank_tag(_whole(viewing.get("best_rank", 0), 0))
 	var place := _whole(viewing.get("place", 0), 0)
@@ -1851,13 +2203,14 @@ func _apply_profile(data: Dictionary) -> void:
 	var cloud_name := _clean_name(str(data.get("name", "")))
 	var cloud_level := clampi(_whole(data.get("cleared", 0), 0), 0, Levels.count())
 	var cloud_time := _seconds(data.get("clear_time", 0.0))
+	var profile_version := _whole(data.get("story_version", 0), 0)
 	if cloud_name.length() >= 2:
 		game_name = cloud_name
-		if _better_record(cloud_level, cloud_time, rank_cleared, rank_time):
+		if profile_version >= Story.VERSION and _better_record(cloud_level, cloud_time, rank_cleared, rank_time):
 			rank_cleared = cloud_level
 			rank_time = cloud_time
 		var fav := str(data.get("favorite", ""))
-		favorite = fav if _roster_known(fav) else ""
+		favorite = fav if Story.known_ids(cleared).has(fav) else ""
 		favorite_skin = _draw_skin(favorite, str(data.get("favorite_skin", "")), false)
 		var cloud_best := clampi(_whole(data.get("best_rank", 0), 0), 0, 100000)
 		if cloud_best > 0 and (best_rank == 0 or cloud_best < best_rank):
@@ -1890,6 +2243,7 @@ func _profile_body() -> Dictionary:
 		"hero_sheet": bool(sheet_worn.get("hero", false)),
 		"saber_worn": "none",
 		"best_rank": best_rank,
+		"story_version": Story.VERSION,
 	}
 
 
@@ -1957,7 +2311,7 @@ func _rank_tag(rank: int) -> String:
 
 func _road_name(level_index: int) -> String:
 	if level_index < 1:
-		return "No road yet"
+		return "No level yet"
 	var row: Dictionary = Levels.level(level_index)
 	return str(row.get("name", "Road %d" % level_index))
 
@@ -1979,6 +2333,26 @@ func _seconds(value: Variant) -> float:
 	if str(value).is_valid_float():
 		return clampf(float(str(value)), 0.0, 86400.0)
 	return 0.0
+
+
+func _pack_seen(bag: Dictionary) -> String:
+	var parts: PackedStringArray = PackedStringArray()
+	for key in bag.keys():
+		var id := str(key).strip_edges()
+		if id != "":
+			parts.append(id)
+	return ",".join(parts)
+
+
+func _unpack_seen(text: String) -> Dictionary:
+	var bag: Dictionary = {}
+	if text == "":
+		return bag
+	for part in text.split(",", false):
+		var id := str(part).strip_edges()
+		if id != "":
+			bag[id] = true
+	return bag
 
 
 func _pack_keys(bag: Dictionary) -> String:
@@ -2009,6 +2383,7 @@ func _bind_net() -> void:
 	Net.linked.connect(_on_duel_linked)
 	Net.dropped.connect(_on_duel_dropped)
 	Net.loadout_got.connect(_on_loadout_got)
+	Net.terms_got.connect(_on_terms)
 	Net.begin_match.connect(_on_begin_match)
 	Net.reselect_got.connect(_on_reselect)
 	Net.rematch_got.connect(_on_rematch)
@@ -2026,6 +2401,9 @@ func _duel_probe() -> void:
 
 
 func _show_duel() -> void:
+	if not Story.duel_open(cleared):
+		_show_menu()
+		return
 	screen = "duel"
 	_clear_screens()
 	duel_status = null
@@ -2044,9 +2422,17 @@ func _show_duel() -> void:
 	duel_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(duel_status)
 	if Net.live:
+		var live_terms := UiSkin.label(_duel_terms_line(), 16, Color("6b3a32"))
+		live_terms.autowrap_mode = TextServer.AUTOWRAP_WORD
+		live_terms.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		box.add_child(live_terms)
 		box.add_child(_menu_button("Choose 6", Color("c44536"), _show_select, 420))
 		box.add_child(_menu_button("Leave", Color("6b3a32"), show_title, 220, 18))
 		return
+	var own_text := "Your ranks  ·  on" if duel_choice != "max" else "Your ranks"
+	var max_text := "Maximum  ·  on" if duel_choice == "max" else "Maximum"
+	box.add_child(_menu_button(own_text, Color("e6c36a"), _set_duel_choice.bind("own"), 420))
+	box.add_child(_menu_button(max_text, Color("c44536"), _set_duel_choice.bind("max"), 420))
 	if OS.has_feature("web"):
 		box.add_child(_menu_button("Find opponent", Color("7d9a6a"), Net.find_opponent, 420))
 	else:
@@ -2083,6 +2469,15 @@ func _on_duel_linked() -> void:
 	duel_sent = false
 	left_ids = []
 	right_ids = []
+	left_rank_pack = ""
+	right_rank_pack = ""
+	if Net.role == "host":
+		duel_mode = duel_choice
+		terms_known = true
+		Net.announce_terms(duel_mode)
+	else:
+		duel_mode = "own"
+		terms_known = false
 	_show_select()
 
 
@@ -2100,7 +2495,7 @@ func _ready_duel() -> void:
 		start_button.disabled = true
 	if count_label != null:
 		count_label.text = "Waiting for the other ninja."
-	Net.announce_loadout(loadout.duplicate(), _worn_ids(), saber_worn == "navy")
+	Net.announce_loadout(loadout.duplicate(), _worn_ids(), saber_worn == "navy", _pack_ranks(), duel_mode)
 
 
 func _worn_ids() -> Array:
@@ -2111,19 +2506,36 @@ func _worn_ids() -> Array:
 	return out
 
 
-func _on_loadout_got(side: int, ids: Array, sheets: Array, navy: bool) -> void:
+func _on_terms(mode: String) -> void:
+	duel_mode = "max" if mode == "max" else "own"
+	terms_known = true
+	if screen == "select" and picking_duel:
+		_show_select()
+
+
+func _on_loadout_got(side: int, ids: Array, sheets: Array, navy: bool, ranks: String, mode: String) -> void:
 	if Net.role != "host" or duel_started:
 		return
 	var skin := {"sheets": sheets.duplicate(), "navy": navy}
 	if side == 0:
 		left_ids = ids.duplicate()
 		left_skin = skin
+		left_rank_pack = ranks
+		if mode == "max" or mode == "own":
+			duel_mode = mode
 	else:
 		right_ids = ids.duplicate()
 		right_skin = skin
+		right_rank_pack = ranks
 	if left_ids.size() == 6 and right_ids.size() == 6:
 		duel_started = true
-		Net.announce_start(left_ids, right_ids, {"left": left_skin, "right": right_skin})
+		Net.announce_start(left_ids, right_ids, {
+			"left": left_skin,
+			"right": right_skin,
+			"mode": duel_mode,
+			"left_ranks": left_rank_pack,
+			"right_ranks": right_rank_pack,
+		})
 
 
 func _on_begin_match(left: Array, right: Array, skins: Dictionary) -> void:
@@ -2152,6 +2564,8 @@ func _on_reselect() -> void:
 	duel_sent = false
 	left_ids = []
 	right_ids = []
+	left_rank_pack = ""
+	right_rank_pack = ""
 	_drop_battle()
 	picking_duel = true
 	_show_select()
@@ -2183,10 +2597,14 @@ func _layout_check() -> void:
 		var quit_rect := quit_b.get_global_rect()
 		quit_ok = quit_rect.position.y >= 0.0 and quit_rect.end.y <= vp.y + 1.0
 		print("TITLE quit=", quit_rect, " ok=", quit_ok)
-	if duel_b != null:
-		var duel_rect := duel_b.get_global_rect()
-		duel_ok = duel_rect.position.y >= 0.0 and duel_rect.end.y <= vp.y + 1.0
-		print("TITLE duel=", duel_rect, " ok=", duel_ok)
+	if Story.duel_open(cleared):
+		if duel_b != null:
+			var duel_rect := duel_b.get_global_rect()
+			duel_ok = duel_rect.position.y >= 0.0 and duel_rect.end.y <= vp.y + 1.0
+			print("TITLE duel=", duel_rect, " ok=", duel_ok)
+	else:
+		duel_ok = duel_b == null
+		print("TITLE duel locked ok=", duel_ok)
 	if play != null:
 		var play_rect := play.get_global_rect()
 		play_ok = play_rect.position.y >= 0.0 and play_rect.end.y <= vp.y + 1.0
@@ -2222,7 +2640,8 @@ func _layout_check() -> void:
 		print("LEVELS back=", level_rect, " vp=", vp, " ok=", back_ok)
 	var roads := 0
 	var first_open := false
-	var saw_night := false
+	var saw_end := false
+	var last_name := str(Levels.level(Levels.count()).get("name", ""))
 	for node in _collect_buttons(self):
 		var b: Button = node
 		if b.text == "Back":
@@ -2230,27 +2649,28 @@ func _layout_check() -> void:
 		roads += 1
 		if b.text.find("First road") >= 0 and not b.disabled:
 			first_open = true
-		if b.text.find("Night march") >= 0:
-			saw_night = true
-		var road_rules: Dictionary = Levels.level(roads)
-		print("LEVEL ", b.disabled, " ", b.text.replace("\n", " / "), " +", float(road_rules["income"]))
-	var win := play_ok and quit_ok and duel_ok and how_ok and back_ok and roads == 10 and first_open and saw_night and body_h > scroll_h and scroll_h > 40.0
+		if last_name != "" and b.text.find(last_name) >= 0:
+			saw_end = true
+		if roads <= Levels.count():
+			var road_rules: Dictionary = Levels.level(roads)
+			print("LEVEL ", b.disabled, " ", b.text.replace("\n", " / "), " +", float(road_rules["income"]))
+	var win := play_ok and quit_ok and duel_ok and how_ok and back_ok and roads == Levels.count() and first_open and saw_end and body_h > scroll_h and scroll_h > 40.0
 	print("LAYOUT ", "OK" if win else "FAIL")
 	get_tree().quit(0 if win else 1)
 
 
 func _unlock_check() -> void:
 	var first: Dictionary = Levels.level(1)
-	var last: Dictionary = Levels.level(10)
+	var last: Dictionary = Levels.level(Levels.count())
 	print("RULES ", float(first["income"]), " ", float(first["start"]), " ", float(last["income"]), " ", float(last["start"]), " ", float(last["oni_at"]), " ", bool(last["paired"]), " ", float(last["hp_mult"]))
 	var before := unlocked
 	note_clear(1)
 	var after1 := unlocked
-	note_clear(10)
-	var after10 := unlocked
+	note_clear(Levels.count())
+	var after_last := unlocked
 	note_clear(2)
-	print("UNLOCK before=", before, " after1=", after1, " after10=", after10, " kept=", unlocked)
-	var ok := after1 >= before and after1 >= mini(Levels.count(), maxi(before, 2)) and after10 == Levels.count() and unlocked == Levels.count()
+	print("UNLOCK before=", before, " after1=", after1, " after_last=", after_last, " kept=", unlocked)
+	var ok := after1 >= before and after1 >= mini(Levels.count(), maxi(before, 2)) and after_last == Levels.count() and unlocked == Levels.count()
 	print("UNLOCK ", "OK" if ok else "FAIL")
 	get_tree().quit(0 if ok else 1)
 
@@ -2262,6 +2682,8 @@ func _win_check() -> void:
 	unlocked = 5
 	cleared = 4
 	chosen_level = 5
+	_mark_story(Story.intro_id(5))
+	_mark_story(Story.intro_id(6))
 	_start_battle(["sword", "archer", "shield", "lancer", "berserker", "heal"], "", 5)
 	await get_tree().process_frame
 	var battle := _battle_node()
@@ -2293,7 +2715,7 @@ func _win_check() -> void:
 	for _i in 4:
 		await get_tree().process_frame
 	vp = get_viewport().get_visible_rect().size
-	var title_btn := _button_named(self, "Next level · Rising curse")
+	var title_btn := _button_named(self, "Next level · The ridge")
 	var title_on := false
 	if title_btn != null:
 		var title_rect := title_btn.get_global_rect()

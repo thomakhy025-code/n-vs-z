@@ -231,6 +231,10 @@ const BOOT := """
       sheet_worn: String(data.sheet_worn || ''),
       diamond_paid: whole(data.diamond_paid),
       code_paid: !!data.code_paid,
+      coins: whole(data.coins),
+      upgrades: String(data.upgrades || ''),
+      story_version: whole(data.story_version),
+      story_seen: String(data.story_seen || ''),
       updated: firebase.firestore.FieldValue.serverTimestamp()
     };
     a.db.collection('saves').doc(a.auth.currentUser.uid).set(body).catch(function() {
@@ -257,7 +261,8 @@ const BOOT := """
     var saber = 'none';
     var body = {
       name: name,
-      cleared: Math.min(10, whole(data.cleared)),
+      cleared: Math.min(70, whole(data.cleared)),
+      story_version: whole(data.story_version),
       clear_time: seconds(data.clear_time),
       favorite: fav,
       favorite_skin: skin,
@@ -284,7 +289,7 @@ const BOOT := """
         rows.push({
           uid: doc.id,
           name: keepLetters(d.name),
-          cleared: Math.min(10, whole(d.cleared)),
+          cleared: Math.min(70, whole(d.cleared)),
           clear_time: seconds(d.clear_time),
           favorite: String(d.favorite || ''),
           favorite_skin: String(d.favorite_skin || ''),

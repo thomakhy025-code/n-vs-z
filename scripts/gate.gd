@@ -52,14 +52,17 @@ func _draw() -> void:
 	if side == 0 or clan_gate:
 		_player_gate(ratio, span)
 	else:
-		_enemy_gate(ratio, span)
+		if _human_army():
+			_army_gate(ratio, span)
+		else:
+			_enemy_gate(ratio, span)
 	var bar_y := span.x - 22.0
 	draw_rect(Rect2(-34, bar_y, 68, 8), Color(0, 0, 0, 0.65))
 	var fill := Color("7dce6a") if ratio > 0.35 else Color("e24b3b")
 	draw_rect(Rect2(-34, bar_y, 68.0 * ratio, 8), fill)
 	var font: Font = ThemeDB.fallback_font
 	if font != null:
-		var title := "CLAN" if side == 0 or clan_gate else "CURSE"
+		var title := "CLAN" if side == 0 or clan_gate else ("ARMY" if _human_army() else "CURSE")
 		draw_string(font, Vector2(-22, bar_y - 6.0), title, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color("f3e6c8"))
 
 
@@ -97,6 +100,31 @@ func _player_gate(ratio: float, span: Vector2) -> void:
 		draw_line(Vector2(-20, bottom - 46), Vector2(6, bottom - 12), Color(0, 0, 0, 0.45), 2.0)
 	if ratio < 0.3:
 		draw_line(Vector2(18, top + 46), Vector2(8, (top + bottom) * 0.5), Color(0, 0, 0, 0.55), 2.0)
+
+
+func _human_army() -> bool:
+	if clan_gate or battle == null or not (battle.rules is Dictionary):
+		return false
+	return str(battle.rules.get("faction", "")) == "human"
+
+
+func _army_gate(ratio: float, span: Vector2) -> void:
+	var top := span.x
+	var bottom := span.y
+	var stone := Color("3e4654")
+	if ratio < 0.35:
+		stone = stone.darkened(0.25)
+	draw_rect(Rect2(-48, bottom - 8, 96, 18), Color("2a241c"))
+	draw_rect(Rect2(-32, top + 18, 18, bottom - top - 26), stone)
+	draw_rect(Rect2(14, top + 18, 18, bottom - top - 26), stone)
+	draw_rect(Rect2(-36, top + 8, 72, 16), stone.lightened(0.08))
+	draw_colored_polygon(PackedVector2Array([
+		Vector2(-6, top + 28),
+		Vector2(28, top + 46),
+		Vector2(-6, top + 78),
+	]), Color("c44536"))
+	if ratio < 0.55:
+		draw_line(Vector2(-18, bottom - 30), Vector2(10, top + 40), Color(0, 0, 0, 0.45), 2.0)
 
 
 func _enemy_gate(ratio: float, span: Vector2) -> void:

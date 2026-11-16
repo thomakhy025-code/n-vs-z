@@ -1,18 +1,20 @@
 extends RefCounted
 
 
-static func apply(node) -> void:
+static func apply(node, power: float = 0.2) -> void:
 	node.level_stacks += 1
+	node.level_power = float(node.level_power) + power
 	_recompute(node)
 
 
-static func remove(node) -> void:
+static func remove(node, power: float = 0.2) -> void:
 	node.level_stacks = maxi(0, node.level_stacks - 1)
+	node.level_power = maxf(0.0, float(node.level_power) - power)
 	_recompute(node)
 
 
 static func _recompute(node) -> void:
-	var new_mult := 1.0 + 0.2 * float(node.level_stacks)
+	var new_mult := 1.0 + float(node.level_power)
 	var new_max := float(node.base_max_hp) * new_mult
 	var delta := new_max - float(node.max_hp)
 	node.max_hp = new_max

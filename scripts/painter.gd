@@ -5,6 +5,23 @@ static var saber_navy: bool = false
 static var sheet_on: Dictionary = {}
 
 
+static func as_monster(look: Dictionary) -> Dictionary:
+	var row := look.duplicate()
+	row["skin"] = Color("9aa884")
+	row["cloth"] = Color("242c22")
+	row["trim"] = Color("7dce6a")
+	row["horns"] = true
+	return row
+
+
+static func as_human(look: Dictionary) -> Dictionary:
+	var row := look.duplicate()
+	row["cloth"] = Color("3e4654")
+	row["trim"] = Color("c44536")
+	row["sash"] = true
+	return row
+
+
 static func look(kind: String) -> Dictionary:
 	var sheet := false
 	if sheet_on.has(kind):
@@ -70,6 +87,20 @@ static func _painted(kind: String) -> Dictionary:
 			return _look(Color("e0c2a0"), Color("3d3428"), Color("e6c36a"), "polearm", false, "soldier")
 		"boss":
 			return _look(Color("e0c2a0"), Color("241c16"), Color("e6c36a"), "polearm", false, "soldier")
+		"spear":
+			return _soldier(Color("3e4c62"), Color("c44536"), "spear", "cap", true)
+		"scout":
+			return _soldier(Color("6d7a52"), Color("e7c07a"), "dagger", "hood", false)
+		"guard":
+			return _soldier(Color("2a3140"), Color("9aa4b0"), "hammer", "heavy", true)
+		"crossbow":
+			return _soldier(Color("4a4034"), Color("6b7c4a"), "crossbow", "kettle", true)
+		"satchel":
+			return _soldier(Color("5c4034"), Color("e24b3b"), "bomb", "bare", false)
+		"captain":
+			return _soldier(Color("241c18"), Color("e6c36a"), "polearm", "crest", true)
+		"general":
+			return _soldier(Color("1a1612"), Color("f0d78c"), "polearm", "crest", true)
 		_:
 			return _look(Color("f0c9a0"), Color("1a1e28"), Color("c5ccd6"), "katana", false, "ninja")
 
@@ -94,7 +125,17 @@ static func call_id(paint: String) -> String:
 			return "call_magic"
 		"walker", "runner", "spitter":
 			return "call_dead"
-		"oni", "boss":
+		"spear":
+			return "call_spear"
+		"scout":
+			return "call_blade"
+		"guard":
+			return "call_heavy"
+		"crossbow":
+			return "call_bow"
+		"satchel":
+			return "call_bomb"
+		"oni", "boss", "captain", "general":
 			return "call_oni"
 		"hero":
 			return "call_hero"
@@ -138,7 +179,7 @@ static func strike_due(weapon: String, beat: int, along: float) -> bool:
 
 
 static func cycle_time(paint: String) -> float:
-	if paint == "runner":
+	if paint == "runner" or paint == "scout":
 		return 0.62
 	return 0.92
 
@@ -155,10 +196,31 @@ static func call_pitch(paint: String) -> float:
 			return 0.92
 		"brute":
 			return 0.86
-		"walker":
+		"walker", "spear":
 			return 0.94
+		"scout":
+			return 1.16
+		"guard":
+			return 0.86
+		"crossbow":
+			return 1.08
+		"satchel":
+			return 0.92
+		"captain", "general":
+			return 0.88
 		_:
 			return 1.0
+
+
+static func is_human_body(paint: String) -> bool:
+	return paint == "spear" or paint == "scout" or paint == "guard" or paint == "crossbow" or paint == "satchel" or paint == "captain" or paint == "general"
+
+
+static func _soldier(cloth: Color, trim: Color, weapon: String, helm: String, pack: bool) -> Dictionary:
+	var row := _look(Color("e7c2a4"), cloth, trim, weapon, false, "soldier", pack)
+	row["sash"] = true
+	row["helm"] = helm
+	return row
 
 
 static func _look(skin: Color, cloth: Color, trim: Color, weapon: String, mount: bool, faction: String, pack: bool = true) -> Dictionary:
@@ -1026,7 +1088,11 @@ static func paint_local(ci: CanvasItem, look: Dictionary, pose: Dictionary) -> v
 	_torso(ci, chest, cloth, trim, faction)
 	if not mount:
 		_leg(ci, chest + Vector2(3.0, 12.0), Vector2(6.0 + step * 12.0, ground), cloth.darkened(0.08), 3.5)
-	_head(ci, chest + Vector2(1.6, -16.0), skin, cloth, trim, faction, weapon, phase)
+	_head(ci, chest + Vector2(1.6, -16.0), skin, cloth, trim, faction, weapon, phase, str(look.get("helm", "")))
+	if bool(look.get("horns", false)):
+		_horns(ci, chest + Vector2(1.6, -24.0), trim)
+	if bool(look.get("sash", false)):
+		_line(ci, chest + Vector2(-9.0, 1.0), chest + Vector2(10.0, 3.0), Color("c44536"), 3.0)
 	var sleeve := cloth.darkened(0.12)
 	var rear_tone := skin if faction == "soldier" else cloth.darkened(0.05)
 	_arm(ci, chest + Vector2(-4.0, -1.0), rear, rear_tone, sleeve, 2.6)
@@ -1230,11 +1296,11 @@ static func _cycle_id(paint: String, weapon: String) -> String:
 			return "horse"
 		"assassin":
 			return "assassin"
-		"runner":
+		"runner", "scout":
 			return "runner"
 		"suicide":
 			return "bomb_dive"
-		"bomber":
+		"bomber", "satchel":
 			return "bomb_throw"
 		_:
 			return weapon
@@ -1603,7 +1669,12 @@ static func _torso(ci: CanvasItem, chest: Vector2, cloth: Color, trim: Color, fa
 	_line(ci, chest + Vector2(-2.0, -7.0), chest + Vector2(7.0, 9.0), trim, 1.6)
 
 
-static func _head(ci: CanvasItem, at: Vector2, skin: Color, cloth: Color, trim: Color, faction: String, weapon: String, phase: String) -> void:
+static func _horns(ci: CanvasItem, at: Vector2, trim: Color) -> void:
+	_line(ci, at + Vector2(-4.0, -2.0), at + Vector2(-9.0, -12.0), trim.darkened(0.15), 2.4)
+	_line(ci, at + Vector2(3.0, -3.0), at + Vector2(9.0, -13.0), trim.darkened(0.15), 2.4)
+
+
+static func _head(ci: CanvasItem, at: Vector2, skin: Color, cloth: Color, trim: Color, faction: String, weapon: String, phase: String, helm: String = "") -> void:
 	if faction == "ninja":
 		_ellipse(ci, at + Vector2(-4.0, 1.0), 8.2, 8.4, cloth.darkened(0.15))
 		_ellipse(ci, at + Vector2(2.4, 0.2), 6.4, 7.0, cloth)
@@ -1615,10 +1686,24 @@ static func _head(ci: CanvasItem, at: Vector2, skin: Color, cloth: Color, trim: 
 		if weapon == "axe":
 			_line(ci, at + Vector2(-2.0, -6.0), at + Vector2(2.0, -2.0), cloth.lightened(0.1), 1.6)
 		return
-	_ellipse(ci, at + Vector2(-1.0, -1.0), 7.4, 6.6, cloth.darkened(0.28))
+	if helm == "bare":
+		_ellipse(ci, at + Vector2(-1.0, -2.0), 7.6, 4.2, cloth.darkened(0.2))
+		_ellipse(ci, at + Vector2(1.4, 1.6), 6.4, 6.2, skin)
+		_dot(ci, at + Vector2(4.0, 0.4), 1.05, Color(0.12, 0.1, 0.08))
+		return
+	if helm == "hood":
+		_ellipse(ci, at + Vector2(-1.2, -0.4), 8.2, 8.0, cloth.darkened(0.18))
+		_ellipse(ci, at + Vector2(2.6, 2.2), 4.8, 4.4, skin)
+		_dot(ci, at + Vector2(4.2, 1.2), 1.0, Color(0.12, 0.1, 0.08))
+		return
+	var helm_w := 8.4 if helm == "heavy" else 7.4
+	var helm_h := 7.4 if helm == "heavy" else 6.6
+	_ellipse(ci, at + Vector2(-1.0, -1.0), helm_w, helm_h, cloth.darkened(0.28))
+	if helm == "kettle":
+		_line(ci, at + Vector2(-8.0, 1.2), at + Vector2(9.0, 1.6), cloth.darkened(0.35), 2.2)
 	_ellipse(ci, at + Vector2(2.2, 2.4), 4.2, 3.2, skin)
 	_line(ci, at + Vector2(-1.0, -0.2), at + Vector2(6.4, 0.4), Color(0.1, 0.1, 0.08), 2.4)
-	if weapon == "polearm":
+	if helm == "crest" or weapon == "polearm":
 		_line(ci, at + Vector2(0.0, -6.0), at + Vector2(1.0, -16.0), trim, 2.4)
 		_ellipse(ci, at + Vector2(1.0, -16.0), 3.2, 2.2, trim)
 
