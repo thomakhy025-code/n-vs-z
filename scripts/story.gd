@@ -152,8 +152,8 @@ static func intro_panels(level_index: int) -> Array:
 	if id == "leave":
 		return _leave()
 	return [_panel("mountain", str(_CARDS[level_index]), [
-		_fig("hero", 0.34, "walk", false, false),
-		_fig("sword", 0.62, "idle", false, false),
+		_fig("hero", 0.34, "pace", false, false),
+		_fig("sword", 0.62, "low", false, false),
 	])]
 
 
@@ -172,74 +172,115 @@ static func outro_panels(level_index: int) -> Array:
 static func _prologue() -> Array:
 	return [
 		_panel("village", "They were small, and the village was not kind.", [
-			_fig("hero", 0.28, "hurt", false, false),
-			_fig("walker", 0.62, "idle", true, false, true),
-			_fig("runner", 0.8, "walk", true, false, true),
+			_fig("hero", 0.22, "small", false, false),
+			_fig("walker", 0.58, "shun", true, false, true),
+			_fig("runner", 0.84, "away", true, false, true),
 		], "Get out."),
 		_panel("village", "There was no place for them there.", [
-			_fig("hero", 0.24, "walk", false, false),
-			_fig("sword", 0.4, "walk", false, false),
+			_fig("hero", 0.24, "pace", false, false),
+			_fig("sword", 0.4, "low", false, false),
 		], "Leave."),
 		_panel("climb", "They took the thin road into the cloud.", [
-			_fig("hero", 0.3, "walk", false, false),
-			_fig("sword", 0.48, "walk", false, false),
+			_fig("hero", 0.3, "pace", false, false),
+			_fig("sword", 0.48, "pace", false, false),
 		]),
 		_panel("mountain", "The mountain did not know their names. That was enough.", [
-			_fig("hero", 0.36, "idle", false, false),
-			_fig("sword", 0.58, "idle", false, false),
+			_fig("hero", 0.36, "still", false, false),
+			_fig("sword", 0.58, "low", false, false),
 		]),
 		_panel("camp", "For a while, the wind was the only visitor.", [
-			_fig("hero", 0.42, "idle", false, false),
+			_fig("hero", 0.42, "still", false, false),
 		]),
 		_panel("night", "Then shapes came up the lower road.", [
-			_fig("walker", 0.58, "walk", true, true),
-			_fig("brute", 0.76, "walk", true, true),
+			_fig("walker", 0.58, "creep", true, true),
+			_fig("brute", 0.76, "creep", true, true),
 		], "", true),
 		_panel("night", "We only know this.", [
-			_fig("hero", 0.34, "act", false, false),
-			_fig("sword", 0.52, "act", false, false),
+			_fig("hero", 0.34, "vow", false, false),
+			_fig("sword", 0.52, "offer", false, false),
 		], "The sword."),
 		_panel("night", "The mountain learned their names too.", [
-			_fig("hero", 0.3, "idle", false, false),
-			_fig("oni", 0.72, "idle", true, true),
+			_fig("hero", 0.3, "still", false, false),
+			_fig("oni", 0.72, "loom", true, true),
 		]),
 	]
 
 
 static func _lesson(id: String) -> Array:
 	var lines: Array = _TAUGHT[id]
+	var coming := _approach_tale(id)
 	return [
 		_panel("road", str(lines[0]), [
-			_fig(id, 0.55, "walk", true, true),
-			_fig(id, 0.7, "walk", true, true),
-			_fig(id, 0.86, "idle", true, true),
+			_fig(id, 0.55, coming, true, true),
+			_fig(id, 0.7, coming, true, true),
+			_fig(id, 0.86, "ordered", true, true),
 		], "", true),
 		_panel("road", str(lines[1]), [
-			_fig("hero", 0.28, "act", false, false),
-			_fig("sword", 0.44, "act", false, false),
-			_fig(id, 0.74, "hurt", true, true),
+			_fig("hero", 0.28, "guard", false, false),
+			_fig("sword", 0.44, "guard", false, false),
+			_fig(id, 0.74, "yield", true, true),
 		]),
 		_panel("camp", str(lines[2]), [
-			_fig("hero", 0.3, "idle", false, false),
-			_fig(id, 0.55, "idle", false, false),
+			_fig("hero", 0.3, "still", false, false),
+			_fig(id, 0.55, _learn_tale(id), false, false),
 		]),
 	]
+
+
+static func _approach_tale(id: String) -> String:
+	match id:
+		"horse":
+			return "rein"
+		"berserker":
+			return "wide"
+		"assassin":
+			return "slip"
+		"suicide":
+			return "rush"
+		_:
+			return "creep"
+
+
+static func _learn_tale(id: String) -> String:
+	match id:
+		"archer":
+			return "draw"
+		"lancer":
+			return "plant"
+		"shield":
+			return "brace"
+		"horse":
+			return "rein"
+		"assassin":
+			return "slip"
+		"saber":
+			return "weigh"
+		"suicide":
+			return "cost"
+		"heal":
+			return "mend"
+		"level":
+			return "read"
+		"berserker":
+			return "wide"
+		_:
+			return "offer"
 
 
 static func _quiet() -> Array:
 	return [
 		_panel("mountain", "Months pass. The monsters stop coming.", [
-			_fig("hero", 0.4, "idle", false, false),
-			_fig("berserker", 0.62, "idle", false, false),
+			_fig("hero", 0.4, "still", false, false),
+			_fig("berserker", 0.62, "wide", false, false),
 		]),
 		_panel("camp", "Other clans have heard of the mountain. One ninja can meet one ninja.", [
-			_fig("hero", 0.32, "idle", false, false),
-			_fig("sword", 0.68, "idle", true, false),
+			_fig("hero", 0.32, "still", false, false),
+			_fig("sword", 0.68, "offer", true, false),
 		]),
 		_panel("banners", "Then banners show on the lower road.", [
-			_fig("hero", 0.26, "walk", false, false),
-			_fig("walker", 0.62, "walk", true, false, true),
-			_fig("brute", 0.8, "walk", true, false, true),
+			_fig("hero", 0.26, "guard", false, false),
+			_fig("walker", 0.62, "parade", true, false, true),
+			_fig("brute", 0.8, "parade", true, false, true),
 		]),
 	]
 
@@ -247,17 +288,17 @@ static func _quiet() -> Array:
 static func _return() -> Array:
 	return [
 		_panel("night", "The monsters come back up the mountain.", [
-			_fig("hero", 0.28, "idle", false, false),
-			_fig("brute", 0.62, "walk", true, true),
-			_fig("oni", 0.8, "walk", true, true),
+			_fig("hero", 0.28, "guard", false, false),
+			_fig("brute", 0.62, "creep", true, true),
+			_fig("oni", 0.8, "loom", true, true),
 		], "", true),
 		_panel("camp", "The clan asks why monsters and human soldiers have both come for them.", [
-			_fig("hero", 0.34, "idle", false, false),
-			_fig("shield", 0.52, "idle", false, false),
-			_fig("heal", 0.7, "idle", false, false),
+			_fig("hero", 0.34, "ask", false, false),
+			_fig("shield", 0.52, "brace", false, false),
+			_fig("heal", 0.7, "mend", false, false),
 		]),
 		_panel("camp", "They cannot prove it. They say the soldiers made the monsters and sent them.", [
-			_fig("hero", 0.4, "act", false, false),
+			_fig("hero", 0.4, "ask", false, false),
 		], "A human hand."),
 	]
 
@@ -265,18 +306,18 @@ static func _return() -> Array:
 static func _leave() -> Array:
 	return [
 		_panel("camp", "They will not wait for the next wave to explain itself.", [
-			_fig("hero", 0.36, "idle", false, false),
-			_fig("saber", 0.56, "idle", false, false),
+			_fig("hero", 0.36, "still", false, false),
+			_fig("saber", 0.56, "weigh", false, false),
 		]),
 		_panel("climb", "They leave their gate, to see the world, and walk toward the village where they were born.", [
-			_fig("hero", 0.28, "walk", false, false),
-			_fig("sword", 0.44, "walk", false, false),
-			_fig("horse", 0.64, "walk", false, false),
+			_fig("hero", 0.28, "pace", false, false),
+			_fig("sword", 0.44, "low", false, false),
+			_fig("horse", 0.64, "rein", false, false),
 		]),
 		_panel("road", "On that road, both armies find them.", [
-			_fig("brute", 0.22, "walk", false, true),
-			_fig("hero", 0.48, "act", false, false),
-			_fig("walker", 0.74, "walk", true, false, true),
+			_fig("brute", 0.22, "creep", false, true),
+			_fig("hero", 0.48, "guard", false, false),
+			_fig("walker", 0.74, "parade", true, false, true),
 		], "", true),
 	]
 
@@ -284,17 +325,17 @@ static func _leave() -> Array:
 static func _cliff() -> Array:
 	return [
 		_panel("cliff", "They stand on a cliff above the old country.", [
-			_fig("hero", 0.32, "idle", false, false),
-			_fig("berserker", 0.5, "idle", false, false),
+			_fig("hero", 0.32, "edge", false, false),
+			_fig("berserker", 0.5, "wide", false, false),
 		]),
 		_panel("war", "Below them, monsters and human soldiers fight each other.", [
-			_fig("oni", 0.22, "act", false, true),
-			_fig("brute", 0.38, "act", false, true),
-			_fig("walker", 0.62, "act", true, false, true),
-			_fig("spitter", 0.8, "act", true, false, true),
+			_fig("oni", 0.22, "loom", false, true),
+			_fig("brute", 0.38, "creep", false, true),
+			_fig("walker", 0.62, "parade", true, false, true),
+			_fig("spitter", 0.8, "draw", true, false, true),
 		], "", true),
 		_panel("cliff", "It is a war between the two sides. The clan still does not know who started it.", [
-			_fig("hero", 0.42, "idle", false, false),
+			_fig("hero", 0.42, "edge", false, false),
 		]),
 	]
 

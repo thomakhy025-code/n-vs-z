@@ -1037,7 +1037,7 @@ static func paint_local(ci: CanvasItem, look: Dictionary, pose: Dictionary) -> v
 	var paint := str(look.get("paint", ""))
 	var faction := str(look.get("faction", "ninja"))
 	var cycle := _cycle_id(paint, weapon)
-	var motion := _motion(phase, t, clock, cycle, beat)
+	var motion := _motion(phase, t, clock, cycle, beat, str(pose.get("tale", "")))
 	var lean := float(motion["lean"])
 	var squat := float(motion["squat"])
 	var step := float(motion["step"])
@@ -1306,7 +1306,19 @@ static func _cycle_id(paint: String, weapon: String) -> String:
 			return weapon
 
 
-static func _motion(phase: String, t: float, clock: float, cycle: String, beat: int) -> Dictionary:
+static func tale_span(name: String) -> float:
+	match name:
+		"small", "loom", "edge":
+			return 6.4
+		"vow", "draw", "weigh", "read", "cost", "mend", "yield":
+			return 5.6
+		"rein", "creep", "pace", "parade", "rush":
+			return 4.6
+		_:
+			return 4.8
+
+
+static func _motion(phase: String, t: float, clock: float, cycle: String, beat: int, tale: String = "") -> Dictionary:
 	var pose := _sample(cycle, 0, 0.0)
 	var lean := _num(pose, "lean")
 	var squat := _num(pose, "squat")
@@ -1363,6 +1375,8 @@ static func _motion(phase: String, t: float, clock: float, cycle: String, beat: 
 			rear = Vector2(-8.0, 8.0).lerp(rear, t)
 			front = Vector2(2.0, 8.0).lerp(front, t)
 			tip = Vector2(4.0, 12.0).lerp(tip, t)
+		"tale":
+			return _tale(tale, t, clock)
 		"fall":
 			squat = lerpf(2.0, 18.0, t)
 			lean = lerpf(0.0, 10.0, t)
@@ -1422,6 +1436,236 @@ static func _motion(phase: String, t: float, clock: float, cycle: String, beat: 
 		"front": front,
 		"tip": tip,
 	}
+
+
+static func _tale(name: String, along: float, clock: float) -> Dictionary:
+	var keys := _tale_keys(name)
+	var count := keys.size()
+	if count < 2:
+		return _motion("idle", 0.0, clock, "katana", 0)
+	var wrapped := clampf(along, 0.0, 0.999) * float(count)
+	var index := int(wrapped) % count
+	var next := (index + 1) % count
+	var blend := wrapped - float(int(wrapped))
+	blend = blend * blend * (3.0 - 2.0 * blend)
+	var left: Array = keys[index]
+	var right: Array = keys[next]
+	return {
+		"lean": lerpf(float(left[0]), float(right[0]), blend),
+		"squat": lerpf(float(left[1]), float(right[1]), blend),
+		"step": lerpf(float(left[2]), float(right[2]), blend),
+		"breath": sin(clock * 1.5) * float(left[3]),
+		"rise": lerpf(float(left[4]), float(right[4]), blend),
+		"tilt": lerpf(float(left[5]), float(right[5]), blend),
+		"rear": Vector2(float(left[6]), float(left[7])).lerp(Vector2(float(right[6]), float(right[7])), blend),
+		"front": Vector2(float(left[8]), float(left[9])).lerp(Vector2(float(right[8]), float(right[9])), blend),
+		"tip": Vector2(float(left[10]), float(left[11])).lerp(Vector2(float(right[10]), float(right[11])), blend),
+	}
+
+
+static func _tk(lean: float, squat: float, step: float, breath: float, rise: float, tilt: float, rx: float, ry: float, fx: float, fy: float, tx: float, ty: float) -> Array:
+	return [lean, squat, step, breath, rise, tilt, rx, ry, fx, fy, tx, ty]
+
+
+static func _tale_keys(name: String) -> Array:
+	match name:
+		"small":
+			return [
+				_tk(-6, 8, 0.1, 0.35, 1, -0.42, -2, 8, 2, 7, 3, 10),
+				_tk(-8, 11, -0.15, 0.2, 2, -0.55, -1, 9, 1, 8, 2, 11),
+				_tk(-12, 10, -0.7, 0.15, 2, -0.48, -4, 10, 0, 9, 1, 12),
+				_tk(-7, 9, -0.2, 0.3, 1, -0.4, -2, 8, 2, 7, 3, 10),
+			]
+		"pace":
+			return [
+				_tk(3, 1, -0.9, 0.25, 0, 0.08, -8, 8, 6, 4, 10, 16),
+				_tk(4, 2, 0.1, 0.2, 0, 0.1, -2, 6, 9, 3, 14, 12),
+				_tk(3, 1, 0.95, 0.25, 0, 0.06, 4, 7, 11, 5, 16, 18),
+				_tk(4, 2, -0.1, 0.2, 0, 0.1, -3, 6, 8, 3, 12, 14),
+			]
+		"still":
+			return [
+				_tk(0, 0, 0.08, 0.7, 0, 0.12, -4, 8, 7, 3, 9, 18),
+				_tk(-1, 0, 0.16, 0.85, 0, -0.08, -3, 7, 8, 2, 8, 8),
+				_tk(1, 0, 0.05, 0.7, 0, -0.18, -4, 8, 7, 2, 8, 4),
+				_tk(0, 0, 0.1, 0.75, 0, 0.04, -4, 8, 7, 3, 9, 14),
+			]
+		"vow":
+			return [
+				_tk(0, 1, 0.1, 0.4, 0, 0.05, -2, 8, 6, 6, 8, 16),
+				_tk(-2, 2, 0.0, 0.3, 0, -0.2, -6, 2, 4, -2, 2, -28),
+				_tk(-1, 0, 0.05, 0.55, 0, -0.28, -4, -2, 5, -6, 1, -36),
+				_tk(-1, 0, 0.05, 0.6, 0, -0.22, -4, 0, 5, -4, 2, -30),
+				_tk(1, 1, 0.12, 0.4, 0, 0.02, -2, 6, 8, 2, 12, 8),
+			]
+		"guard":
+			return [
+				_tk(1, 1, 0.15, 0.45, 0, 0.04, -3, 6, 8, 2, 14, 6),
+				_tk(2, 2, 0.2, 0.4, 0, -0.06, -2, 4, 10, -1, 18, -6),
+				_tk(2, 2, 0.12, 0.55, 0, -0.04, -2, 4, 10, -1, 18, -4),
+				_tk(1, 1, 0.16, 0.45, 0, 0.02, -3, 6, 8, 2, 14, 4),
+			]
+		"ask":
+			return [
+				_tk(0, 0, 0.1, 0.5, 0, 0.02, -4, 8, 6, 4, 8, 12),
+				_tk(2, 0, 0.2, 0.4, 0, -0.08, -3, 6, 16, 1, 28, 2),
+				_tk(3, 0, 0.15, 0.55, 0, -0.12, -3, 6, 18, 0, 32, 1),
+				_tk(1, 0, 0.1, 0.5, 0, 0.0, -4, 7, 8, 3, 12, 8),
+			]
+		"edge":
+			return [
+				_tk(0, 0, 0.1, 0.6, 0, 0.16, -4, 8, 7, 4, 9, 16),
+				_tk(6, 1, 0.35, 0.4, 0, 0.28, -2, 6, 12, 2, 16, 10),
+				_tk(2, 2, -0.2, 0.35, 1, 0.1, -6, 8, 4, 6, 6, 14),
+				_tk(1, 0, 0.08, 0.7, 0, 0.2, -4, 8, 7, 3, 8, 16),
+			]
+		"low":
+			return [
+				_tk(1, 1, 0.05, 0.45, 0, 0.06, -5, 10, 6, 8, 8, 20),
+				_tk(0, 0, 0.12, 0.55, 0, 0.02, -4, 9, 7, 7, 9, 18),
+				_tk(1, 1, -0.05, 0.45, 0, 0.08, -5, 10, 6, 8, 7, 22),
+				_tk(0, 0, 0.08, 0.5, 0, 0.04, -4, 9, 7, 7, 9, 19),
+			]
+		"offer":
+			return [
+				_tk(0, 2, 0.1, 0.4, 0, 0.1, -2, 8, 6, 6, 8, 10),
+				_tk(1, 1, 0.15, 0.35, 0, -0.05, 2, 4, 14, 2, 26, 4),
+				_tk(2, 3, 0.1, 0.4, 1, 0.18, 2, 6, 14, 4, 24, 8),
+				_tk(1, 1, 0.12, 0.4, 0, 0.02, 0, 5, 10, 3, 16, 6),
+			]
+		"draw":
+			return [
+				_tk(0, 0, 0.1, 0.4, 0, 0.04, 2, 6, 8, 4, 10, 4),
+				_tk(-1, 1, 0.05, 0.3, 0, -0.06, -2, 2, 12, 1, 16, 0),
+				_tk(-3, 1, -0.05, 0.25, 0, -0.1, -8, 1, 14, 0, 18, -1),
+				_tk(-3, 1, -0.05, 0.45, 0, -0.08, -8, 1, 14, 0, 18, -1),
+				_tk(0, 0, 0.1, 0.4, 0, 0.02, 2, 5, 8, 3, 10, 3),
+			]
+		"plant":
+			return [
+				_tk(2, 1, 0.4, 0.35, 0, 0.08, -6, 4, 8, 2, 22, -8),
+				_tk(4, 2, 0.15, 0.3, 0, 0.04, -2, 6, 12, 3, 30, 2),
+				_tk(3, 3, 0.05, 0.5, 0, 0.02, -2, 8, 10, 4, 28, 6),
+				_tk(3, 2, 0.08, 0.45, 0, 0.04, -3, 7, 10, 3, 26, 4),
+			]
+		"brace":
+			return [
+				_tk(1, 2, 0.2, 0.4, 0, 0.02, -4, 8, 8, 2, 8, 2),
+				_tk(-2, 5, 0.45, 0.25, 1, -0.08, -3, 8, 10, 1, 10, 1),
+				_tk(-1, 4, 0.35, 0.45, 0, -0.02, -3, 7, 10, 1, 10, 1),
+				_tk(1, 2, 0.15, 0.4, 0, 0.04, -4, 8, 8, 2, 8, 2),
+			]
+		"rein":
+			return [
+				_tk(4, 1, -1.0, 0.2, 0, 0.12, -4, 6, 8, 2, 12, 8),
+				_tk(3, 2, 0.2, 0.25, 0, 0.08, -2, 5, 7, 2, 10, 6),
+				_tk(1, 0, 0.15, 0.45, 0, -0.04, -2, 6, 6, 2, 8, 4),
+				_tk(0, 0, 0.08, 0.6, 0, -0.1, -3, 7, 6, 3, 7, 6),
+			]
+		"slip":
+			return [
+				_tk(0, 1, 0.1, 0.3, 0, 0.02, -4, 6, 8, 3, 12, 8),
+				_tk(-10, 3, -0.8, 0.15, 0, -0.35, -10, 8, 0, 6, 2, 10),
+				_tk(-8, 2, -0.4, 0.2, 1, -0.2, -8, 6, 2, 4, 4, 6),
+				_tk(2, 1, 0.3, 0.3, 0, 0.12, -2, 5, 10, 2, 16, 4),
+			]
+		"weigh":
+			return [
+				_tk(1, 1, 0.1, 0.4, 0, 0.06, -4, 10, 6, 8, 8, 22),
+				_tk(-2, 3, 0.05, 0.25, 0, -0.25, -8, 2, 2, -4, -2, -30),
+				_tk(-4, 4, 0.0, 0.35, 1, -0.18, -6, 4, 1, 2, 4, -8),
+				_tk(-1, 2, 0.08, 0.45, 0, 0.04, -3, 8, 5, 6, 8, 16),
+			]
+		"rush":
+			return [
+				_tk(6, 2, -1.15, 0.1, 0, 0.2, -6, 6, 10, 2, 14, 2),
+				_tk(7, 3, 1.05, 0.1, 0, 0.22, -4, 5, 12, 2, 16, 1),
+				_tk(2, 4, 0.2, 0.2, 1, 0.05, -2, 6, 8, 4, 10, 2),
+				_tk(1, 2, 0.05, 0.35, 0, 0.0, -2, 7, 7, 5, 9, 3),
+			]
+		"cost":
+			return [
+				_tk(4, 1, 0.7, 0.2, 0, 0.1, -4, 6, 9, 3, 12, 2),
+				_tk(1, 3, 0.1, 0.25, 0, 0.2, -2, 8, 8, 6, 10, 6),
+				_tk(2, 10, 0.2, 0.2, 4, 0.45, -2, 12, 6, 10, 8, 12),
+				_tk(1, 12, 0.1, 0.25, 5, 0.4, -1, 12, 5, 11, 7, 13),
+			]
+		"mend":
+			return [
+				_tk(0, 0, 0.08, 0.55, 0, 0.02, -2, 6, 6, 4, 6, -8),
+				_tk(1, 0, 0.1, 0.4, 0, -0.06, -1, 2, 12, 0, 8, -22),
+				_tk(2, 1, 0.12, 0.6, 0, -0.04, 0, 3, 16, 1, 22, -6),
+				_tk(1, 0, 0.08, 0.55, 0, 0.0, -2, 5, 8, 3, 8, -4),
+			]
+		"read":
+			return [
+				_tk(1, 1, 0.05, 0.4, 0, 0.16, 2, 6, 8, 4, 10, 2),
+				_tk(2, 1, 0.08, 0.35, 0, 0.22, 4, 4, 12, 3, 16, 1),
+				_tk(0, 0, 0.05, 0.3, 0, -0.16, 1, 2, 8, -2, 6, -18),
+				_tk(0, 0, 0.05, 0.45, 0, -0.1, 2, 3, 8, 0, 7, -10),
+			]
+		"wide":
+			return [
+				_tk(0, 2, 0.55, 0.35, 0, 0.04, -6, 8, 8, 6, 4, 16),
+				_tk(0, 3, 0.85, 0.5, 0, 0.0, -4, 6, 6, 2, 2, -6),
+				_tk(1, 2, 0.7, 0.7, 0, -0.04, -2, 4, 8, 1, 6, -16),
+				_tk(0, 2, 0.6, 0.45, 0, 0.02, -5, 8, 7, 5, 4, 10),
+			]
+		"shun":
+			return [
+				_tk(1, 0, 0.1, 0.3, 0, -0.02, -4, 7, 8, 3, 10, 8),
+				_tk(3, 0, 0.25, 0.25, 0, -0.08, -3, 6, 16, 1, 30, 2),
+				_tk(3, 0, 0.2, 0.35, 0, -0.06, -3, 6, 16, 1, 30, 2),
+				_tk(1, 0, 0.1, 0.3, 0, 0.0, -4, 7, 8, 3, 12, 8),
+			]
+		"away":
+			return [
+				_tk(2, 1, 0.3, 0.3, 0, 0.2, -8, 6, 4, 6, 2, 12),
+				_tk(4, 1, 0.8, 0.2, 0, 0.28, -10, 7, 2, 8, 0, 14),
+				_tk(3, 1, 0.4, 0.25, 0, 0.22, -8, 6, 3, 7, 1, 12),
+				_tk(2, 1, 0.2, 0.3, 0, 0.16, -6, 6, 4, 6, 2, 10),
+			]
+		"creep":
+			return [
+				_tk(5, 4, -0.7, 0.2, 1, 0.22, -6, 8, 8, 5, 12, 10),
+				_tk(6, 5, 0.15, 0.15, 1, 0.26, -4, 8, 10, 4, 14, 8),
+				_tk(5, 4, 0.75, 0.2, 1, 0.2, -2, 7, 11, 5, 16, 12),
+				_tk(6, 5, -0.1, 0.15, 1, 0.24, -5, 8, 9, 5, 13, 10),
+			]
+		"parade":
+			return [
+				_tk(2, 1, -0.65, 0.3, 0, 0.06, -6, 6, 8, 2, 14, -4),
+				_tk(2, 2, 0.05, 0.25, 0, 0.04, -4, 6, 9, 2, 16, -2),
+				_tk(2, 1, 0.7, 0.3, 0, 0.06, -2, 6, 10, 2, 18, -4),
+				_tk(2, 2, 0.0, 0.25, 0, 0.04, -4, 6, 9, 2, 15, -2),
+			]
+		"loom":
+			return [
+				_tk(0, 1, 0.05, 0.9, 0, 0.02, -3, 6, 6, 2, 4, -34),
+				_tk(1, 0, 0.08, 1.1, 0, -0.04, -2, 4, 7, 1, 5, -38),
+				_tk(0, 1, 0.04, 0.95, 0, 0.06, -3, 6, 6, 2, 4, -32),
+				_tk(-1, 1, 0.06, 0.8, 0, 0.1, -4, 7, 5, 3, 3, -28),
+			]
+		"yield":
+			return [
+				_tk(1, 1, 0.1, 0.3, 0, 0.05, -4, 6, 8, 3, 12, 8),
+				_tk(-4, 6, -0.4, 0.15, 2, -0.35, -6, 10, 3, 8, 6, 14),
+				_tk(-2, 12, 0.15, 0.2, 6, 0.55, -2, 14, 4, 12, 6, 16),
+				_tk(-1, 13, 0.1, 0.25, 6, 0.48, -2, 14, 4, 12, 6, 16),
+			]
+		"ordered":
+			return [
+				_tk(1, 0, 0.05, 0.15, 0, 0.02, -4, 6, 8, 2, 14, 2),
+				_tk(1, 0, 0.05, 0.15, 0, 0.02, -4, 6, 8, 2, 14, 2),
+				_tk(1, 1, 0.2, 0.2, 0, -0.04, -3, 5, 9, 1, 16, -2),
+				_tk(1, 0, 0.05, 0.15, 0, 0.02, -4, 6, 8, 2, 14, 2),
+			]
+		_:
+			return [
+				_tk(0, 0, 0.08, 0.6, 0, 0.04, -4, 8, 7, 3, 9, 14),
+				_tk(0, 0, 0.12, 0.7, 0, -0.04, -3, 7, 8, 2, 8, 10),
+				_tk(0, 0, 0.08, 0.6, 0, 0.02, -4, 8, 7, 3, 9, 14),
+			]
 
 
 static func _num(row: Dictionary, key: String) -> float:

@@ -3,6 +3,8 @@ extends Node
 var _players: Array[AudioStreamPlayer] = []
 var _bank: Dictionary = {}
 var _index: int = 0
+var _bed: AudioStreamPlayer
+var _mood: String = ""
 
 
 func _ready() -> void:
@@ -11,6 +13,51 @@ func _ready() -> void:
 		player.volume_db = -2.0
 		add_child(player)
 		_players.append(player)
+	_bed = AudioStreamPlayer.new()
+	_bed.volume_db = -14.0
+	add_child(_bed)
+
+
+func mood(place: String) -> void:
+	var id := _mood_id(place)
+	if id == _mood and _bed != null and _bed.playing:
+		return
+	_mood = id
+	var stream := _stream(id)
+	if stream == null or _bed == null:
+		return
+	if stream is AudioStreamWAV:
+		var wave := (stream as AudioStreamWAV).duplicate() as AudioStreamWAV
+		wave.loop_mode = AudioStreamWAV.LOOP_FORWARD
+		wave.loop_begin = 0
+		var frames := int(round(wave.get_length() * float(wave.mix_rate)))
+		wave.loop_end = maxi(1, frames)
+		stream = wave
+	_bed.stream = stream
+	_bed.volume_db = -16.0 if id == "story_dread" or id == "story_war" else -13.0
+	_bed.play()
+
+
+func stop_mood() -> void:
+	_mood = ""
+	if _bed != null:
+		_bed.stop()
+
+
+func _mood_id(place: String) -> String:
+	match place:
+		"village":
+			return "story_lonely"
+		"camp":
+			return "story_hearth"
+		"night", "banners":
+			return "story_dread"
+		"war":
+			return "story_war"
+		"cliff", "mountain":
+			return "story_high"
+		_:
+			return "story_road"
 
 
 func play(id: String, pitch: float = 1.0, db: float = -2.0) -> void:

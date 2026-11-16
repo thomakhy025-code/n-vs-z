@@ -1257,6 +1257,7 @@ func _play_manga(pages: Array, after: Callable) -> void:
 
 
 func _drop_story() -> void:
+	Sfx.stop_mood()
 	if story_layer != null and is_instance_valid(story_layer):
 		story_layer.queue_free()
 	story_layer = null
