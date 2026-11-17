@@ -161,6 +161,7 @@ func _ground_y(rect: Rect2, place: String) -> float:
 
 func _place(rect: Rect2, place: String, time: float) -> void:
 	var ground_y := _ground_y(rect, place)
+	_far_land(rect, ground_y, place)
 	match place:
 		"village":
 			_scene_village(rect, ground_y, time)
@@ -238,6 +239,7 @@ func _scene_climb(rect: Rect2, ground_y: float, time: float) -> void:
 	_peak(rect, ground_y, 0.22, 240.0)
 	_peak(rect, ground_y, 0.7, 280.0)
 	_steps(rect, ground_y)
+	_grove(rect.position + Vector2(rect.size.x * 0.72, ground_y), 4, 110.0)
 	_pine(rect.position + Vector2(rect.size.x * 0.86, ground_y), 78.0)
 	var bank := ground_y - 170.0 + sin(time * 0.3) * 6.0
 	draw_rect(Rect2(rect.position.x, rect.position.y, rect.size.x, bank - rect.position.y), Color(0.97, 0.98, 0.98, 0.94))
@@ -256,9 +258,10 @@ func _scene_descent(rect: Rect2, ground_y: float) -> void:
 	for i in 6:
 		var y := ground_y - 8.0 - float(5 - i) * 16.0
 		draw_rect(Rect2(x + float(i) * 48.0, y, 40.0, 6.0), Color("7a7268"))
-	var far := rect.position + Vector2(rect.size.x * 0.82, ground_y - 18.0)
-	draw_circle(far, 10.0, Color(0.95, 0.72, 0.35, 0.45))
-	_far_village(far + Vector2(-20.0, 8.0))
+	var far := rect.position + Vector2(rect.size.x * 0.7, ground_y - 6.0)
+	draw_circle(far + Vector2(40.0, -24.0), 14.0, Color(0.95, 0.72, 0.35, 0.4))
+	_hamlet(far)
+	_grove(rect.position + Vector2(rect.size.x * 0.48, ground_y), 3, 86.0)
 
 
 func _scene_mountain(rect: Rect2, ground_y: float, time: float) -> void:
@@ -282,6 +285,8 @@ func _scene_mist(rect: Rect2, ground_y: float, time: float) -> void:
 	_sky(rect, ground_y, Color("e7eef2"), Color("f7f7f4"), Color("8a9188"))
 	_peak(rect, ground_y, 0.3, 260.0)
 	_peak(rect, ground_y, 0.62, 300.0)
+	_grove(rect.position + Vector2(rect.size.x * 0.08, ground_y), 3, 120.0)
+	_grove(rect.position + Vector2(rect.size.x * 0.78, ground_y), 3, 100.0)
 	for i in 4:
 		var y := ground_y - 20.0 - float(i) * 18.0
 		draw_line(Vector2(rect.position.x + 20.0, y), Vector2(rect.end.x - 40.0, y), Color(0.35, 0.32, 0.28, 0.22), 2.0)
@@ -530,21 +535,66 @@ func _scene_road(rect: Rect2, ground_y: float, time: float) -> void:
 	_dust(rect, ground_y, time)
 
 
+func _far_land(rect: Rect2, ground_y: float, place: String) -> void:
+	match place:
+		"village":
+			_hill(rect, ground_y, 0.16, 90.0, Color("9aa3ab"))
+			_hill(rect, ground_y, 0.84, 120.0, Color("8e98a2"))
+		"climb", "mountain", "mist":
+			_hill(rect, ground_y, 0.4, 150.0, Color("b7c2cc"))
+			_hill(rect, ground_y, 0.9, 110.0, Color("aeb8c2"))
+		"descent", "low", "quiet":
+			_hill(rect, ground_y, 0.22, 100.0, Color("c5d0b4"))
+			_hill(rect, ground_y, 0.78, 130.0, Color("b7c4a4"))
+		"lone":
+			_hill(rect, ground_y, 0.7, 70.0, Color("7a756c"))
+		"camp", "depart", "banners":
+			_hill(rect, ground_y, 0.35, 120.0, Color("c4a48c"))
+			_hill(rect, ground_y, 0.88, 90.0, Color("b8947c"))
+		"council":
+			_hill(rect, ground_y, 0.28, 110.0, Color("3a3040"))
+			_hill(rect, ground_y, 0.7, 80.0, Color("4a3840"))
+		"night", "vow":
+			_hill(rect, ground_y, 0.32, 160.0, Color("141824"))
+			_hill(rect, ground_y, 0.62, 200.0, Color("10141c"))
+		"omen":
+			_hill(rect, ground_y, 0.7, 180.0, Color("1a1014"))
+			_hill(rect, ground_y, 0.9, 120.0, Color("241418"))
+		"stone", "ash":
+			_hill(rect, ground_y, 0.2, 80.0, Color("8a8e88"))
+			_hill(rect, ground_y, 0.85, 100.0, Color("7c807a"))
+		"bury":
+			_hill(rect, ground_y, 0.3, 90.0, Color("8a7e68"))
+			_hill(rect, ground_y, 0.92, 70.0, Color("7a705c"))
+		"road":
+			_hill(rect, ground_y, 0.18, 100.0, Color("b7a898"))
+			_hill(rect, ground_y, 0.55, 70.0, Color("a89888"))
+		"between":
+			_hill(rect, ground_y, 0.16, 140.0, Color("241820"))
+			_hill(rect, ground_y, 0.86, 110.0, Color("a87868"))
+		"war":
+			_hill(rect, ground_y, 0.2, 90.0, Color("4a4040"))
+			_hill(rect, ground_y, 0.8, 80.0, Color("6a5048"))
+		"cliff":
+			_hill(rect, ground_y, 0.16, 80.0, Color("d5deea"))
+			_hill(rect, ground_y, 0.4, 60.0, Color("c9d4e4"))
+
+
 func _dress(rect: Rect2, ground_y: float, place: String, time: float) -> void:
 	match place:
 		"village":
-			_ridge(rect, ground_y, 0.06, 64.0, Color("8b969f"))
 			_well(rect.position + Vector2(rect.size.x * 0.08, ground_y))
+			_house(rect.position + Vector2(rect.size.x * 0.9, ground_y), 72.0, false)
+			_grove(rect.position + Vector2(rect.size.x * 0.01, ground_y), 2, 90.0)
 			_barrel(rect.position + Vector2(rect.size.x * 0.43, ground_y))
 			_barrel(rect.position + Vector2(rect.size.x * 0.46, ground_y))
 			_crate(rect.position + Vector2(rect.size.x * 0.66, ground_y))
-			_bare(rect.position + Vector2(rect.size.x * 0.93, ground_y), 120.0)
+			_bare(rect.position + Vector2(rect.size.x * 0.97, ground_y), 120.0)
 			_birds(rect, time, rect.position.y + 78.0, 4, Color("2a241c"))
 		"climb":
 			_rock(rect.position + Vector2(rect.size.x * 0.16, ground_y), 16.0)
 			_rock(rect.position + Vector2(rect.size.x * 0.58, ground_y), 12.0)
 			_stake(rect.position + Vector2(rect.size.x * 0.74, ground_y))
-			_pine(rect.position + Vector2(rect.size.x * 0.04, ground_y), 96.0)
 			_birds(rect, time, ground_y - 150.0, 3, Color("3a4450"))
 		"descent":
 			_pine(rect.position + Vector2(rect.size.x * 0.28, ground_y), 70.0)
@@ -552,38 +602,39 @@ func _dress(rect: Rect2, ground_y: float, place: String, time: float) -> void:
 			_birds(rect, time, rect.position.y + 90.0, 3, Color("3a3228"))
 			_far_village(rect.position + Vector2(rect.size.x * 0.74, ground_y - 8.0))
 		"mountain":
-			_ridge(rect, ground_y, 0.18, 90.0, Color("9aa3ae"))
+			_grove(rect.position + Vector2(rect.size.x * 0.02, ground_y), 3, 120.0)
+			_grove(rect.position + Vector2(rect.size.x * 0.78, ground_y), 3, 100.0)
 			_cairn(rect.position + Vector2(rect.size.x * 0.46, ground_y))
-			_pine(rect.position + Vector2(rect.size.x * 0.82, ground_y), 86.0)
 			_tufts(rect, ground_y, time, Color("6a7464"))
 			_birds(rect, time, rect.position.y + 64.0, 3, Color("2a241c"))
 		"quiet":
-			_bush(rect.position + Vector2(rect.size.x * 0.12, ground_y))
-			_bush(rect.position + Vector2(rect.size.x * 0.88, ground_y))
-			_house(rect.position + Vector2(rect.size.x * 0.9, ground_y), 48.0, false)
+			_grove(rect.position + Vector2(rect.size.x * 0.02, ground_y), 4, 130.0)
+			_house(rect.position + Vector2(rect.size.x * 0.82, ground_y), 80.0, true)
+			_bush(rect.position + Vector2(rect.size.x * 0.74, ground_y))
 			_cloud_at(rect.position + Vector2(rect.size.x * 0.48, rect.position.y + 70.0), time)
 			_birds(rect, time, rect.position.y + 110.0, 4, Color("3a3228"))
 			_tufts(rect, ground_y, time, Color("3f5a3a"))
 		"mist":
 			_rock(rect.position + Vector2(rect.size.x * 0.16, ground_y), 18.0)
 			_cairn(rect.position + Vector2(rect.size.x * 0.82, ground_y))
-			_stake(rect.position + Vector2(rect.size.x * 0.9, ground_y))
+			_fallen(rect.position + Vector2(rect.size.x * 0.9, ground_y), true)
 		"stone":
 			_rock(rect.position + Vector2(rect.size.x * 0.16, ground_y), 22.0)
-			_rock(rect.position + Vector2(rect.size.x * 0.28, ground_y), 14.0)
 			_rock(rect.position + Vector2(rect.size.x * 0.84, ground_y), 18.0)
 			_bare(rect.position + Vector2(rect.size.x * 0.08, ground_y), 80.0)
-			_tufts(rect, ground_y, time, Color("5c6158"))
+			_blood(rect.position + Vector2(rect.size.x * 0.46, ground_y), 28.0)
+			_fallen(rect.position + Vector2(rect.size.x * 0.9, ground_y), true)
 		"lone":
-			_ridge(rect, ground_y, 0.78, 48.0, Color("6a645c"))
-			_bare(rect.position + Vector2(rect.size.x * 0.86, ground_y), 100.0)
+			_bare(rect.position + Vector2(rect.size.x * 0.86, ground_y), 130.0)
+			_pine(rect.position + Vector2(rect.size.x * 0.94, ground_y), 70.0)
 			_pot(rect.position + Vector2(rect.size.x * 0.18, ground_y))
 			_rock(rect.position + Vector2(rect.size.x * 0.62, ground_y), 12.0)
 		"camp":
+			_tent(rect.position + Vector2(rect.size.x * 0.94, ground_y))
+			_grove(rect.position + Vector2(rect.size.x * 0.0, ground_y), 2, 100.0)
 			_log(rect.position + Vector2(rect.size.x * 0.56, ground_y))
 			_pot(rect.position + Vector2(rect.size.x * 0.64, ground_y))
 			_stake(rect.position + Vector2(rect.size.x * 0.78, ground_y))
-			_crate(rect.position + Vector2(rect.size.x * 0.28, ground_y))
 			_cloud_at(rect.position + Vector2(rect.size.x * 0.4, rect.position.y + 56.0), time)
 		"council":
 			_tent(rect.position + Vector2(rect.size.x * 0.16, ground_y))
@@ -598,75 +649,69 @@ func _dress(rect: Rect2, ground_y: float, place: String, time: float) -> void:
 			_birds(rect, time, rect.position.y + 80.0, 3, Color("3a3228"))
 			_tufts(rect, ground_y, time, Color("6a745c"))
 		"night":
-			_pine(rect.position + Vector2(rect.size.x * 0.28, ground_y), 90.0)
-			_rock(rect.position + Vector2(rect.size.x * 0.4, ground_y), 14.0)
-			_cart(rect.position + Vector2(rect.size.x * 0.68, ground_y), true)
-			for eye_i in 3:
-				var eye := rect.position + Vector2(rect.size.x * (0.5 + float(eye_i) * 0.08), ground_y - 36.0 - float(eye_i) * 10.0)
-				draw_circle(eye, 2.2, Color("c44536"))
+			_grove(rect.position + Vector2(rect.size.x * 0.18, ground_y), 3, 130.0)
+			_blood(rect.position + Vector2(rect.size.x * 0.36, ground_y), 36.0)
+			_fallen(rect.position + Vector2(rect.size.x * 0.34, ground_y), true)
+			_cart(rect.position + Vector2(rect.size.x * 0.46, ground_y), true)
 		"vow":
 			_stars(rect, time)
+			_grove(rect.position + Vector2(rect.size.x * 0.02, ground_y), 2, 90.0)
 			_cairn(rect.position + Vector2(rect.size.x * 0.24, ground_y))
 			_cairn(rect.position + Vector2(rect.size.x * 0.58, ground_y))
 			_stake(rect.position + Vector2(rect.size.x * 0.22, ground_y))
 		"omen":
 			_bare(rect.position + Vector2(rect.size.x * 0.62, ground_y), 130.0)
 			_bare(rect.position + Vector2(rect.size.x * 0.9, ground_y), 90.0)
-			_rock(rect.position + Vector2(rect.size.x * 0.16, ground_y), 16.0)
+			_blood(rect.position + Vector2(rect.size.x * 0.5, ground_y), 40.0)
+			_fallen(rect.position + Vector2(rect.size.x * 0.48, ground_y), true)
 		"banners":
-			_ridge(rect, ground_y, 0.2, 40.0, Color("a07858"))
+			_tent(rect.position + Vector2(rect.size.x * 0.08, ground_y))
+			_grove(rect.position + Vector2(rect.size.x * 0.9, ground_y), 2, 80.0)
 			_dust(rect, ground_y, time + 1.2)
-			_stake(rect.position + Vector2(rect.size.x * 0.08, ground_y))
 			_stake(rect.position + Vector2(rect.size.x * 0.94, ground_y))
 		"ash":
+			_bare(rect.position + Vector2(rect.size.x * 0.08, ground_y), 90.0)
 			_bare(rect.position + Vector2(rect.size.x * 0.72, ground_y), 70.0)
-			_wheel(rect.position + Vector2(rect.size.x * 0.84, ground_y))
+			_blood(rect.position + Vector2(rect.size.x * 0.4, ground_y), 30.0)
+			_fallen(rect.position + Vector2(rect.size.x * 0.82, ground_y), true)
 			_cart(rect.position + Vector2(rect.size.x * 0.18, ground_y), true)
-			_rock(rect.position + Vector2(rect.size.x * 0.5, ground_y), 10.0)
 		"low":
+			_grove(rect.position + Vector2(rect.size.x * 0.04, ground_y - 110.0), 4, 70.0)
+			_house(rect.position + Vector2(rect.size.x * 0.4, ground_y - 110.0), 48.0, false)
 			_fence(rect.position + Vector2(rect.size.x * 0.78, ground_y - 110.0), 90.0)
-			_log(rect.position + Vector2(rect.size.x * 0.58, ground_y - 110.0))
-			_crate(rect.position + Vector2(rect.size.x * 0.8, ground_y - 108.0))
-			_bush(rect.position + Vector2(rect.size.x * 0.2, ground_y))
 			_birds(rect, time, rect.position.y + 70.0, 3, Color("3a3228"))
 		"bury":
-			_bare(rect.position + Vector2(rect.size.x * 0.28, ground_y), 110.0)
-			_bush(rect.position + Vector2(rect.size.x * 0.4, ground_y))
+			_house(rect.position + Vector2(rect.size.x * 0.18, ground_y), 64.0, false)
+			_bare(rect.position + Vector2(rect.size.x * 0.3, ground_y), 120.0)
+			_blood(rect.position + Vector2(rect.size.x * 0.55, ground_y), 22.0)
+			_fallen(rect.position + Vector2(rect.size.x * 0.9, ground_y), true)
 			_tufts(rect, ground_y, time, Color("5c5840"))
-			for flower_i in 4:
-				var flower_x := rect.position.x + rect.size.x * (0.5 + float(flower_i) * 0.1)
-				draw_circle(Vector2(flower_x, ground_y - 28.0), 3.0, Color("8d5a4a"))
 		"between":
-			_pine(rect.position + Vector2(rect.size.x * 0.06, ground_y), 140.0)
-			_pine(rect.position + Vector2(rect.size.x * 0.2, ground_y), 100.0)
+			_grove(rect.position + Vector2(rect.size.x * 0.0, ground_y), 3, 140.0)
+			_tent(rect.position + Vector2(rect.size.x * 0.92, ground_y))
 			_banner(rect.position + Vector2(rect.size.x * 0.74, ground_y), Color("8d2f28"), time + 0.6)
-			_stake(rect.position + Vector2(rect.size.x * 0.94, ground_y))
-			_rock(rect.position + Vector2(rect.size.x * 0.3, ground_y), 12.0)
+			_blood(rect.position + Vector2(rect.size.x * 0.36, ground_y), 26.0)
+			_fallen(rect.position + Vector2(rect.size.x * 0.34, ground_y), true)
 		"cliff":
-			_bush(rect.position + Vector2(rect.size.x * 0.08, ground_y))
-			_rock(rect.position + Vector2(rect.size.x * 0.18, ground_y), 14.0)
+			_grove(rect.position + Vector2(rect.size.x * 0.02, ground_y), 2, 90.0)
 			_tufts(rect, ground_y, time, Color("6a7460"), 0.5)
 			_birds(rect, time, rect.position.y + 80.0, 4, Color("3a4450"))
-			var drop_x := rect.position.x + rect.size.x * 0.58
-			var valley_y := ground_y + 64.0
-			_bush(Vector2(drop_x + 80.0, valley_y + 20.0))
-			_far_village(Vector2(drop_x + rect.size.x * 0.28, valley_y + 24.0))
+			_hamlet(rect.position + Vector2(rect.size.x * 0.7, ground_y + 96.0))
+			_grove(rect.position + Vector2(rect.size.x * 0.62, ground_y + 90.0), 2, 48.0)
 		"war":
 			_banner(rect.position + Vector2(rect.size.x * 0.28, ground_y), Color("1c140e"), time + 0.8)
 			_banner(rect.position + Vector2(rect.size.x * 0.72, ground_y), Color("c44536"), time + 1.1)
-			_stake(rect.position + Vector2(rect.size.x * 0.16, ground_y))
-			_stake(rect.position + Vector2(rect.size.x * 0.84, ground_y))
-			_wheel(rect.position + Vector2(rect.size.x * 0.46, ground_y))
-			_rock(rect.position + Vector2(rect.size.x * 0.58, ground_y), 10.0)
+			_blood(rect.position + Vector2(rect.size.x * 0.48, ground_y), 46.0)
+			_blood(rect.position + Vector2(rect.size.x * 0.14, ground_y), 24.0)
+			_fallen(rect.position + Vector2(rect.size.x * 0.46, ground_y), true)
+			_fallen(rect.position + Vector2(rect.size.x * 0.08, ground_y), false)
+			_bare(rect.position + Vector2(rect.size.x * 0.96, ground_y), 80.0)
 		_:
-			_barrel(rect.position + Vector2(rect.size.x * 0.12, ground_y))
-			_cart(rect.position + Vector2(rect.size.x * 0.22, ground_y), true)
-			_rock(rect.position + Vector2(rect.size.x * 0.4, ground_y), 12.0)
-			_stake(rect.position + Vector2(rect.size.x * 0.55, ground_y))
+			_grove(rect.position + Vector2(rect.size.x * 0.0, ground_y), 2, 100.0)
+			_house(rect.position + Vector2(rect.size.x * 0.08, ground_y), 56.0, false)
+			_blood(rect.position + Vector2(rect.size.x * 0.4, ground_y), 28.0)
+			_fallen(rect.position + Vector2(rect.size.x * 0.12, ground_y), true)
 			_birds(rect, time, rect.position.y + 70.0, 3, Color("2a241c"))
-			for arrow_i in 4:
-				var arrow_x := rect.position.x + rect.size.x * (0.3 + float(arrow_i) * 0.12)
-				draw_line(Vector2(arrow_x, ground_y - 4.0), Vector2(arrow_x + 4.0, ground_y - 22.0), Color("5c4034"), 2.0)
 
 
 func _frame(rect: Rect2) -> void:
@@ -868,6 +913,59 @@ func _peak(rect: Rect2, ground_y: float, spot: float, tall: float) -> void:
 		Vector2(x, ground_y - tall),
 		Vector2(x + 18.0, ground_y - tall + 28.0),
 	]), Color("f7f1df"))
+
+
+func _hill(rect: Rect2, ground_y: float, spot: float, tall: float, color: Color) -> void:
+	var x := rect.position.x + rect.size.x * spot
+	draw_colored_polygon(PackedVector2Array([
+		Vector2(x - tall * 1.7, ground_y),
+		Vector2(x - tall * 0.15, ground_y - tall),
+		Vector2(x + tall * 0.45, ground_y - tall * 0.62),
+		Vector2(x + tall * 1.5, ground_y),
+	]), color)
+
+
+func _grove(at: Vector2, count: int, tall: float) -> void:
+	for tree_i in count:
+		_pine(at + Vector2(float(tree_i) * 36.0, 0.0), tall - float(tree_i % 3) * 18.0)
+
+
+func _hamlet(at: Vector2) -> void:
+	_house(at, 56.0, false)
+	_house(at + Vector2(64.0, 6.0), 42.0, true)
+	_house(at + Vector2(112.0, 0.0), 36.0, false)
+	_pine(at + Vector2(-24.0, 4.0), 64.0)
+
+
+func _blood(at: Vector2, wide: float) -> void:
+	draw_colored_polygon(PackedVector2Array([
+		at + Vector2(-wide, 0.0),
+		at + Vector2(-wide * 0.25, -wide * 0.28),
+		at + Vector2(wide * 0.4, -wide * 0.12),
+		at + Vector2(wide, 0.0),
+	]), Color("7a2430"))
+	draw_circle(at + Vector2(wide * 0.15, -wide * 0.08), wide * 0.16, Color("8d2f28"))
+
+
+func _fallen(at: Vector2, horned: bool) -> void:
+	var body := Color("243028") if horned else Color("5c4034")
+	draw_colored_polygon(PackedVector2Array([
+		at + Vector2(-16.0, -1.0),
+		at + Vector2(-4.0, -9.0),
+		at + Vector2(36.0, -7.0),
+		at + Vector2(50.0, 0.0),
+	]), Color("6e2430"))
+	draw_colored_polygon(PackedVector2Array([
+		at + Vector2(-4.0, 0.0),
+		at + Vector2(10.0, -18.0),
+		at + Vector2(52.0, -15.0),
+		at + Vector2(62.0, -1.0),
+	]), body)
+	draw_circle(at + Vector2(-10.0, -12.0), 9.0, body)
+	draw_line(at + Vector2(22.0, -16.0), at + Vector2(8.0, -30.0), body, 4.0)
+	if horned:
+		draw_line(at + Vector2(-16.0, -18.0), at + Vector2(-22.0, -32.0), Color("c4b48a"), 3.0)
+		draw_line(at + Vector2(-4.0, -20.0), at + Vector2(4.0, -32.0), Color("c4b48a"), 3.0)
 
 
 func _ridge(rect: Rect2, ground_y: float, spot: float, tall: float, color: Color) -> void:

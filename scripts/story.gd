@@ -4,7 +4,7 @@ extends RefCounted
 # A fresh roll each game would make these pages disagree with the fight, so the order is fixed.
 
 const CAMPAIGN := 2
-const VERSION := 3
+const VERSION := 4
 
 const LESSONS := {
 	1: "archer",
