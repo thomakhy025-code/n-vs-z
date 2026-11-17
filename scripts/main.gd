@@ -35,7 +35,7 @@ The shop sells one new skin for the hero and one for each soldier. A skin costs 
 
 On the website you can keep playing as a guest. That progress stays on the device. Sign in with Google and the levels you have opened, your diamonds, your coins, your ranks, and your skins stay with that account, so a phone, a tablet, and a computer can share them. The first sign-in asks for a name. Ranking lists signed-in players: a higher level cleared ranks above a lower one, and the same level ranks the shorter clear time first. A profile shows that name, the best tag, the hero, and a favourite character.
 
-1 vs 1 opens after level 20. It is two clans. Each side chooses 6 of the 11. Both have the same value, the same calls, the same roads, the same wind, and a hero. Before the search, choose Your ranks or Maximum. Your ranks uses the ranks saved on each account. Maximum locks both sides at rank 20. The host's choice is what the match uses, and the other ninja can leave. On this page, press Find opponent. The game looks for one other ninja and connects. The match runs until a gate falls. A 1 vs 1 pays no coins. You do not type an address or a code. On a computer build, Host opens port 3001 and the other ninja joins the address.
+1 vs 1 is on the home screen. It opens after level 20, and until then the button wears a lock. It is two clans. Each side chooses 6 of the 11. Both have the same value, the same calls, the same roads, the same wind, and a hero. Before the search, choose Your ranks or Maximum. Your ranks uses the ranks saved on each account. Maximum locks both sides at rank 20. The host's choice is what the match uses, and the other ninja can leave. On this page, press Find opponent. The game looks for one other ninja and connects. The match runs until a gate falls. A 1 vs 1 pays no coins. You do not type an address or a code. On a computer build, Host opens port 3001 and the other ninja joins the address.
 
 Escape or Back returns to the title."
 
@@ -420,8 +420,7 @@ func _show_menu() -> void:
 		box.add_child(_menu_button("Next level · %s" % str(road["name"]), Color("c44536"), next_level, 420))
 	else:
 		box.add_child(_menu_button("Play", Color("c44536"), _show_levels, 420))
-	if Story.duel_open(cleared):
-		box.add_child(_menu_button("1 vs 1", Color("7d9a6a"), _show_duel, 420))
+	box.add_child(_duel_button())
 	box.add_child(_home_pair(
 		"Choose a level", Color("e6c36a"), _show_levels,
 		"How to play", Color("f3e6c8"), _show_how
@@ -2613,14 +2612,15 @@ func _layout_check() -> void:
 		var quit_rect := quit_b.get_global_rect()
 		quit_ok = quit_rect.position.y >= 0.0 and quit_rect.end.y <= vp.y + 1.0
 		print("TITLE quit=", quit_rect, " ok=", quit_ok)
-	if Story.duel_open(cleared):
-		if duel_b != null:
-			var duel_rect := duel_b.get_global_rect()
-			duel_ok = duel_rect.position.y >= 0.0 and duel_rect.end.y <= vp.y + 1.0
-			print("TITLE duel=", duel_rect, " ok=", duel_ok)
+	if duel_b != null:
+		var duel_rect := duel_b.get_global_rect()
+		var duel_locked := not Story.duel_open(cleared)
+		duel_ok = duel_rect.position.y >= 0.0 and duel_rect.end.y <= vp.y + 1.0
+		if duel_locked:
+			duel_ok = duel_ok and bool(duel_b.get_meta("duel_locked", false))
+		print("TITLE duel=", duel_rect, " locked=", duel_locked, " ok=", duel_ok)
 	else:
-		duel_ok = duel_b == null
-		print("TITLE duel locked ok=", duel_ok)
+		print("TITLE duel missing ok=false")
 	if play != null:
 		var play_rect := play.get_global_rect()
 		play_ok = play_rect.position.y >= 0.0 and play_rect.end.y <= vp.y + 1.0
@@ -2778,6 +2778,25 @@ func _collect_buttons(node: Node) -> Array:
 	return found
 
 
+func _duel_button() -> Button:
+	var open := Story.duel_open(cleared)
+	var button := LockButton.new()
+	button.text = "1 vs 1"
+	button.locked = not open
+	button.custom_minimum_size = Vector2(420, 52)
+	var color := Color("7d9a6a") if open else Color("d9d0c3")
+	var lum := color.r * 0.3 + color.g * 0.59 + color.b * 0.11
+	UiSkin.apply(button, color, 22, Color("1c140e") if lum > 0.62 else Color("f3e6c8"))
+	if not open:
+		button.set_meta("duel_locked", true)
+	button.pressed.connect(func() -> void:
+		Sfx.play("click", 1.0, -6.0)
+		if open:
+			_show_duel()
+	)
+	return button
+
+
 func _menu_button(text: String, color: Color, action: Callable, wide: float = 280.0, font_px: int = 22) -> Button:
 	var button := Button.new()
 	button.text = text
@@ -2789,6 +2808,25 @@ func _menu_button(text: String, color: Color, action: Callable, wide: float = 28
 		action.call()
 	)
 	return button
+
+
+class LockButton:
+	extends Button
+
+	var locked: bool = false
+
+	func _ready() -> void:
+		resized.connect(queue_redraw)
+
+	func _draw() -> void:
+		if not locked:
+			return
+		var ink := Color("1c140e")
+		var cx := size.x - 36.0
+		var cy := size.y * 0.5 + 3.0
+		draw_arc(Vector2(cx, cy - 6.0), 7.0, PI, TAU, 14, ink, 3.0, true)
+		draw_rect(Rect2(cx - 9.0, cy - 2.0, 18.0, 14.0), ink, true)
+		draw_circle(Vector2(cx, cy + 4.0), 2.0, Color("d9d0c3"))
 
 
 class Portrait:
