@@ -54,6 +54,8 @@ var winding: bool = false
 var strike_sent: bool = false
 var act_tool: String = "katana"
 var pending_kind: String = ""
+var numb: float = 0.0
+var bone_t: float = 0.0
 const RESPAWN: float = 6.0
 
 
@@ -109,9 +111,34 @@ func on_buff_death() -> void:
 	_go_down()
 
 
-func take_damage(amount: float, quiet: bool = false) -> void:
-	if not alive or invuln > 0.0:
+func apply_numb(seconds: float) -> void:
+	numb = maxf(numb, seconds)
+	dragging = false
+	winding = false
+	act = 0.0
+	strike_sent = true
+	stepping = false
+
+
+func clear_numb() -> void:
+	if numb <= 0.0:
 		return
+	numb = 0.0
+	if battle != null:
+		battle.float_text(position + Vector2(0, -40), "clear", Color("8ee0a2"))
+
+
+func numb_left() -> float:
+	return numb
+
+
+func show_bones() -> void:
+	bone_t = 0.9
+
+
+func take_damage(amount: float, quiet: bool = false, _from_id: String = "") -> bool:
+	if not alive or invuln > 0.0:
+		return false
 	hp -= amount
 	flash = 0.16
 	hurt = 1.0
@@ -122,6 +149,7 @@ func take_damage(amount: float, quiet: bool = false) -> void:
 	if hp <= 0.0:
 		hp = 0.0
 		_go_down()
+	return true
 
 
 func _go_down() -> void:
@@ -145,6 +173,8 @@ func _process(delta: float) -> void:
 	muzzle = maxf(0.0, muzzle - delta)
 	invuln = maxf(0.0, invuln - delta)
 	home_lock = maxf(0.0, home_lock - delta)
+	numb = maxf(0.0, numb - delta)
+	bone_t = maxf(0.0, bone_t - delta)
 	if battle != null and battle.puppet:
 		if not alive:
 			visible = false
@@ -163,6 +193,14 @@ func _process(delta: float) -> void:
 			_revive()
 		return
 	if battle.finished or battle.paused:
+		queue_redraw()
+		return
+	if numb > 0.0:
+		dragging = false
+		winding = false
+		act = 0.0
+		stepping = false
+		strike_sent = true
 		queue_redraw()
 		return
 	_move(delta)
@@ -256,7 +294,7 @@ func _land_hero() -> void:
 		Sfx.play(Painter.hit_id("katana"), randf_range(0.97, 1.05), -4.0)
 		var melee = _nearest(sword_reach())
 		if melee != null:
-			melee.take_damage(sword_damage * damage_multiplier, true)
+			melee.take_damage(sword_damage * damage_multiplier, true, "hero")
 		elif _gate_in(sword_reach()):
 			battle.damage_gate(1 - side, sword_damage * damage_multiplier)
 	else:
@@ -271,7 +309,7 @@ func _land_hero() -> void:
 			aim_x = float(ranged.position.x)
 		elif _gate_in(shoot_reach):
 			aim_x = gate_x
-		battle.fire_arrow(Vector2(position.x, road_y), Vector2(aim_x, road_y), shoot_damage * damage_multiplier, side, Color("fff6c8"), shoot_reach, road, true, _gate_in(shoot_reach), false)
+		battle.fire_arrow(Vector2(position.x, road_y), Vector2(aim_x, road_y), shoot_damage * damage_multiplier, side, Color("fff6c8"), shoot_reach, road, true, _gate_in(shoot_reach), false, "hero")
 
 
 func _act_clock() -> Vector2:
@@ -303,6 +341,8 @@ func _nearest(reach: float):
 	var best_d := reach
 	var mine := lane
 	for foe in battle.hostile_targets(side):
+		if foe.has_method("is_perched") and foe.is_perched():
+			continue
 		if int(foe.lane) != mine and not battle.is_boss(foe):
 			continue
 		var dist: float = absf(float(foe.position.x) - position.x)
@@ -377,6 +417,8 @@ func _draw() -> void:
 	draw_rect(Rect2(-26, -88, 52.0 * ratio, 6), Color("f2d38a") if ratio > 0.35 else Color("e24b3b"))
 	if level_stacks > 0:
 		draw_circle(Vector2(32, -85), 3.5, Color("e6c36a"))
+	if bone_t > 0.0 or numb > 0.0:
+		Painter.paint_ailment(self, bone_t, numb, bob_time)
 
 
 func _draw_slash() -> void:

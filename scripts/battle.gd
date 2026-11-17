@@ -484,11 +484,11 @@ func _enemy_ai(delta: float) -> void:
 	var human := str(rules.get("faction", "")) == "human"
 	var options: Array = ["spear", "spear", "scout"] if human else ["walker", "walker", "runner"]
 	if battle_time >= _rule_f("oni_at", 50.0):
-		options = ["captain", "guard", "satchel", "crossbow", "spear", "scout"] if human else ["oni", "brute", "bomber", "spitter", "walker", "runner"]
+		options = ["captain", "guard", "satchel", "crossbow", "spear", "scout"] if human else ["oni", "howler", "storm", "herald", "reaver", "shell", "walker", "runner"]
 	elif battle_time >= _rule_f("brute_at", 24.0):
-		options = ["guard", "satchel", "crossbow", "spear", "scout"] if human else ["brute", "bomber", "spitter", "walker", "runner"]
+		options = ["guard", "satchel", "crossbow", "spear", "scout"] if human else ["howler", "herald", "reaver", "shell", "viper", "walker", "runner"]
 	elif battle_time >= _rule_f("spitter_at", 12.0):
-		options = ["spear", "scout", "crossbow", "satchel", "spear"] if human else ["walker", "runner", "spitter", "bomber", "walker"]
+		options = ["spear", "scout", "crossbow", "satchel", "spear"] if human else ["viper", "shell", "walker", "runner"]
 	options.shuffle()
 	var spawned := false
 	for id in options:
@@ -523,8 +523,11 @@ func _try_enemy(id: String, ignore_cd: bool = false) -> bool:
 
 func _scaled_enemy(entry: Dictionary) -> Dictionary:
 	var copy: Dictionary = entry.duplicate()
+	var mult := _rule_f("dmg_mult", 1.0)
 	copy["hp"] = maxi(1, int(round(float(copy["hp"]) * _rule_f("hp_mult", 1.0))))
-	copy["damage"] = maxi(1, int(round(float(copy["damage"]) * _rule_f("dmg_mult", 1.0))))
+	copy["damage"] = maxi(1, int(round(float(copy["damage"]) * mult)))
+	if copy.has("swing"):
+		copy["swing"] = maxi(1, int(round(float(copy["swing"]) * mult)))
 	return copy
 
 
@@ -733,6 +736,20 @@ func _spawn(entry: Dictionary, side: int, forced_road: int = -1, back: float = 0
 	poof(unit.position, Color("f3e6c8") if side == 0 else Color("c6e38a"))
 
 
+func summon_for_herald() -> void:
+	var pool: Array = ["walker", "runner", "howler", "viper", "shell", "reaver"]
+	for call_n in 2:
+		if _count(1) >= MAX_SIDE:
+			return
+		var picked: String = str(pool[randi() % pool.size()])
+		var entry := Catalog.find_in(enemy_roster, picked)
+		if entry.is_empty():
+			continue
+		var copy := _scaled_enemy(entry)
+		copy["bounty"] = 0
+		_spawn(copy, 1)
+
+
 func _count(side: int) -> int:
 	var total := 0
 	for unit in units:
@@ -783,9 +800,9 @@ func damage_gate(defender_side: int, amount: float) -> void:
 		gate.take_damage(amount)
 
 
-func fire_arrow(from: Vector2, aim: Vector2, amount: float, side: int, color: Color, reach: float, road: int, bold: bool = false, hits_gate: bool = true, homing: bool = false) -> void:
+func fire_arrow(from: Vector2, aim: Vector2, amount: float, side: int, color: Color, reach: float, road: int, bold: bool = false, hits_gate: bool = true, homing: bool = false, from_id: String = "") -> void:
 	var arrow = ArrowScript.new()
-	arrow.setup(from, aim, amount, side, color, reach, road, self, bold, hits_gate, homing)
+	arrow.setup(from, aim, amount, side, color, reach, road, self, bold, hits_gate, homing, from_id)
 	world.add_child(arrow)
 	if duel and Net.role == "host":
 		var start := _to_norm(from)

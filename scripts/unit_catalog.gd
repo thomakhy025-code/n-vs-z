@@ -31,9 +31,12 @@ static func enemy_roster() -> Array:
 	return [
 		_e("walker", "Walker", 4, 1.5, 140, 16, 1.0, 70.0, 70.0, "melee", 54, 1.18, 3),
 		_e("runner", "Runner", 5, 3.0, 75, 14, 0.7, 62.0, 62.0, "melee", 118, 1.05, 3),
-		_e("brute", "Brute", 10, 6.5, 380, 26, 1.2, 76.0, 76.0, "melee", 34, 1.55, 7),
-		_e("spitter", "Spitter", 8, 5.0, 100, 18, 1.25, 330.0, 330.0, "ranged", 44, 1.12, 5),
-		_e("bomber", "Bomber", 8, 6.0, 55, 120, 0.7, 145.0, 70.0, "suicide", 102, 1.2, 5),
+		_swing(_e("howler", "Howler", 12, 8.0, 160, 18, 1.1, 70.0, 72.0, "howler", 62, 1.28, 6), 72),
+		_e("viper", "Viper", 7, 4.0, 58, 22, 1.2, 68.0, 64.0, "viper", 78, 1.08, 4),
+		_e("storm", "Storm", 14, 9.0, 76, 24, 4.0, 330.0, 330.0, "storm", 40, 1.22, 6),
+		_e("herald", "Herald", 10, 6.0, 68, 8, 1.3, 64.0, 60.0, "herald", 46, 1.16, 5),
+		_e("shell", "Shell", 12, 7.0, 680, 9, 1.45, 74.0, 70.0, "melee", 26, 1.62, 8),
+		_e("reaver", "Reaver", 10, 5.5, 230, 34, 0.95, 78.0, 76.0, "melee", 52, 1.36, 7),
 		_e("oni", "Oni", 22, 16.0, 860, 42, 1.5, 150.0, 100.0, "aoe", 30, 1.8, 14),
 		_e("spear", "Spear", 4, 1.5, 161, 18, 1.0, 70.0, 70.0, "melee", 54, 1.18, 3),
 		_e("scout", "Scout", 5, 3.0, 86, 16, 0.7, 62.0, 62.0, "melee", 118, 1.05, 3),
@@ -124,3 +127,8 @@ static func _e(id: String, name: String, cost: int, cooldown: float, hp: int, da
 		"self_damage": 40 if role == "suicide" else 0,
 		"bounty": bounty,
 	}
+
+
+static func _swing(row: Dictionary, swing: int) -> Dictionary:
+	row["swing"] = swing
+	return row

@@ -14,9 +14,10 @@ var bold: bool = false
 var hits_gate: bool = true
 var homing: bool = false
 var cosmetic: bool = false
+var from_id: String = ""
 
 
-func setup(from: Vector2, aim: Vector2, amount: float, side: int, color: Color, reach: float, road: int, field, heavy: bool = false, may_hit_gate: bool = true, seek_cross: bool = false) -> void:
+func setup(from: Vector2, aim: Vector2, amount: float, side: int, color: Color, reach: float, road: int, field, heavy: bool = false, may_hit_gate: bool = true, seek_cross: bool = false, shot_from: String = "") -> void:
 	battle = field
 	position = from
 	damage = amount
@@ -28,6 +29,7 @@ func setup(from: Vector2, aim: Vector2, amount: float, side: int, color: Color, 
 	bold = heavy
 	hits_gate = may_hit_gate
 	homing = seek_cross
+	from_id = shot_from
 	var delta := aim - from
 	if not seek_cross:
 		delta.y = 0.0
@@ -50,8 +52,10 @@ func _process(delta: float) -> void:
 	if cosmetic:
 		return
 	for foe in battle.hostile_targets(shooter_side):
+		if _perch_miss(foe):
+			continue
 		if _hits(foe):
-			foe.take_damage(damage)
+			foe.take_damage(damage, false, from_id)
 			_end()
 			return
 	if not hits_gate:
@@ -62,6 +66,14 @@ func _process(delta: float) -> void:
 		if abs(gx) <= 22.0 and gx * velocity.x >= -10.0:
 			gate.take_damage(damage)
 			_end()
+
+
+func _perch_miss(foe) -> bool:
+	if from_id == "archer":
+		return false
+	if foe != null and foe.has_method("is_perched") and foe.is_perched():
+		return true
+	return false
 
 
 func _hits(foe) -> bool:

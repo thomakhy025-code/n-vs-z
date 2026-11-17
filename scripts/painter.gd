@@ -85,6 +85,18 @@ static func _painted(kind: String) -> Dictionary:
 			return _look(Color("e0c2a0"), Color("4a4634"), Color("e24b3b"), "bomb", false, "soldier")
 		"oni":
 			return _look(Color("e0c2a0"), Color("3d3428"), Color("e6c36a"), "polearm", false, "soldier")
+		"howler":
+			return _look(Color("c4a882"), Color("6a4a32"), Color("e6c36a"), "hammer", false, "beast")
+		"viper":
+			return _look(Color("d7e2a8"), Color("3d6a45"), Color("c44536"), "spear", false, "beast")
+		"storm":
+			return _look(Color("d5e8f6"), Color("1c2438"), Color("7ec8ff"), "staff", false, "beast")
+		"herald":
+			return _look(Color("e6c36a"), Color("4a3048"), Color("e6c36a"), "staff", false, "beast")
+		"shell":
+			return _look(Color("8a9a78"), Color("7a8490"), Color("d7dde6"), "hammer", false, "beast")
+		"reaver":
+			return _look(Color("e0c2a0"), Color("3a1818"), Color("e24b3b"), "axe", false, "beast")
 		"boss":
 			return _look(Color("e0c2a0"), Color("241c16"), Color("e6c36a"), "polearm", false, "soldier")
 		"spear":
@@ -145,6 +157,14 @@ static func call_id(paint: String) -> String:
 			return "call_bow"
 		"satchel":
 			return "call_bomb"
+		"howler", "shell":
+			return "call_heavy"
+		"viper", "herald":
+			return "call_dead"
+		"storm":
+			return "call_magic"
+		"reaver":
+			return "call_oni"
 		"oni", "boss", "captain", "general":
 			return "call_oni"
 		"hero":
@@ -206,6 +226,18 @@ static func call_pitch(paint: String) -> float:
 			return 0.92
 		"brute":
 			return 0.86
+		"howler":
+			return 0.78
+		"viper":
+			return 1.24
+		"storm":
+			return 1.04
+		"herald":
+			return 0.82
+		"shell":
+			return 0.7
+		"reaver":
+			return 0.9
 		"walker", "spear":
 			return 0.94
 		"scout":
@@ -1043,6 +1075,10 @@ static func paint_local(ci: CanvasItem, look: Dictionary, pose: Dictionary) -> v
 		skin = skin.lerp(Color.WHITE, wash)
 		cloth = cloth.lerp(Color.WHITE, wash)
 		trim = trim.lerp(Color.WHITE, wash)
+	var beast := str(look.get("paint", ""))
+	if _is_beast(beast):
+		_paint_beast(ci, beast, phase, beat, t, clock, pose)
+		return
 	var weapon := str(pose.get("tool", look["weapon"]))
 	var paint := str(look.get("paint", ""))
 	var faction := str(look.get("faction", "ninja"))
@@ -2257,3 +2293,249 @@ static func _ellipse(ci: CanvasItem, center: Vector2, rx: float, ry: float, colo
 		pts.append(_around(center + Vector2(cos(angle) * rx, sin(angle) * ry)))
 	if pts.size() >= 3:
 		ci.draw_colored_polygon(pts, color)
+
+
+static func _is_beast(paint: String) -> bool:
+	return paint == "howler" or paint == "viper" or paint == "storm" or paint == "herald" or paint == "shell" or paint == "reaver"
+
+
+static func paint_ailment(ci: CanvasItem, bone: float, still: float, clock: float) -> void:
+	if still > 0.0:
+		var ring := 0.28 + 0.22 * sin(clock * 6.0)
+		_arc(ci, Vector2(0, -18), 24.0, 0.4, TAU - 0.2, 18, Color(0.62, 0.9, 0.7, ring), 2.2)
+	if bone <= 0.0:
+		return
+	var blink := 0.2 + 0.8 * absf(sin(clock * 16.0))
+	var chalk := Color(0.96, 0.94, 0.88, clampf(bone / 0.9, 0.0, 1.0) * blink)
+	_line(ci, Vector2(-12, -36), Vector2(-3, -18), chalk, 2.4)
+	_line(ci, Vector2(10, -38), Vector2(2, -16), chalk, 2.4)
+	_line(ci, Vector2(-8, -6), Vector2(11, 0), chalk, 2.4)
+	_dot(ci, Vector2(0, -46), 3.4, chalk)
+	_line(ci, Vector2(-5, -48), Vector2(5, -43), chalk, 1.8)
+
+
+static func _paint_beast(ci: CanvasItem, paint: String, phase: String, beat: int, t: float, clock: float, pose: Dictionary) -> void:
+	var hang := float(pose.get("hang", 0.0))
+	var calling := bool(pose.get("calling", false))
+	var step := 0.0
+	if phase == "march":
+		step = sin(clock * 8.0)
+	var chop := 0.0
+	if phase == "act":
+		if beat < 2:
+			chop = -0.85
+		elif beat == 2:
+			chop = lerpf(-0.15, 1.0, t)
+		else:
+			chop = lerpf(1.0, 0.05, t)
+	_tilt = 0.0
+	match paint:
+		"howler":
+			_beast_howler(ci, phase, chop, step, hang)
+		"viper":
+			_beast_viper(ci, phase, chop, step, clock)
+		"storm":
+			_beast_storm(ci, phase, chop, clock)
+		"herald":
+			_beast_herald(ci, phase, chop, calling, clock)
+		"shell":
+			_beast_shell(ci, phase, chop, step)
+		"reaver":
+			_beast_reaver(ci, phase, chop, step)
+	_tilt = 0.0
+
+
+static func _beast_howler(ci: CanvasItem, phase: String, chop: float, step: float, hang: float) -> void:
+	var fur := Color("6b4630")
+	var belly := Color("c4a070")
+	var face := Color("e7d2b0")
+	_ellipse(ci, Vector2(2, 20), 18, 4.4, Color(0, 0, 0, 0.3))
+	var hold := Vector2(-4, -22)
+	var swing := Vector2(16, 4)
+	if phase == "act":
+		var along := clampf(chop * 0.5 + 0.5, 0.0, 1.0)
+		swing = Vector2(lerpf(-6.0, 26.0, along), lerpf(-16.0, 10.0, along))
+	elif hang > 0.4:
+		swing = Vector2(10, 6)
+	if hang > 0.25:
+		_line(ci, Vector2(-26, -70), Vector2(18, -76), Color("2c261e"), 5.0)
+		_line(ci, Vector2(-6, -72), hold, Color("4a3b30"), 2.4)
+	var foot := 17.0 if hang < 0.45 else 10.0
+	_line(ci, Vector2(-5, 8), Vector2(-8.0 - step * 5.0, foot), fur.darkened(0.25), 4.4)
+	_line(ci, Vector2(4, 8), Vector2(8.0 + step * 5.0, foot), fur, 4.6)
+	_ellipse(ci, Vector2(1, 3), 14, 12, fur)
+	_ellipse(ci, Vector2(4, 5), 8, 7, belly)
+	_line(ci, Vector2(-2, -4), hold, fur.darkened(0.1), 4.8)
+	_dot(ci, hold, 3.4, face)
+	_line(ci, Vector2(4, -2), swing, fur, 5.2)
+	_dot(ci, swing, 3.6, face)
+	if phase == "act" and chop > 0.35:
+		_arc(ci, swing, 11.0, -1.1, 0.7, 10, Color(0.93, 0.78, 0.42, 0.75), 2.6)
+	_ellipse(ci, Vector2(8, -12), 10, 9, fur)
+	_ellipse(ci, Vector2(14, -11), 6.2, 4.6, face)
+	_dot(ci, Vector2(16.5, -12), 1.4, Color("1a140c"))
+	_poly(ci, PackedVector2Array([Vector2(2, -18), Vector2(-1, -28), Vector2(6, -16)]), fur)
+	_poly(ci, PackedVector2Array([Vector2(10, -18), Vector2(14, -27), Vector2(16, -14)]), fur.darkened(0.12))
+	_line(ci, Vector2(-10, 6), Vector2(-18, 12), fur.darkened(0.15), 3.4)
+
+
+static func _beast_viper(ci: CanvasItem, phase: String, chop: float, step: float, clock: float) -> void:
+	var scale_c := Color("2f6a45")
+	var belly := Color("d5e2a4")
+	var lunge := 0.0
+	if phase == "act":
+		lunge = maxf(chop, 0.0) * 7.0
+	_ellipse(ci, Vector2(2, 14), 24, 3.4, Color(0, 0, 0, 0.24))
+	for coil in 5:
+		var cx := -20.0 + float(coil) * 7.2
+		var cy := 6.0 + sin(clock * 6.0 + float(coil) + step) * 2.2
+		var rx := 5.2 + float(coil) * 0.35
+		_ellipse(ci, Vector2(cx, cy), rx, 4.2, scale_c if coil % 2 == 0 else scale_c.darkened(0.15))
+		_ellipse(ci, Vector2(cx + 0.6, cy + 1.0), rx * 0.45, 1.5, belly)
+	var neck := Vector2(12.0, 4.0)
+	var head := Vector2(18.0 + lunge, 1.0)
+	_ellipse(ci, neck, 5.0, 3.6, scale_c)
+	_poly(ci, PackedVector2Array([
+		head + Vector2(-4, 0),
+		head + Vector2(-1, -11),
+		head + Vector2(5, -1),
+	]), scale_c.darkened(0.2))
+	_ellipse(ci, head, 6.4, 4.2, scale_c.lightened(0.05))
+	_dot(ci, head + Vector2(2.4, -1.0), 1.45, Color("e24b3b"))
+	_line(ci, head + Vector2(5.2, 0.6), head + Vector2(10.0, 3.2), Color("f4f4f0"), 1.5)
+	_line(ci, head + Vector2(5.0, 2.2), head + Vector2(9.4, 5.4), Color("f4f4f0"), 1.5)
+	if phase == "act" and chop > 0.25:
+		_arc(ci, head + Vector2(6, 2), 7.0, -0.5, 0.85, 8, Color(0.72, 0.9, 0.45, 0.7), 2.0)
+
+
+static func _beast_storm(ci: CanvasItem, phase: String, chop: float, clock: float) -> void:
+	var robe := Color("1b2740")
+	var cloud := Color("e8f2fb")
+	var bolt := Color("d6f4ff")
+	_ellipse(ci, Vector2(0, 20), 16, 4.0, Color(0, 0, 0, 0.28))
+	_line(ci, Vector2(-5, 10), Vector2(-7, 18), robe.darkened(0.2), 3.6)
+	_line(ci, Vector2(5, 10), Vector2(7, 18), robe, 3.6)
+	_poly(ci, PackedVector2Array([
+		Vector2(-7, -10),
+		Vector2(7, -10),
+		Vector2(13, 14),
+		Vector2(-13, 14),
+	]), robe)
+	_line(ci, Vector2(-8, 6), Vector2(8, 8), Color("7ec8ff"), 2.0)
+	_ellipse(ci, Vector2(0, -16), 6.5, 6.2, Color("d5e6f4"))
+	_dot(ci, Vector2(-2.2, -16), 1.35, Color("e6c36a"))
+	_dot(ci, Vector2(2.4, -16), 1.35, Color("e6c36a"))
+	_ellipse(ci, Vector2(-9, -12), 7, 4.2, cloud)
+	_ellipse(ci, Vector2(8, -13), 8, 4.6, cloud)
+	var tip := Vector2(4, -32)
+	if phase == "act":
+		var lift := clampf(chop + 0.45, 0.0, 1.0)
+		tip = Vector2(lerpf(2.0, 14.0, lift), lerpf(-20.0, -36.0, lift))
+	_line(ci, Vector2(3, 0), tip, Color("8a7048"), 2.8)
+	_dot(ci, tip, 2.6, bolt)
+	var flick := sin(clock * 24.0) * 3.0
+	_line(ci, tip, tip + Vector2(6.0 + flick, 7.0), bolt, 2.2)
+	_line(ci, tip + Vector2(5.0, 5.0), tip + Vector2(12.0, 13.0), Color("fff6c8"), 1.7)
+	if phase == "act" and chop > 0.3:
+		_line(ci, tip + Vector2(8, 8), tip + Vector2(4, 16), bolt, 1.8)
+
+
+static func _beast_herald(ci: CanvasItem, phase: String, chop: float, calling: bool, clock: float) -> void:
+	var hide := Color("4a3050")
+	var mouth := Color("1a1018")
+	var gold := Color("e6c36a")
+	var open := calling or (phase == "act" and beat_open(chop))
+	_ellipse(ci, Vector2(0, 18), 13, 3.6, Color(0, 0, 0, 0.26))
+	_line(ci, Vector2(-4, 8), Vector2(-6, 17), hide.darkened(0.25), 3.6)
+	_line(ci, Vector2(3, 8), Vector2(6, 17), hide, 3.6)
+	_poly(ci, PackedVector2Array([
+		Vector2(-10, -2),
+		Vector2(9, -4),
+		Vector2(8, 12),
+		Vector2(-8, 12),
+	]), hide)
+	_ellipse(ci, Vector2(3, -12), 7, 6.5, hide.lightened(0.06))
+	_dot(ci, Vector2(1, -13), 1.15, gold)
+	_dot(ci, Vector2(5, -13), 1.15, gold)
+	var jaw := 3.6 if open else 1.8
+	_ellipse(ci, Vector2(8, -9), 3.4, jaw, mouth)
+	var horn := Vector2(12, -20)
+	if open:
+		horn = Vector2(14, -24)
+	_line(ci, Vector2(4, -6), horn, Color("d7c49a"), 3.2)
+	_poly(ci, PackedVector2Array([
+		horn + Vector2(-3, 1),
+		horn + Vector2(5, -2),
+		horn + Vector2(1, 4),
+	]), gold)
+	if open:
+		var mote := sin(clock * 7.0) * 2.5
+		_dot(ci, horn + Vector2(8, 2 + mote), 2.3, gold)
+		_dot(ci, horn + Vector2(13, 7 - mote), 1.7, Color("f3e6c8"))
+
+
+static func _beast_shell(ci: CanvasItem, phase: String, chop: float, step: float) -> void:
+	var plate := Color("6e7886")
+	var rim := Color("e7eef6")
+	var skin := Color("7f9474")
+	var shove := 0.0
+	if phase == "act":
+		shove = maxf(chop, 0.0) * 5.0
+	_ellipse(ci, Vector2(shove, 16), 22, 4.2, Color(0, 0, 0, 0.28))
+	_line(ci, Vector2(-12, 8), Vector2(-14.0 - step * 2.0, 16), skin, 3.4)
+	_line(ci, Vector2(-4, 10), Vector2(-3.0 + step * 2.0, 16), skin, 3.4)
+	_line(ci, Vector2(5, 10), Vector2(6.0 - step, 16), skin, 3.4)
+	_line(ci, Vector2(12, 8), Vector2(14.0 + step, 16), skin, 3.2)
+	_ellipse(ci, Vector2(shove, 1), 20, 13, plate)
+	_ellipse(ci, Vector2(shove - 3, -2), 13, 8, plate.lightened(0.1))
+	_line(ci, Vector2(shove - 14, 2), Vector2(shove + 12, 4), plate.darkened(0.18), 1.6)
+	_arc(ci, Vector2(shove, 1), 17.5, 3.4, 6.0, 14, rim, 2.6)
+	_ellipse(ci, Vector2(16 + shove, 3), 5.2, 4.2, skin)
+	_dot(ci, Vector2(18 + shove, 2.2), 1.15, Color("1a140c"))
+	if phase == "act" and chop > 0.35:
+		_arc(ci, Vector2(18 + shove, 5), 9.0, -0.7, 0.7, 8, Color(0.92, 0.94, 0.96, 0.75), 2.4)
+
+
+static func _beast_reaver(ci: CanvasItem, phase: String, chop: float, step: float) -> void:
+	var cloth := Color("3a1818")
+	var skin := Color("c9a888")
+	var horn := Color("e6c36a")
+	var steel := Color("d5dde6")
+	_ellipse(ci, Vector2(0, 20), 15, 4.0, Color(0, 0, 0, 0.28))
+	_line(ci, Vector2(-4, 8), Vector2(-7.0 - step * 6.0, 18), cloth.darkened(0.25), 4.2)
+	_line(ci, Vector2(3, 8), Vector2(8.0 + step * 6.0, 18), cloth, 4.4)
+	_poly(ci, PackedVector2Array([
+		Vector2(-13, -6),
+		Vector2(12, -8),
+		Vector2(11, 12),
+		Vector2(-11, 12),
+	]), cloth)
+	_line(ci, Vector2(-12, 1), Vector2(12, 3), Color("c44536"), 3.0)
+	_ellipse(ci, Vector2(3, -16), 8, 8, Color("2a1412"))
+	_ellipse(ci, Vector2(4, -15), 5.5, 5.2, skin.darkened(0.08))
+	_line(ci, Vector2(-1, -22), Vector2(-6, -32), horn, 2.8)
+	_line(ci, Vector2(6, -22), Vector2(11, -32), horn, 2.8)
+	_dot(ci, Vector2(2, -15), 1.25, Color("f0c14a"))
+	_dot(ci, Vector2(6.5, -15), 1.25, Color("f0c14a"))
+	var along := 0.35
+	if phase == "act":
+		along = clampf(chop * 0.5 + 0.55, 0.0, 1.0)
+	var grip := Vector2(lerpf(2.0, 12.0, along), lerpf(-2.0, 2.0, along))
+	var tip := Vector2(lerpf(-2.0, 22.0, along), lerpf(-24.0, 6.0, along))
+	_line(ci, Vector2(6, -4), grip, skin, 3.6)
+	_line(ci, grip, tip, Color("6b4a32"), 3.0)
+	var dir := tip - grip
+	var side := Vector2(-dir.y, dir.x)
+	if side.length() > 1.0:
+		side = side.normalized()
+	_poly(ci, PackedVector2Array([
+		grip + side * 5.0,
+		grip - side * 2.0,
+		tip,
+	]), steel)
+	if phase == "act" and chop > 0.4:
+		_arc(ci, tip, 12.0, -1.3, 0.55, 10, Color(0.9, 0.32, 0.22, 0.8), 2.8)
+
+
+static func beat_open(chop: float) -> bool:
+	return chop > -0.2

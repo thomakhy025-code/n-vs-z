@@ -45,6 +45,20 @@ var pending_foe = null
 var pending_gate = null
 var boss_marks: Array[Vector2] = []
 var net_id: int = 0
+var numb: float = 0.0
+var bone_t: float = 0.0
+var perched: bool = false
+var diving: bool = false
+var dive_t: float = 0.0
+var dive_from: Vector2 = Vector2.ZERO
+var dive_aim: Vector2 = Vector2.ZERO
+var dive_lane: int = 1
+var dive_prey = null
+var hang: float = 0.0
+var call_left: float = 3.0
+var call_flash: float = 0.0
+var bolt_t: float = 0.0
+var bolt_marks: Array[Vector2] = []
 
 
 func setup(field, entry: Dictionary, which_side: int) -> void:
@@ -71,6 +85,14 @@ func setup(field, entry: Dictionary, which_side: int) -> void:
 		attack_timer = 0.08
 	if role == "boss":
 		attack_timer = 0.9
+	if role == "howler":
+		perched = true
+		hang = 1.0
+		attack_timer = 0.35
+	if role == "storm":
+		attack_timer = float(entry["interval"])
+	if role == "herald":
+		call_left = 3.0
 	bob_time = randf() * TAU
 
 
@@ -90,9 +112,42 @@ func on_buff_death() -> void:
 	_report_down()
 
 
-func take_damage(amount: float, quiet: bool = false) -> void:
-	if not alive:
+func is_perched() -> bool:
+	return perched
+
+
+func apply_numb(seconds: float) -> void:
+	numb = maxf(numb, seconds)
+	winding = false
+	act = 0.0
+	strike_sent = true
+	moving = false
+
+
+func clear_numb() -> void:
+	if numb <= 0.0:
 		return
+	numb = 0.0
+	if battle != null:
+		battle.float_text(position + Vector2(0, -36), "clear", Color("8ee0a2"))
+
+
+func numb_left() -> float:
+	return numb
+
+
+func show_bones() -> void:
+	bone_t = 0.9
+
+
+func take_damage(amount: float, quiet: bool = false, from_id: String = "") -> bool:
+	if not alive:
+		return false
+	if perched and from_id != "archer":
+		return false
+	if str(data.get("id", "")) == "viper" and randf() < 0.75:
+		battle.float_text(position + Vector2(0, -48), "miss", Color("c9d6c4"))
+		return false
 	hp -= amount
 	flash = 0.16
 	hurt = 1.0
@@ -105,6 +160,7 @@ func take_damage(amount: float, quiet: bool = false) -> void:
 		hp = 0.0
 		alive = false
 		_report_down()
+	return true
 
 
 func _report_down() -> void:
@@ -160,12 +216,25 @@ func _process(delta: float) -> void:
 	attack_timer -= delta
 	blink_wait = maxf(0.0, blink_wait - delta)
 	bob_time += delta
-	if gust_lock > 0.0:
+	numb = maxf(0.0, numb - delta)
+	bone_t = maxf(0.0, bone_t - delta)
+	bolt_t = maxf(0.0, bolt_t - delta)
+	call_flash = maxf(0.0, call_flash - delta)
+	if not perched:
+		hang = move_toward(hang, 0.0, delta * 4.0)
+	if numb > 0.0:
+		winding = false
+		act = 0.0
+		strike_sent = true
+		moving = false
+	if gust_lock > 0.0 or numb > 0.0:
 		moving = false
 	elif role == "heal" or role == "buff":
 		_support(delta)
 	else:
 		_fight(delta)
+	if role == "herald" and numb <= 0.0 and gust_lock <= 0.0:
+		_herald(delta)
 	if _spans_roads() and battle.lane_ys.size() > 0:
 		z_index = int(battle.lane_ys[battle.lane_ys.size() - 1]) + 24
 	else:
@@ -174,6 +243,9 @@ func _process(delta: float) -> void:
 
 
 func _fight(delta: float) -> void:
+	if role == "howler" and perched:
+		_howler(delta)
+		return
 	if role == "assassin":
 		_hunt(delta)
 		return
@@ -299,8 +371,71 @@ func _try_blink() -> void:
 	Sfx.play("blink", 1.0, -4.0)
 
 
+func _herald(delta: float) -> void:
+	call_left -= delta
+	if call_left > 0.0:
+		return
+	call_left = 3.0
+	call_flash = 0.85
+	if not winding:
+		act = 1.0
+	if battle != null and battle.has_method("summon_for_herald"):
+		battle.summon_for_herald()
+
+
+func _howler(delta: float) -> void:
+	if diving:
+		act = 0.55
+		dive_t += delta / 0.38
+		var glide := clampf(dive_t, 0.0, 1.0)
+		position = dive_from.lerp(dive_aim, glide)
+		hang = 1.0 - glide
+		lane = dive_lane
+		moving = false
+		if glide < 1.0:
+			return
+		diving = false
+		perched = false
+		hang = 0.0
+		act = 0.0
+		var landed = dive_prey
+		dive_prey = null
+		if landed != null and is_instance_valid(landed) and landed.alive:
+			var swing := float(data.get("swing", data["damage"])) * damage_multiplier
+			landed.take_damage(swing, true, "howler")
+			lunge = 1.0
+			Sfx.play("hit_blunt", randf_range(0.9, 1.02), -5.0)
+		attack_timer = float(data["interval"])
+		return
+	var prey = _closest_prey()
+	if prey != null:
+		var gap := _along(prey)
+		if gap > -8.0 and gap <= 900.0:
+			diving = true
+			dive_t = 0.0
+			dive_from = position
+			dive_lane = int(prey.lane)
+			dive_prey = prey
+			var land_x: float = float(prey.position.x) - facing * 28.0
+			land_x = clampf(land_x, battle.player_front + 10.0, battle.enemy_front - 10.0)
+			dive_aim = Vector2(land_x, battle.lane_y(dive_lane))
+			act = 1.0
+			return
+	var foe = _closest_ahead(true)
+	var gate = battle.gate_for_attacker(side)
+	var siege := minf(float(data["reach"]), 150.0)
+	var at_line: bool = foe != null and _along(foe) <= 90.0
+	var at_gate: bool = gate != null and abs(position.x - float(gate.front_x)) <= siege + 6.0
+	if at_line or at_gate:
+		perched = false
+		return
+	moving = true
+	position.x += facing * float(data["speed"]) * delta
+	_clamp_x()
+
+
 func _try_strike(foe, gate) -> void:
-	if attack_timer > 0.0 or winding or gust_lock > 0.0:
+	if attack_timer > 0.0 or winding or gust_lock > 0.0 or numb > 0.0:
 		return
 	attack_timer = float(data["interval"])
 	act = 1.0
@@ -325,6 +460,8 @@ func _resolve_strike() -> void:
 		if ally != null and is_instance_valid(ally) and ally.alive:
 			var healed := 40.0 * float(data.get("rank_factor", 1.0))
 			ally.hp = minf(ally.max_hp, ally.hp + healed)
+			if ally.has_method("clear_numb"):
+				ally.clear_numb()
 			heal_flash = 0.55
 			battle.float_text(ally.position + Vector2(0, -46), "+%d" % int(round(healed)), Color("8ee0a2"))
 			Sfx.play("heal", randf_range(0.96, 1.05), -8.0)
@@ -337,11 +474,18 @@ func _resolve_strike() -> void:
 	var gate = pending_gate
 	if foe != null and (not is_instance_valid(foe) or not foe.alive):
 		foe = null
+	if role == "viper":
+		_strike_viper(amount, float(data["reach"]), gate)
+		return
+	if role == "storm":
+		_strike_storm(amount, float(data["reach"]), foe, gate)
+		return
 	if role != "suicide":
 		var swing := Painter.hit_id(str(look.get("weapon", "katana")))
 		Sfx.play(swing, randf_range(0.94, 1.06), -7.0)
 	var reach := float(data["reach"])
 	var siege := minf(reach, 150.0)
+	var from_id := str(data.get("id", ""))
 	if role == "ranged":
 		if foe != null and _along(foe) <= reach + 8.0:
 			var cross := int(foe.lane) != lane
@@ -349,10 +493,10 @@ func _resolve_strike() -> void:
 			if cross:
 				aim_y = float(foe.position.y)
 			var tint: Color = Color("b6e36a") if side == 1 else Color("f2d38a")
-			battle.fire_arrow(position + Vector2(0, -16), Vector2(float(foe.position.x), aim_y - 16.0), amount, side, tint, reach + 40.0, lane, false, true, cross)
+			battle.fire_arrow(position + Vector2(0, -16), Vector2(float(foe.position.x), aim_y - 16.0), amount, side, tint, reach + 40.0, lane, false, true, cross, from_id)
 		elif foe == null and gate != null and abs(position.x - gate.front_x) <= siege + 6.0:
 			var tint_gate: Color = Color("b6e36a") if side == 1 else Color("f2d38a")
-			battle.fire_arrow(position + Vector2(0, -16), Vector2(gate.front_x, position.y - 16.0), amount, side, tint_gate, reach + 40.0, lane, false, true, false)
+			battle.fire_arrow(position + Vector2(0, -16), Vector2(gate.front_x, position.y - 16.0), amount, side, tint_gate, reach + 40.0, lane, false, true, false, from_id)
 		return
 	if _is_boss():
 		_strike_boss(amount, reach)
@@ -360,7 +504,7 @@ func _resolve_strike() -> void:
 	if _is_berserker():
 		for other in battle.hostile_targets(side):
 			if abs(other.position.x - position.x) <= reach:
-				other.take_damage(amount, true)
+				other.take_damage(amount, true, from_id)
 		if gate != null and abs(position.x - gate.front_x) <= reach + 8.0:
 			gate.take_damage(amount)
 		return
@@ -369,18 +513,18 @@ func _resolve_strike() -> void:
 			if int(other.lane) != lane and not battle.is_boss(other):
 				continue
 			if abs(other.position.x - position.x) <= reach:
-				other.take_damage(amount, true)
+				other.take_damage(amount, true, from_id)
 		if gate != null and abs(position.x - gate.front_x) <= reach + 8.0:
 			gate.take_damage(amount)
 		if role == "suicide":
 			Sfx.play("explode", randf_range(0.92, 1.05), -3.0)
-			take_damage(float(data.get("self_damage", 40)), true)
+			take_damage(float(data.get("self_damage", 40)), true, from_id)
 		return
 	if foe != null and _along(foe) <= reach + 8.0:
 		if int(foe.lane) != lane:
 			strike_to = foe.position
 			show_strike = true
-		foe.take_damage(amount, true)
+		foe.take_damage(amount, true, from_id)
 	elif gate != null and abs(position.x - gate.front_x) <= siege + 6.0:
 		gate.take_damage(amount)
 
@@ -439,6 +583,8 @@ func _closest_ahead(same_road: bool):
 		var along := _along(foe)
 		if along < -8.0:
 			continue
+		if _ignores_perch(foe):
+			continue
 		if along < best_d:
 			best_d = along
 			best = foe
@@ -492,15 +638,97 @@ func _strike_boss(amount: float, reach: float) -> void:
 			second_d = along
 	boss_marks.clear()
 	if first != null:
-		first.take_damage(amount, true)
+		first.take_damage(amount, true, "boss")
 		boss_marks.append(first.global_position)
 	if second != null:
-		second.take_damage(amount, true)
+		second.take_damage(amount, true, "boss")
 		boss_marks.append(second.global_position)
 
 
 func _along(other) -> float:
 	return (other.position.x - position.x) * facing
+
+
+func _ignores_perch(foe) -> bool:
+	if foe == null or not is_instance_valid(foe) or not foe.has_method("is_perched"):
+		return false
+	if not foe.is_perched():
+		return false
+	return str(data.get("id", "")) != "archer"
+
+
+func _collect_ahead(limit: float) -> Array:
+	var found: Array = []
+	for body in battle.hostile_targets(side):
+		if int(body.lane) != lane and not battle.is_boss(body):
+			continue
+		var span := _along(body)
+		if span < -8.0 or span > limit:
+			continue
+		found.append(body)
+	return found
+
+
+func _hardest(group: Array):
+	var pick = null
+	var best := -1.0
+	for body in group:
+		var rating := 0.0
+		if body.has_method("damage_rating"):
+			rating = float(body.damage_rating())
+		if pick == null or rating > best:
+			best = rating
+			pick = body
+	return pick
+
+
+func _strike_viper(amount: float, reach: float, gate) -> void:
+	Sfx.play("hit_pierce", randf_range(0.92, 1.06), -6.0)
+	var ahead := _collect_ahead(100000.0)
+	var within := _collect_ahead(reach + 8.0)
+	var hold := ahead.size() < 2
+	var victim = _hardest(within)
+	if victim != null:
+		var bit = victim.take_damage(amount, true, "viper")
+		if hold and bit == true and is_instance_valid(victim) and victim.alive and victim.has_method("apply_numb"):
+			victim.apply_numb(2.0)
+		return
+	if gate != null and abs(position.x - gate.front_x) <= minf(reach, 150.0) + 6.0:
+		gate.take_damage(amount)
+
+
+func _strike_storm(amount: float, reach: float, foe, gate) -> void:
+	Sfx.play("hit_magic", randf_range(0.94, 1.05), -4.0)
+	var front = null
+	if foe != null and is_instance_valid(foe) and foe.alive and int(foe.lane) == lane and _along(foe) <= reach + 8.0:
+		front = foe
+	var pool: Array = []
+	for body in battle.hostile_targets(side):
+		if body == front:
+			continue
+		pool.append(body)
+	pool.shuffle()
+	var hits: Array = []
+	if front != null:
+		hits.append(front)
+	var extra := 4
+	if front == null:
+		extra = 5
+	var room := mini(extra, pool.size())
+	for pick_i in room:
+		hits.append(pool[pick_i])
+	bolt_marks.clear()
+	for struck in hits:
+		var zapped = struck.take_damage(amount, true, "storm")
+		if zapped == true and is_instance_valid(struck) and struck.alive:
+			if struck.has_method("apply_numb"):
+				struck.apply_numb(1.0)
+			if struck.has_method("show_bones"):
+				struck.show_bones()
+		bolt_marks.append(struck.global_position)
+	bolt_t = 0.55
+	if front == null and gate != null and abs(position.x - gate.front_x) <= minf(reach, 150.0) + 6.0:
+		gate.take_damage(amount)
 
 
 func _support_target():
@@ -512,8 +740,13 @@ func _support_target():
 		var along: float = float(ally.position.x - position.x) * facing
 		if along < -4.0 or along > float(data["reach"]):
 			continue
+		var held := 0.0
+		if ally.has_method("numb_left"):
+			held = float(ally.numb_left())
 		var score: float
-		if role == "heal":
+		if role == "heal" and held > 0.0:
+			score = 300000.0 + held
+		elif role == "heal":
 			if ally.hp >= ally.max_hp - 0.5:
 				continue
 			score = 100000.0 - ally.hp
@@ -561,7 +794,7 @@ func _pose() -> Dictionary:
 		t = 1.0 - clampf(hurt, 0.0, 1.0)
 	elif moving:
 		phase = "march"
-	return {"phase": phase, "t": t, "clock": bob_time, "flash": flash, "beat": beat}
+	return {"phase": phase, "t": t, "clock": bob_time, "flash": flash, "beat": beat, "hang": hang, "calling": call_flash > 0.0}
 
 
 func _road_span() -> float:
@@ -592,7 +825,8 @@ func _draw() -> void:
 	var bob := 0.0
 	if moving and alive and debut <= 0.0:
 		bob = sin(bob_time * 8.0) * 1.5
-	draw_set_transform(Vector2(0, bob + shift), 0, Vector2(facing * sc, sc))
+	var lift := -58.0 * hang
+	draw_set_transform(Vector2(0, bob + shift + lift), 0, Vector2(facing * sc, sc))
 	Painter.paint_local(self, look, _pose())
 	draw_set_transform(Vector2.ZERO, 0, Vector2.ONE)
 	if debut > 0.0 and alive:
@@ -630,6 +864,17 @@ func _draw() -> void:
 			draw_line(Vector2(0, -12), Vector2(facing * reach, local_y), Color(1, 0.72, 0.28, alpha * 0.9), 5.0)
 	if show_strike and lunge > 0.05:
 		draw_line(Vector2(0, -16), to_local(strike_to), Color(1, 0.86, 0.45, clampf(lunge, 0.0, 1.0)), 4.0)
+	if bolt_t > 0.0:
+		var glow := clampf(bolt_t / 0.55, 0.0, 1.0)
+		var bolt_i := 0
+		for bolt_at in bolt_marks:
+			var tip := to_local(bolt_at)
+			var mid := tip * 0.5 + Vector2(sin(tip.y * 0.07 + float(bolt_i)) * 18.0, -22.0)
+			draw_line(Vector2(0, -30), mid, Color(0.75, 0.92, 1.0, glow), 4.0)
+			draw_line(mid, tip, Color(1.0, 0.98, 0.86, glow), 2.2)
+			bolt_i += 1
+	if bone_t > 0.0 or numb > 0.0:
+		Painter.paint_ailment(self, bone_t, numb, bob_time)
 	if support_target != null and is_instance_valid(support_target) and support_target.alive:
 		var to: Vector2 = to_local(support_target.global_position)
 		var line := Color("8ee0a2") if role == "heal" else Color("e6c36a")
