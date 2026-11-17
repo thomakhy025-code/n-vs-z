@@ -21,7 +21,7 @@ There are three roads. Soldiers only march forward on the road where you called 
 
 If a runner slips past the line, you are the one who runs back. If your gate breaks, you lose. On a lesson, breaking their gate is not the end: nine of that monster walk out, and you win when those nine are dead. On level 40, a general walks out after their gate falls, and you win when the general dies. Every other level ends when their gate breaks.
 
-When their gate is down to a quarter of its blood, they immediately gain their starting gold again. From level 5 on they also gain that gold at half blood. From level 10 on they gain it at 70% blood as well.
+When their gate is down to a quarter of its blood, they immediately gain their starting gold again. At half blood, on every level, they gain 100 value at once. From level 20 on they also gain 100 value when the gate is still at 70% blood.
 
 The other gate calls its own fighters. On monster levels they are walkers, runners, brutes, spitters, bombers, and later an oni, and they have horns. On soldier levels they are spears, scouts, guards, crossbows, satchels, and a captain. Level 40's general is an officer.
 

@@ -955,20 +955,19 @@ func note_enemy_purse() -> void:
 		return
 	var ratio: float = float(enemy_gate.hp) / maxf(1.0, float(enemy_gate.max_hp))
 	var start: float = float(rules.get("start", ENEMY_START))
-	if level_no >= 10:
-		_pay_purse("70", 0.70, ratio, start)
-	if level_no >= 5:
-		_pay_purse("50", 0.50, ratio, start)
+	if level_no >= 20:
+		_pay_purse("70", 0.70, ratio, 100.0)
+	_pay_purse("50", 0.50, ratio, 100.0)
 	_pay_purse("25", 0.25, ratio, start)
 
 
-func _pay_purse(key: String, line: float, ratio: float, start: float) -> void:
+func _pay_purse(key: String, line: float, ratio: float, amount: float) -> void:
 	if ratio > line or purse_paid.has(key):
 		return
 	purse_paid[key] = true
-	enemy_value += start
+	enemy_value += amount
 	var stack := purse_paid.size() - 1
-	float_text(Vector2(enemy_front, lane_y(0) - 20.0 - float(stack) * 22.0), "+%d" % int(round(start)), Color("c6e38a"))
+	float_text(Vector2(enemy_front, lane_y(0) - 20.0 - float(stack) * 22.0), "+%d" % int(round(amount)), Color("c6e38a"))
 
 
 func on_gate_fallen(defender_side: int) -> void:
