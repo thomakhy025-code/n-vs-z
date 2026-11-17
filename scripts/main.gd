@@ -1585,13 +1585,15 @@ func _load_progress() -> void:
 		favorite = str(cfg.get_value("progress", "favorite", ""))
 		favorite_skin = str(cfg.get_value("progress", "favorite_skin", ""))
 		best_rank = clampi(int(cfg.get_value("progress", "best_rank", 0)), 0, 100000)
-		story_version = int(cfg.get_value("progress", "story_version", 0))
+		var stored_story: int = int(cfg.get_value("progress", "story_version", 0))
+		story_version = stored_story
 		story_seen = _unpack_seen(str(cfg.get_value("progress", "story_seen", "")))
-		if story_version < Story.VERSION:
+		if stored_story < Story.CAMPAIGN:
 			unlocked = 1
 			cleared = 0
 			rank_cleared = 0
 			rank_time = 0.0
+		if stored_story < Story.VERSION:
 			story_seen = {}
 			story_version = Story.VERSION
 			migrated = true
@@ -1770,9 +1772,10 @@ func _merge_from_cloud(data: Dictionary) -> void:
 		_save_progress()
 		return
 	var cloud_version := _whole(data.get("story_version", 0), 0)
-	if cloud_version >= Story.VERSION:
+	if cloud_version >= Story.CAMPAIGN:
 		unlocked = maxi(unlocked, clampi(_whole(data.get("unlocked", 1), 1), 1, Levels.count()))
 		cleared = maxi(cleared, clampi(_whole(data.get("cleared", 0), 0), 0, Levels.count()))
+	if cloud_version >= Story.VERSION:
 		for key in _unpack_seen(str(data.get("story_seen", ""))).keys():
 			story_seen[str(key)] = true
 	diamond_paid = maxi(diamond_paid, clampi(_whole(data.get("diamond_paid", 1), 1), 1, Levels.count()))
@@ -2221,7 +2224,7 @@ func _apply_profile(data: Dictionary) -> void:
 	var profile_version := _whole(data.get("story_version", 0), 0)
 	if cloud_name.length() >= 2:
 		game_name = cloud_name
-		if profile_version >= Story.VERSION and _better_record(cloud_level, cloud_time, rank_cleared, rank_time):
+		if profile_version >= Story.CAMPAIGN and _better_record(cloud_level, cloud_time, rank_cleared, rank_time):
 			rank_cleared = cloud_level
 			rank_time = cloud_time
 		var fav := str(data.get("favorite", ""))

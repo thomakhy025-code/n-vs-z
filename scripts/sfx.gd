@@ -4,7 +4,9 @@ var _players: Array[AudioStreamPlayer] = []
 var _bank: Dictionary = {}
 var _index: int = 0
 var _bed: AudioStreamPlayer
+var _voice: AudioStreamPlayer
 var _mood: String = ""
+var _voice_len: float = 0.0
 
 
 func _ready() -> void:
@@ -16,6 +18,18 @@ func _ready() -> void:
 	_bed = AudioStreamPlayer.new()
 	_bed.volume_db = -14.0
 	add_child(_bed)
+	_voice = AudioStreamPlayer.new()
+	_voice.volume_db = -2.0
+	add_child(_voice)
+
+
+func _process(_delta: float) -> void:
+	if _bed == null or _mood == "":
+		return
+	if _voice != null and _voice.playing:
+		_bed.volume_db = -22.0
+	else:
+		_bed.volume_db = _mood_db(_mood)
 
 
 func mood(place: String) -> void:
@@ -34,14 +48,43 @@ func mood(place: String) -> void:
 		wave.loop_end = maxi(1, frames)
 		stream = wave
 	_bed.stream = stream
-	_bed.volume_db = -16.0 if id == "story_dread" or id == "story_war" else -13.0
+	_bed.volume_db = _mood_db(id)
 	_bed.play()
+
+
+func narrate(line: String) -> void:
+	_voice_len = 0.0
+	if _voice != null and _voice.playing:
+		_voice.stop()
+	if line == "" or _voice == null:
+		return
+	var stream := _stream("tale_" + line.md5_text().substr(0, 12))
+	if stream == null:
+		return
+	_voice.stream = stream
+	_voice.pitch_scale = 1.0
+	_voice.volume_db = -2.0
+	_voice.play()
+	_voice_len = stream.get_length()
+
+
+func narration_length() -> float:
+	return _voice_len
 
 
 func stop_mood() -> void:
 	_mood = ""
+	_voice_len = 0.0
 	if _bed != null:
 		_bed.stop()
+	if _voice != null:
+		_voice.stop()
+
+
+func _mood_db(id: String) -> float:
+	if id == "story_dread" or id == "story_war":
+		return -16.0
+	return -13.0
 
 
 func _mood_id(place: String) -> String:
@@ -79,6 +122,8 @@ func _stream(id: String) -> AudioStream:
 	if _bank.has(id):
 		return _bank[id] as AudioStream
 	var path := "res://audio/%s.wav" % id
+	if not ResourceLoader.exists(path):
+		path = "res://audio/%s.mp3" % id
 	if not ResourceLoader.exists(path):
 		_bank[id] = null
 		return null

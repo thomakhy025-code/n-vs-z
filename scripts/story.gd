@@ -3,7 +3,8 @@ extends RefCounted
 # The campaign story. Lesson levels, the pages between fights, and who the clan can call.
 # A fresh roll each game would make these pages disagree with the fight, so the order is fixed.
 
-const VERSION := 2
+const CAMPAIGN := 2
+const VERSION := 3
 
 const LESSONS := {
 	1: "archer",
