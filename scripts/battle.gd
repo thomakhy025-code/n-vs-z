@@ -47,6 +47,7 @@ var player_rear: float = 48.0
 var enemy_rear: float = 1232.0
 var units: Array = []
 var buff_links: Dictionary = {}
+var hazards: Array = []
 var player_cd: Dictionary = {}
 var enemy_cd: Dictionary = {}
 var player_roster: Array = []
@@ -433,6 +434,7 @@ func _process(delta: float) -> void:
 		for id in enemy_cd.keys():
 			enemy_cd[id] = maxf(0.0, float(enemy_cd[id]) - delta)
 		player_value += PLAYER_INCOME * delta
+		_tick_hazards(delta)
 		if duel:
 			enemy_value += PLAYER_INCOME * delta
 			if hand_seen >= 0.0 and battle_time - hand_seen > 0.45 and foe != null:
@@ -482,13 +484,13 @@ func _enemy_ai(delta: float) -> void:
 		return
 	enemy_lock = _rule_f("spawn_gap", 0.42)
 	var human := str(rules.get("faction", "")) == "human"
-	var options: Array = ["spear", "spear", "scout"] if human else ["walker", "walker", "runner"]
+	var options: Array = ["knives", "knives", "firebow"] if human else ["walker", "walker", "runner"]
 	if battle_time >= _rule_f("oni_at", 50.0):
-		options = ["captain", "guard", "satchel", "crossbow", "spear", "scout"] if human else ["oni", "howler", "storm", "herald", "reaver", "shell", "walker", "runner"]
+		options = ["crow", "drum", "fan", "ward", "javelin", "firebow", "knives"] if human else ["oni", "howler", "storm", "herald", "reaver", "shell", "walker", "runner"]
 	elif battle_time >= _rule_f("brute_at", 24.0):
-		options = ["guard", "satchel", "crossbow", "spear", "scout"] if human else ["howler", "herald", "reaver", "shell", "viper", "walker", "runner"]
+		options = ["fan", "drum", "javelin", "ward", "knives"] if human else ["howler", "herald", "reaver", "shell", "viper", "walker", "runner"]
 	elif battle_time >= _rule_f("spitter_at", 12.0):
-		options = ["spear", "scout", "crossbow", "satchel", "spear"] if human else ["viper", "shell", "walker", "runner"]
+		options = ["knives", "firebow", "javelin", "ward"] if human else ["viper", "shell", "walker", "runner"]
 	options.shuffle()
 	var spawned := false
 	for id in options:
@@ -524,10 +526,24 @@ func _try_enemy(id: String, ignore_cd: bool = false) -> bool:
 func _scaled_enemy(entry: Dictionary) -> Dictionary:
 	var copy: Dictionary = entry.duplicate()
 	var mult := _rule_f("dmg_mult", 1.0)
+	var kind := str(copy.get("id", ""))
 	copy["hp"] = maxi(1, int(round(float(copy["hp"]) * _rule_f("hp_mult", 1.0))))
-	copy["damage"] = maxi(1, int(round(float(copy["damage"]) * mult)))
+	if kind == "ward":
+		copy["damage"] = 5
+	elif kind == "fan":
+		copy["damage"] = 3
+	elif kind == "drum":
+		copy["damage"] = 0
+	else:
+		copy["damage"] = maxi(1, int(round(float(copy["damage"]) * mult)))
 	if copy.has("swing"):
 		copy["swing"] = maxi(1, int(round(float(copy["swing"]) * mult)))
+	if copy.has("opening"):
+		copy["opening"] = maxi(1, int(round(float(copy["opening"]) * mult)))
+	if copy.has("sword"):
+		copy["sword"] = maxi(1, int(round(float(copy["sword"]) * mult)))
+	if copy.has("burn"):
+		copy["burn"] = maxi(1, int(round(float(copy["burn"]) * mult)))
 	return copy
 
 
@@ -800,9 +816,9 @@ func damage_gate(defender_side: int, amount: float) -> void:
 		gate.take_damage(amount)
 
 
-func fire_arrow(from: Vector2, aim: Vector2, amount: float, side: int, color: Color, reach: float, road: int, bold: bool = false, hits_gate: bool = true, homing: bool = false, from_id: String = "") -> void:
+func fire_arrow(from: Vector2, aim: Vector2, amount: float, side: int, color: Color, reach: float, road: int, bold: bool = false, hits_gate: bool = true, homing: bool = false, from_id: String = "", hazard_kind: String = "", hazard_amount: float = 0.0) -> void:
 	var arrow = ArrowScript.new()
-	arrow.setup(from, aim, amount, side, color, reach, road, self, bold, hits_gate, homing, from_id)
+	arrow.setup(from, aim, amount, side, color, reach, road, self, bold, hits_gate, homing, from_id, hazard_kind, hazard_amount)
 	world.add_child(arrow)
 	if duel and Net.role == "host":
 		var start := _to_norm(from)
@@ -924,15 +940,24 @@ func on_unit_down(unit) -> void:
 	for source in snapshot:
 		if not buff_links.has(source):
 			continue
+		var stored = buff_links[source]
 		if source == unit:
-			var target = buff_links[source]
 			var spent := float(buff_power.get(source, 0.2))
 			buff_links.erase(source)
 			buff_power.erase(source)
-			if _can_buff(target) and target != unit:
-				target.remove_level_buff(spent)
-		elif buff_links[source] == unit:
-			buff_links[source] = null
+			var marked: Array = []
+			if stored is Array:
+				marked = stored
+			elif stored != null:
+				marked.append(stored)
+			for marked_one in marked:
+				if _can_buff(marked_one) and marked_one != unit:
+					marked_one.remove_level_buff(spent)
+		elif stored is Array:
+			if stored.has(unit):
+				stored.erase(unit)
+		elif stored == unit:
+			buff_links[source] = []
 	if boss_up and _unit_id(unit) == "boss":
 		_finish_battle(1)
 		return
@@ -943,23 +968,46 @@ func on_unit_down(unit) -> void:
 
 
 func set_buff_link(buffer, target) -> void:
+	var one: Array = []
+	if target != null:
+		one.append(target)
+	set_buff_group(buffer, one)
+
+
+func set_buff_group(buffer, targets: Array) -> void:
 	var power := 0.2
 	if buffer != null and "data" in buffer and buffer.data is Dictionary:
 		power = 0.2 * float(buffer.data.get("rank_factor", 1.0))
-	var prev = buff_links.get(buffer, null)
-	if prev == target:
-		return
-	var prev_power := float(buff_power.get(buffer, 0.2))
-	if _can_buff(prev):
-		prev.remove_level_buff(prev_power)
-	if target == null:
+	var prev = buff_links.get(buffer, [])
+	var old: Array = []
+	if prev is Array:
+		old = prev
+	elif prev != null:
+		old.append(prev)
+	var next: Array = []
+	for pick in targets:
+		if not _can_buff(pick) or next.has(pick):
+			continue
+		next.append(pick)
+	var spent := float(buff_power.get(buffer, power))
+	for old_one in old:
+		if next.has(old_one):
+			continue
+		if _can_buff(old_one):
+			old_one.remove_level_buff(spent)
+	var added := false
+	for chosen in next:
+		if old.has(chosen):
+			continue
+		chosen.apply_level_buff(power)
+		added = true
+	if next.is_empty():
 		buff_links.erase(buffer)
 		buff_power.erase(buffer)
 		return
-	buff_links[buffer] = target
+	buff_links[buffer] = next
 	buff_power[buffer] = power
-	if _can_buff(target):
-		target.apply_level_buff(power)
+	if added:
 		Sfx.play("buff", 1.0, -6.0)
 
 
@@ -1651,3 +1699,137 @@ func _from_norm(nx: float, ny: float) -> Vector2:
 func _ink(color: Color) -> Color:
 	var lum := color.r * 0.3 + color.g * 0.59 + color.b * 0.11
 	return Color("1c140e") if lum > 0.62 else Color("f3e6c8")
+
+
+func lay_hazard(kind: String, road: int, at: Vector2, seconds: float, amount: float) -> void:
+	var origin := at.x
+	hazards.append({
+		"kind": kind,
+		"lane": road,
+		"origin": origin,
+		"x0": origin - 48.0,
+		"x1": origin + 48.0,
+		"y": at.y,
+		"left": seconds,
+		"tick": 0.25,
+		"dmg": amount,
+	})
+	queue_redraw()
+
+
+func spread_road(road: int, toward_x: float) -> void:
+	for patch in hazards:
+		if int(patch.get("lane", -1)) != road:
+			continue
+		var kind := str(patch.get("kind", ""))
+		if kind != "fire" and kind != "ice":
+			continue
+		var origin := float(patch.get("origin", toward_x))
+		patch["x0"] = minf(origin, toward_x)
+		patch["x1"] = maxf(origin, toward_x)
+		patch["left"] = float(patch.get("left", 0.0)) + 2.0
+	queue_redraw()
+
+
+func blow_road(road: int, attacker_side: int, amount: float, from_id: String) -> void:
+	var mid := (player_front + enemy_front) * 0.5
+	var castle_x := player_front + 18.0
+	if attacker_side == 0:
+		castle_x = enemy_front - 18.0
+	for body in hostile_targets(attacker_side):
+		var on_road := int(body.lane) == road or is_berserker(body) or is_boss(body)
+		if not on_road:
+			continue
+		var passed := float(body.position.x) > mid
+		if attacker_side == 0:
+			passed = float(body.position.x) < mid
+		var dest := mid if passed else castle_x
+		if body.has_method("take_damage"):
+			body.take_damage(amount, true, from_id)
+		if body.has_method("catch_blow"):
+			body.catch_blow(dest)
+	spread_road(road, castle_x)
+	var puff_y := lane_y(road)
+	var span := maxf(1.0, enemy_front - player_front)
+	for puff_i in 5:
+		var px := player_front + span * (float(puff_i) + 0.5) / 5.0
+		poof(Vector2(px, puff_y), Color("d5e6f2"))
+	Sfx.play("wind", 0.92, -6.0)
+	float_text(Vector2(mid, puff_y - 28.0), "WIND", Color("d5e6f2"))
+
+
+func _tick_hazards(delta: float) -> void:
+	if hazards.is_empty():
+		return
+	var kept: Array = []
+	for patch in hazards:
+		var left := float(patch.get("left", 0.0)) - delta
+		if left <= 0.0:
+			continue
+		patch["left"] = left
+		var tick := float(patch.get("tick", 0.0)) - delta
+		if tick <= 0.0:
+			_scorch(patch)
+			tick = 1.0
+		patch["tick"] = tick
+		kept.append(patch)
+	hazards = kept
+	queue_redraw()
+
+
+func _scorch(patch: Dictionary) -> void:
+	var road := int(patch.get("lane", 0))
+	var x0 := float(patch.get("x0", 0.0))
+	var x1 := float(patch.get("x1", 0.0))
+	var amount := float(patch.get("dmg", 0.0))
+	var kind := str(patch.get("kind", "fire"))
+	if amount <= 0.0:
+		return
+	var bodies: Array = units.duplicate()
+	for body in bodies:
+		if _stands_in(body, road, x0, x1):
+			body.take_damage(amount, true, kind)
+	if _stands_in(hero, road, x0, x1):
+		hero.take_damage(amount, true, kind)
+	if _stands_in(foe, road, x0, x1):
+		foe.take_damage(amount, true, kind)
+
+
+func _stands_in(body, road: int, x0: float, x1: float) -> bool:
+	if body == null or not is_instance_valid(body) or not body.alive:
+		return false
+	var wide := is_berserker(body) or is_boss(body)
+	if not wide and int(body.lane) != road:
+		return false
+	var x := float(body.position.x)
+	return x >= x0 - 0.5 and x <= x1 + 0.5
+
+
+func _draw() -> void:
+	for patch in hazards:
+		var kind := str(patch.get("kind", "fire"))
+		var x0 := float(patch.get("x0", 0.0))
+		var x1 := float(patch.get("x1", 0.0))
+		var y := float(patch.get("y", ground_y))
+		var span := maxf(8.0, x1 - x0)
+		var flames := clampi(int(span / 22.0), 1, 36)
+		var hot := Color("ff7a2a")
+		var core := Color("ffe08a")
+		if kind == "ice":
+			hot = Color("9fd4ff")
+			core = Color("eef7ff")
+		for flame_i in flames:
+			var fx := x0 + span * (float(flame_i) + 0.5) / float(flames)
+			var hop := sin(battle_time * 9.0 + fx * 0.07) * 4.0
+			var height := 16.0 + hop
+			draw_colored_polygon(PackedVector2Array([
+				Vector2(fx - 7.0, y + 6.0),
+				Vector2(fx + 7.0, y + 6.0),
+				Vector2(fx, y - height),
+			]), hot)
+			draw_colored_polygon(PackedVector2Array([
+				Vector2(fx - 3.0, y + 4.0),
+				Vector2(fx + 3.0, y + 4.0),
+				Vector2(fx, y - height * 0.45),
+			]), core)
+

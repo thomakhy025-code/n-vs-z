@@ -59,6 +59,10 @@ var call_left: float = 3.0
 var call_flash: float = 0.0
 var bolt_t: float = 0.0
 var bolt_marks: Array[Vector2] = []
+var roost: float = 0.0
+var crow_fresh: bool = false
+var throws_left: int = 0
+var drum_targets: Array = []
 
 
 func setup(field, entry: Dictionary, which_side: int) -> void:
@@ -89,10 +93,16 @@ func setup(field, entry: Dictionary, which_side: int) -> void:
 		perched = true
 		hang = 1.0
 		attack_timer = 0.35
-	if role == "storm":
+	if role == "storm" or role == "fan":
 		attack_timer = float(entry["interval"])
 	if role == "herald":
 		call_left = 3.0
+	if role == "crow":
+		roost = 3.0
+		crow_fresh = true
+		attack_timer = 0.05
+	if role == "javelin":
+		throws_left = 5
 	bob_time = randf() * TAU
 
 
@@ -229,7 +239,10 @@ func _process(delta: float) -> void:
 		moving = false
 	if gust_lock > 0.0 or numb > 0.0:
 		moving = false
-	elif role == "heal" or role == "buff":
+	elif role == "crow" and roost > 0.0:
+		roost -= delta
+		moving = false
+	elif role == "heal" or role == "buff" or role == "drum":
 		_support(delta)
 	else:
 		_fight(delta)
@@ -243,6 +256,9 @@ func _process(delta: float) -> void:
 
 
 func _fight(delta: float) -> void:
+	if role == "fan":
+		_fan(delta)
+		return
 	if role == "howler" and perched:
 		_howler(delta)
 		return
@@ -269,26 +285,42 @@ func _fight(delta: float) -> void:
 
 
 func _support(delta: float) -> void:
-	var target = _support_target()
-	support_target = target
-	if role == "heal" and target != null and attack_timer <= 0.0 and not winding:
-		attack_timer = float(data["interval"])
-		act = 1.0
-		winding = true
-		strike_sent = false
-		support_pulse = true
-		pending_foe = target
-	elif role == "buff":
-		battle.set_buff_link(self, target)
-		if target != null and attack_timer <= 0.0 and not winding:
+	var target = null
+	if role == "drum":
+		drum_targets = _drum_targets()
+		if not drum_targets.is_empty():
+			target = drum_targets[0]
+		battle.set_buff_group(self, drum_targets)
+		if not drum_targets.is_empty() and attack_timer <= 0.0 and not winding:
 			attack_timer = float(data["interval"])
 			act = 1.0
 			winding = true
 			strike_sent = false
 			support_pulse = false
+	else:
+		target = _support_target()
+		if role == "heal" and target != null and attack_timer <= 0.0 and not winding:
+			attack_timer = float(data["interval"])
+			act = 1.0
+			winding = true
+			strike_sent = false
+			support_pulse = true
+			pending_foe = target
+		elif role == "buff":
+			battle.set_buff_link(self, target)
+			if target != null and attack_timer <= 0.0 and not winding:
+				attack_timer = float(data["interval"])
+				act = 1.0
+				winding = true
+				strike_sent = false
+				support_pulse = false
+	support_target = target
 	var foe = _nearest_foe()
 	var blocked := foe != null and _along(foe) <= float(data["engage"])
-	if target != null or blocked or not _any_ally_ahead():
+	var holding := target != null
+	if role == "drum":
+		holding = not drum_targets.is_empty()
+	if holding or blocked or not _any_ally_ahead():
 		moving = false
 		return
 	moving = true
@@ -466,10 +498,13 @@ func _resolve_strike() -> void:
 			battle.float_text(ally.position + Vector2(0, -46), "+%d" % int(round(healed)), Color("8ee0a2"))
 			Sfx.play("heal", randf_range(0.96, 1.05), -8.0)
 		return
-	if role == "buff":
+	if role == "buff" or role == "drum":
+		return
+	var amount := float(data["damage"]) * damage_multiplier
+	if role == "fan":
+		_strike_fan(amount)
 		return
 	lunge = 1.0
-	var amount := float(data["damage"]) * damage_multiplier
 	var foe = pending_foe
 	var gate = pending_gate
 	if foe != null and (not is_instance_valid(foe) or not foe.alive):
@@ -486,6 +521,9 @@ func _resolve_strike() -> void:
 	var reach := float(data["reach"])
 	var siege := minf(reach, 150.0)
 	var from_id := str(data.get("id", ""))
+	if role == "firebow" or role == "javelin":
+		_loose_shot(amount, foe, gate)
+		return
 	if role == "ranged":
 		if foe != null and _along(foe) <= reach + 8.0:
 			var cross := int(foe.lane) != lane
@@ -520,6 +558,9 @@ func _resolve_strike() -> void:
 			Sfx.play("explode", randf_range(0.92, 1.05), -3.0)
 			take_damage(float(data.get("self_damage", 40)), true, from_id)
 		return
+	if role == "crow" and crow_fresh and foe != null and _along(foe) <= reach + 8.0:
+		amount = float(data.get("opening", amount)) * damage_multiplier
+		crow_fresh = false
 	if foe != null and _along(foe) <= reach + 8.0:
 		if int(foe.lane) != lane:
 			strike_to = foe.position
@@ -527,6 +568,101 @@ func _resolve_strike() -> void:
 		foe.take_damage(amount, true, from_id)
 	elif gate != null and abs(position.x - gate.front_x) <= siege + 6.0:
 		gate.take_damage(amount)
+
+
+func _fan(delta: float) -> void:
+	var someone := false
+	for body in battle.hostile_targets(side):
+		if int(body.lane) == lane or battle.is_berserker(body) or battle.is_boss(body):
+			someone = true
+			break
+	var gate = battle.gate_for_attacker(side)
+	moving = false
+	if someone or (gate != null and abs(position.x - gate.front_x) <= 156.0):
+		_try_strike(null, gate)
+		return
+	moving = true
+	position.x += facing * float(data["speed"]) * delta
+	_clamp_x()
+
+
+func _strike_fan(amount: float) -> void:
+	lunge = 1.0
+	battle.blow_road(lane, side, amount, str(data.get("id", "")))
+
+
+func _loose_shot(amount: float, foe, gate) -> void:
+	var reach := float(data["reach"])
+	var siege := minf(reach, 150.0)
+	var from_id := str(data.get("id", ""))
+	var tint := Color("ff7a2a") if role == "firebow" else Color("e6d3a1")
+	var hazard := ""
+	var burn := 0.0
+	if role == "firebow":
+		hazard = "fire"
+		burn = float(data.get("burn", 8.0))
+	var aim := Vector2.ZERO
+	var shoot := false
+	var cross := false
+	if foe != null and _along(foe) <= reach + 8.0:
+		var aim_y := position.y
+		if int(foe.lane) != lane:
+			aim_y = float(foe.position.y)
+			cross = true
+		aim = Vector2(float(foe.position.x), aim_y - 16.0)
+		shoot = true
+	elif gate != null and abs(position.x - gate.front_x) <= siege + 6.0:
+		aim = Vector2(gate.front_x, position.y - 16.0)
+		shoot = true
+	if shoot:
+		battle.fire_arrow(position + Vector2(0, -16), aim, amount, side, tint, reach + 40.0, lane, false, true, cross, from_id, hazard, burn)
+	if role == "javelin":
+		_spend_throw()
+
+
+func _spend_throw() -> void:
+	throws_left = maxi(0, throws_left - 1)
+	if throws_left > 0:
+		return
+	data["damage"] = int(data.get("sword", 12))
+	data["reach"] = 70.0
+	data["engage"] = 70.0
+	data["interval"] = 1.0
+	role = "melee"
+	attack_reach = 70.0
+	look["weapon"] = "shortsword"
+
+
+func _drum_targets() -> Array:
+	var picked: Array = []
+	for _slot in 3:
+		var best = null
+		var best_score := -1.0
+		for ally in battle.support_candidates(side):
+			if ally == self or not ally.alive or int(ally.lane) != lane:
+				continue
+			if picked.has(ally):
+				continue
+			var along: float = float(ally.position.x - position.x) * facing
+			if along < -4.0 or along > float(data["reach"]):
+				continue
+			var score: float = ally.damage_rating()
+			if score > best_score:
+				best_score = score
+				best = ally
+		if best == null:
+			break
+		picked.append(best)
+	return picked
+
+
+func catch_blow(at_x: float) -> void:
+	position.x = at_x
+	hurt = 0.8
+	gust_lock = 0.45
+	act = 0.0
+	winding = false
+	strike_sent = true
 
 
 func catch_gust(at_x: float) -> void:
@@ -794,7 +930,17 @@ func _pose() -> Dictionary:
 		t = 1.0 - clampf(hurt, 0.0, 1.0)
 	elif moving:
 		phase = "march"
-	return {"phase": phase, "t": t, "clock": bob_time, "flash": flash, "beat": beat, "hang": hang, "calling": call_flash > 0.0}
+	return {
+		"phase": phase,
+		"t": t,
+		"clock": bob_time,
+		"flash": flash,
+		"beat": beat,
+		"hang": hang,
+		"calling": call_flash > 0.0,
+		"roost": roost,
+		"spears": throws_left,
+	}
 
 
 func _road_span() -> float:
@@ -875,7 +1021,21 @@ func _draw() -> void:
 			bolt_i += 1
 	if bone_t > 0.0 or numb > 0.0:
 		Painter.paint_ailment(self, bone_t, numb, bob_time)
-	if support_target != null and is_instance_valid(support_target) and support_target.alive:
+	if role == "drum":
+		for marked in drum_targets:
+			if marked != null and is_instance_valid(marked) and marked.alive:
+				draw_line(Vector2(0, -20), to_local(marked.global_position), Color(0.9, 0.76, 0.42, 0.85), 2.0)
+		for note_i in 3:
+			var nx := sin(bob_time * 3.0 + float(note_i)) * 8.0 + float(note_i) * 9.0
+			var ny := -52.0 - float(note_i) * 7.0 + sin(bob_time * 5.0 + float(note_i)) * 3.0
+			draw_circle(Vector2(nx, ny), 3.0, Color("f4efe4"))
+			draw_line(Vector2(nx + 2.6, ny), Vector2(nx + 2.6, ny - 11.0), Color("f4efe4"), 1.3)
+	elif support_target != null and is_instance_valid(support_target) and support_target.alive:
 		var to: Vector2 = to_local(support_target.global_position)
 		var line := Color("8ee0a2") if role == "heal" else Color("e6c36a")
 		draw_line(Vector2(0, -20), to, Color(line.r, line.g, line.b, 0.85), 2.0)
+	if role == "fan" and lunge > 0.08:
+		var gust := clampf(lunge, 0.0, 1.0)
+		for gust_i in 4:
+			var gy := -30.0 + float(gust_i) * 12.0
+			draw_line(Vector2(0, gy), Vector2(facing * 240.0, gy - 4.0), Color(0.75, 0.9, 0.86, gust * 0.75), 2.0)

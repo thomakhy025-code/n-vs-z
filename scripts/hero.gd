@@ -37,6 +37,7 @@ var bob_time: float = 0.0
 var stepping: bool = false
 var down_timer: float = 0.0
 var home_lock: float = 0.0
+var gust_lock: float = 0.0
 var invuln: float = 0.0
 var look: Dictionary = {}
 var min_x: float = 80.0
@@ -173,6 +174,7 @@ func _process(delta: float) -> void:
 	muzzle = maxf(0.0, muzzle - delta)
 	invuln = maxf(0.0, invuln - delta)
 	home_lock = maxf(0.0, home_lock - delta)
+	gust_lock = maxf(0.0, gust_lock - delta)
 	numb = maxf(0.0, numb - delta)
 	bone_t = maxf(0.0, bone_t - delta)
 	if battle != null and battle.puppet:
@@ -195,7 +197,7 @@ func _process(delta: float) -> void:
 	if battle.finished or battle.paused:
 		queue_redraw()
 		return
-	if numb > 0.0:
+	if numb > 0.0 or gust_lock > 0.0:
 		dragging = false
 		winding = false
 		act = 0.0
@@ -317,6 +319,16 @@ func _act_clock() -> Vector2:
 	var beat := mini(3, int(u * 4.0))
 	var along := clampf(u * 4.0 - float(beat), 0.0, 1.0)
 	return Vector2(float(beat), along)
+
+
+func catch_blow(at_x: float) -> void:
+	position.x = clampf(at_x, min_x, max_x)
+	hurt = 0.8
+	gust_lock = 0.45
+	dragging = false
+	act = 0.0
+	winding = false
+	strike_sent = true
 
 
 func shove_back(at_x: float) -> void:
