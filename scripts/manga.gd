@@ -153,117 +153,372 @@ func _ground_y(rect: Rect2, place: String) -> float:
 
 func _place(rect: Rect2, place: String, time: float) -> void:
 	var ground_y := _ground_y(rect, place)
-	var sky_top := Color("efe6d4")
-	var sky_low := Color("d9cbb4")
-	var earth := Color("4a4034")
 	match place:
 		"village":
-			sky_top = Color("f0d7b0")
-			sky_low = Color("e2b7a0")
-			earth = Color("6a5340")
-		"night":
-			sky_top = Color("12141f")
-			sky_low = Color("2a3148")
-			earth = Color("12141c")
-		"cliff":
-			sky_top = Color("d5e4ef")
-			sky_low = Color("f7f1df")
-			earth = Color("5c564c")
-		"war":
-			sky_top = Color("8e9a9a")
-			sky_low = Color("c4b4a4")
-			earth = Color("3d3832")
-		"banners":
-			sky_top = Color("f3e2c8")
-			sky_low = Color("e4c4a4")
-			earth = Color("5a4636")
+			_scene_village(rect, ground_y, time)
 		"climb":
-			sky_top = Color("e7eef2")
-			sky_low = Color("c5d0d4")
-			earth = Color("5d675c")
-		"camp":
-			sky_top = Color("f0c49a")
-			sky_low = Color("c47a62")
-			earth = Color("3e342c")
+			_scene_climb(rect, ground_y, time)
+		"descent":
+			_scene_descent(rect, ground_y)
 		"mountain":
-			sky_top = Color("d7e4ee")
-			sky_low = Color("f4efe4")
-			earth = Color("6a6258")
+			_scene_mountain(rect, ground_y, time)
+		"quiet":
+			_scene_quiet(rect, ground_y, time)
+		"mist":
+			_scene_mist(rect, ground_y, time)
+		"stone":
+			_scene_stone(rect, ground_y)
+		"lone":
+			_scene_lone(rect, ground_y, time)
+		"camp":
+			_scene_camp(rect, ground_y, time)
+		"council":
+			_scene_council(rect, ground_y, time)
+		"depart":
+			_scene_depart(rect, ground_y)
+		"night":
+			_scene_night(rect, ground_y, time)
+		"vow":
+			_scene_vow(rect, ground_y)
+		"omen":
+			_scene_omen(rect, ground_y, time)
+		"banners":
+			_scene_banners(rect, ground_y, time)
+		"ash":
+			_scene_ash(rect, ground_y, time)
+		"low":
+			_scene_low(rect, ground_y, time)
+		"bury":
+			_scene_bury(rect, ground_y)
+		"between":
+			_scene_between(rect, ground_y, time)
+		"cliff":
+			_scene_cliff(rect, ground_y, time)
+		"war":
+			_scene_war(rect, ground_y, time)
 		_:
-			sky_top = Color("efe6d4")
-			sky_low = Color("d7cbb6")
-	_bands(rect, sky_top, sky_low, ground_y)
-	draw_rect(Rect2(rect.position.x, ground_y, rect.size.x, rect.end.y - ground_y), earth)
-	if place == "village":
-		_house(rect.position + Vector2(rect.size.x * 0.46, ground_y), 168.0, true)
-		_house(rect.position + Vector2(rect.size.x * 0.7, ground_y), 128.0, false)
-		_fence(rect.position + Vector2(rect.size.x * 0.18, ground_y), rect.size.x * 0.28)
-		_lantern(rect.position + Vector2(rect.size.x * 0.5, ground_y), time)
-		_path(rect, ground_y)
-		draw_rect(Rect2(rect.position.x, ground_y - 10.0, rect.size.x * 0.42, 16.0), Color(0.55, 0.62, 0.72, 0.16))
-		draw_rect(Rect2(rect.position.x + rect.size.x * 0.52, ground_y - 8.0, rect.size.x * 0.46, 14.0), Color(0.95, 0.55, 0.22, 0.14))
-	elif place == "climb":
-		_peak(rect, ground_y, 0.16, 130.0)
-		_peak(rect, ground_y, 0.4, 190.0)
-		_peak(rect, ground_y, 0.72, 150.0)
-		_pine(rect.position + Vector2(rect.size.x * 0.22, ground_y), 70.0)
-		_pine(rect.position + Vector2(rect.size.x * 0.84, ground_y), 92.0)
-		_mist(rect, ground_y, time, 0.28)
-		_steps(rect, ground_y)
-	elif place == "mountain":
-		_peak(rect, ground_y, 0.18, 170.0)
-		_peak(rect, ground_y, 0.46, 240.0)
-		_peak(rect, ground_y, 0.74, 180.0)
-		_cairn(rect.position + Vector2(rect.size.x * 0.62, ground_y))
-		_cloud(rect, time)
-		_wind(rect, ground_y, time)
-	elif place == "camp":
-		_peak(rect, ground_y, 0.2, 120.0)
-		_peak(rect, ground_y, 0.78, 140.0)
-		_tent(rect.position + Vector2(rect.size.x * 0.22, ground_y))
-		_fire(rect.position + Vector2(rect.size.x * 0.62, ground_y), time)
-		_stones(rect.position + Vector2(rect.size.x * 0.62, ground_y))
-		draw_circle(rect.position + Vector2(rect.size.x * 0.62, ground_y - 6.0), 54.0, Color(1.0, 0.55, 0.22, 0.08))
-	elif place == "night":
-		_stars(rect, time)
-		draw_circle(rect.position + Vector2(rect.size.x * 0.78, 54.0), 18.0, Color("f7f1df"))
-		draw_circle(rect.position + Vector2(rect.size.x * 0.78, 54.0), 28.0, Color(1, 1, 0.9, 0.08))
-		_peak(rect, ground_y, 0.18, 110.0)
-		_peak(rect, ground_y, 0.58, 150.0)
-		draw_rect(Rect2(rect.position.x + 12.0, ground_y - 8.0, rect.size.x - 24.0, 7.0), Color(0.75, 0.8, 0.92, 0.1))
-		_mist(rect, ground_y, time, 0.45)
-	elif place == "cliff":
-		var drop_x := rect.position.x + rect.size.x * 0.6
-		draw_rect(Rect2(drop_x, rect.position.y, rect.end.x - drop_x, rect.end.y - rect.position.y), Color("d5e4ef"))
-		var valley_y := rect.end.y - 36.0
-		draw_rect(Rect2(drop_x + 28.0, valley_y, rect.end.x - drop_x - 28.0, rect.end.y - valley_y), Color("8a9a78"))
-		draw_colored_polygon(PackedVector2Array([
-			Vector2(drop_x - 8.0, ground_y),
-			Vector2(drop_x + 36.0, valley_y),
-			Vector2(drop_x - 20.0, rect.end.y),
-			Vector2(drop_x - 70.0, rect.end.y),
-		]), Color("5c564c"))
-		var face := int((valley_y - ground_y) / 14.0)
-		for i in face:
-			var y := ground_y + 12.0 + float(i) * 14.0
-			draw_line(Vector2(drop_x - 36.0, y), Vector2(drop_x + 10.0, y + 6.0), Color("3e3832"), 2.0)
-		_far_village(Vector2(drop_x + rect.size.x * 0.12, valley_y))
-		_wind(rect, ground_y, time)
-	elif place == "war":
-		_smoke(rect, ground_y, time)
-		_banner(rect.position + Vector2(rect.size.x * 0.18, ground_y), Color("3d4634"), time)
-		_banner(rect.position + Vector2(rect.size.x * 0.78, ground_y), Color("8d2f28"), time + 0.6)
-		draw_line(Vector2(rect.position.x + rect.size.x * 0.5, rect.position.y + 20.0), Vector2(rect.position.x + rect.size.x * 0.5, ground_y), Color(0.1, 0.08, 0.06, 0.35), 2.0)
-	elif place == "banners":
-		_banner(rect.position + Vector2(rect.size.x * 0.62, ground_y), Color("c44536"), time)
-		_banner(rect.position + Vector2(rect.size.x * 0.78, ground_y), Color("8d2f28"), time + 0.4)
-		_banner(rect.position + Vector2(rect.size.x * 0.9, ground_y), Color("c4a574"), time + 0.9)
-		_dust(rect, ground_y, time)
-	else:
-		_lane_marks(rect, ground_y)
-		_gate_far(rect.position + Vector2(rect.size.x * 0.86, ground_y))
+			_scene_road(rect, ground_y, time)
 	_vignette(rect)
 	_frame(rect)
+
+
+func _sky(rect: Rect2, ground_y: float, top: Color, low: Color, earth: Color) -> void:
+	_bands(rect, top, low, ground_y)
+	draw_rect(Rect2(rect.position.x, ground_y, rect.size.x, rect.end.y - ground_y), earth)
+
+
+func _scene_village(rect: Rect2, ground_y: float, time: float) -> void:
+	_sky(rect, ground_y, Color("b7c0c8"), Color("e4ddd2"), Color("6a645c"))
+	_house(rect.position + Vector2(rect.size.x * 0.5, ground_y), 150.0, false)
+	_house(rect.position + Vector2(rect.size.x * 0.72, ground_y), 118.0, false)
+	var door := rect.position + Vector2(rect.size.x * 0.5 + 58.0, ground_y)
+	draw_line(Vector2(door.x, door.y - 28.0), Vector2(door.x + 16.0, door.y), Color("1c140e"), 3.0)
+	_fence(rect.position + Vector2(rect.size.x * 0.34, ground_y), rect.size.x * 0.22)
+	var sway := sin(time * 0.8) * 4.0
+	var hook := rect.position + Vector2(rect.size.x * 0.46, ground_y)
+	draw_line(Vector2(hook.x, hook.y - 150.0), Vector2(hook.x + sway, hook.y - 112.0), INK, 2.0)
+	draw_rect(Rect2(hook.x + sway - 8.0, hook.y - 112.0, 16.0, 20.0), Color("3a3228"))
+	for i in 7:
+		var x := rect.position.x + 30.0 + float(i) * (rect.size.x / 8.0)
+		var drift := fmod(time * 30.0 + float(i) * 40.0, 80.0)
+		draw_line(Vector2(x, rect.position.y + 20.0 + drift), Vector2(x + 10.0, rect.position.y + 48.0 + drift), Color(0.55, 0.6, 0.66, 0.28), 1.0)
+
+
+func _scene_climb(rect: Rect2, ground_y: float, time: float) -> void:
+	_sky(rect, ground_y, Color("c5d2dc"), Color("e7eef2"), Color("6d756c"))
+	_peak(rect, ground_y, 0.22, 240.0)
+	_peak(rect, ground_y, 0.7, 280.0)
+	_steps(rect, ground_y)
+	_pine(rect.position + Vector2(rect.size.x * 0.86, ground_y), 78.0)
+	var bank := ground_y - 170.0 + sin(time * 0.3) * 6.0
+	draw_rect(Rect2(rect.position.x, rect.position.y, rect.size.x, bank - rect.position.y), Color(0.97, 0.98, 0.98, 0.94))
+	draw_rect(Rect2(rect.position.x, bank, rect.size.x, 46.0), Color(0.94, 0.96, 0.97, 0.62))
+
+
+func _scene_descent(rect: Rect2, ground_y: float) -> void:
+	_sky(rect, ground_y, Color("d7e6f0"), Color("f7f1df"), Color("6a6258"))
+	var back := rect.position + Vector2(rect.size.x * 0.18, ground_y)
+	draw_colored_polygon(PackedVector2Array([
+		Vector2(rect.position.x, ground_y),
+		Vector2(back.x, ground_y - 220.0),
+		Vector2(back.x + 180.0, ground_y),
+	]), Color("6e7884"))
+	var x := rect.position.x + rect.size.x * 0.34
+	for i in 6:
+		var y := ground_y - 8.0 - float(5 - i) * 16.0
+		draw_rect(Rect2(x + float(i) * 48.0, y, 40.0, 6.0), Color("7a7268"))
+	var far := rect.position + Vector2(rect.size.x * 0.82, ground_y - 18.0)
+	draw_circle(far, 10.0, Color(0.95, 0.72, 0.35, 0.45))
+	_far_village(far + Vector2(-20.0, 8.0))
+
+
+func _scene_mountain(rect: Rect2, ground_y: float, time: float) -> void:
+	_sky(rect, ground_y, Color("c5d5e2"), Color("f7f4ee"), Color("7a736a"))
+	_peak(rect, ground_y, 0.58, 280.0)
+	_cairn(rect.position + Vector2(rect.size.x * 0.28, ground_y))
+	_wind(rect, ground_y, time)
+
+
+func _scene_quiet(rect: Rect2, ground_y: float, time: float) -> void:
+	_sky(rect, ground_y, Color("f6edd4"), Color("d7e4c8"), Color("6d7a58"))
+	_peak(rect, ground_y, 0.72, 150.0)
+	draw_circle(rect.position + Vector2(rect.size.x * 0.18, 64.0), 22.0, Color("f0c14a"))
+	for i in 9:
+		var x := rect.position.x + 24.0 + float(i) * (rect.size.x / 10.0)
+		var lean := sin(time * 0.6 + float(i)) * 3.0
+		draw_line(Vector2(x, ground_y), Vector2(x + lean, ground_y - 16.0), Color("3f5a3a"), 2.0)
+
+
+func _scene_mist(rect: Rect2, ground_y: float, time: float) -> void:
+	_sky(rect, ground_y, Color("e7eef2"), Color("f7f7f4"), Color("8a9188"))
+	_peak(rect, ground_y, 0.3, 260.0)
+	_peak(rect, ground_y, 0.62, 300.0)
+	for i in 4:
+		var y := ground_y - 20.0 - float(i) * 18.0
+		draw_line(Vector2(rect.position.x + 20.0, y), Vector2(rect.end.x - 40.0, y), Color(0.35, 0.32, 0.28, 0.22), 2.0)
+	var veil := rect.position.y + (ground_y - rect.position.y) * 0.28
+	draw_rect(Rect2(rect.position.x, veil, rect.size.x, ground_y - veil + 4.0), Color(0.97, 0.98, 0.98, 0.86))
+
+
+func _scene_stone(rect: Rect2, ground_y: float) -> void:
+	_sky(rect, ground_y, Color("8e989e"), Color("c5c8c4"), Color("5c615e"))
+	var slab := rect.position + Vector2(rect.size.x * 0.62, ground_y)
+	draw_colored_polygon(PackedVector2Array([
+		Vector2(slab.x - 80.0, ground_y),
+		Vector2(slab.x - 20.0, ground_y - 160.0),
+		Vector2(slab.x + 70.0, ground_y - 120.0),
+		Vector2(slab.x + 40.0, ground_y),
+	]), Color("6a706c"))
+	draw_line(Vector2(slab.x - 30.0, ground_y - 40.0), Vector2(slab.x + 24.0, ground_y - 90.0), Color("3e4442"), 2.0)
+	draw_line(Vector2(rect.position.x + 40.0, ground_y - 8.0), Vector2(rect.position.x + rect.size.x * 0.4, ground_y - 8.0), Color("3e4442"), 3.0)
+
+
+func _scene_lone(rect: Rect2, ground_y: float, time: float) -> void:
+	_sky(rect, ground_y, Color("5c6270"), Color("b7aea2"), Color("3a342e"))
+	var at := rect.position + Vector2(rect.size.x * 0.24, ground_y)
+	draw_colored_polygon(PackedVector2Array([
+		Vector2(at.x - 70.0, at.y),
+		Vector2(at.x + 8.0, at.y - 86.0),
+		Vector2(at.x + 78.0, at.y),
+	]), Color("4a4038"))
+	draw_line(Vector2(at.x + 8.0, at.y - 86.0), Vector2(at.x + 8.0, at.y), Color("2a241c"), 2.0)
+	var logs := at + Vector2(130.0, 0.0)
+	draw_rect(Rect2(logs.x, logs.y - 8.0, 36.0, 8.0), Color("1c140e"))
+	draw_rect(Rect2(logs.x + 8.0, logs.y - 14.0, 22.0, 6.0), Color("2a241c"))
+	var smoke_y := fmod(time * 12.0, 36.0)
+	draw_circle(logs + Vector2(18.0, -22.0 - smoke_y), 8.0, Color(0.55, 0.52, 0.48, 0.28))
+	_wind(rect, ground_y, time)
+
+
+func _scene_camp(rect: Rect2, ground_y: float, time: float) -> void:
+	_sky(rect, ground_y, Color("f0c49a"), Color("c47a62"), Color("3e342c"))
+	_peak(rect, ground_y, 0.84, 110.0)
+	var tent_at := rect.position + Vector2(rect.size.x * 0.14, ground_y)
+	draw_colored_polygon(PackedVector2Array([
+		Vector2(tent_at.x - 78.0, tent_at.y),
+		Vector2(tent_at.x, tent_at.y - 150.0),
+		Vector2(tent_at.x + 78.0, tent_at.y),
+	]), Color("6b3a32"))
+	draw_line(Vector2(tent_at.x, tent_at.y - 150.0), Vector2(tent_at.x, tent_at.y), Color("c4a574"), 2.0)
+	var rack := rect.position + Vector2(rect.size.x * 0.9, ground_y)
+	draw_line(Vector2(rack.x, ground_y), Vector2(rack.x, ground_y - 70.0), Color("5c3d24"), 3.0)
+	draw_line(Vector2(rack.x - 8.0, ground_y - 64.0), Vector2(rack.x + 6.0, ground_y - 8.0), Color("8a8176"), 3.0)
+	_fire(rect.position + Vector2(rect.size.x * 0.7, ground_y), time)
+	_stones(rect.position + Vector2(rect.size.x * 0.7, ground_y))
+	draw_circle(rect.position + Vector2(rect.size.x * 0.7, ground_y - 8.0), 70.0, Color(1.0, 0.55, 0.22, 0.1))
+
+
+func _scene_council(rect: Rect2, ground_y: float, time: float) -> void:
+	_sky(rect, ground_y, Color("2c2838"), Color("8a5a48"), Color("3a322c"))
+	var hearth := rect.position + Vector2(rect.size.x * 0.82, ground_y)
+	_fire(hearth, time * 0.6)
+	for i in 7:
+		var x := rect.position.x + rect.size.x * (0.18 + float(i) * 0.1)
+		draw_circle(Vector2(x, ground_y - 3.0), 5.0, Color("2a241c"))
+	draw_circle(hearth + Vector2(0.0, -12.0), 48.0, Color(1.0, 0.4, 0.16, 0.1))
+
+
+func _scene_depart(rect: Rect2, ground_y: float) -> void:
+	_sky(rect, ground_y, Color("e7eef2"), Color("f4efe4"), Color("6a6258"))
+	var at := rect.position + Vector2(rect.size.x * 0.22, ground_y)
+	draw_colored_polygon(PackedVector2Array([
+		Vector2(at.x - 50.0, at.y),
+		Vector2(at.x - 10.0, at.y - 22.0),
+		Vector2(at.x + 46.0, at.y),
+	]), Color("6b3a32"))
+	_peak(rect, ground_y, 0.08, 80.0)
+	var x := rect.position.x + rect.size.x * 0.4
+	for i in 5:
+		draw_rect(Rect2(x + float(i) * 56.0, ground_y - 6.0, 22.0, 4.0), Color("8a8176"))
+
+
+func _scene_night(rect: Rect2, ground_y: float, time: float) -> void:
+	_sky(rect, ground_y, Color("0c0e16"), Color("1c2436"), Color("10141c"))
+	_stars(rect, time)
+	var moon := rect.position + Vector2(rect.size.x * 0.8, 48.0)
+	draw_circle(moon, 12.0, Color("d7deea"))
+	_pine(rect.position + Vector2(rect.size.x * 0.12, ground_y), 120.0)
+	_pine(rect.position + Vector2(rect.size.x * 0.9, ground_y), 150.0)
+	var mouth := rect.position + Vector2(rect.size.x * 0.5, rect.position.y + 80.0)
+	draw_colored_polygon(PackedVector2Array([
+		mouth + Vector2(-18.0, 0.0),
+		mouth + Vector2(18.0, 0.0),
+		Vector2(rect.end.x - 80.0, ground_y),
+		Vector2(rect.position.x + 80.0, ground_y),
+	]), Color("2a3144"))
+	_mist(rect, ground_y, time, 0.55)
+
+
+func _scene_vow(rect: Rect2, ground_y: float) -> void:
+	_sky(rect, ground_y, Color("10182a"), Color("243044"), Color("161c28"))
+	var beam_x := rect.position.x + rect.size.x * 0.42
+	draw_rect(Rect2(beam_x, rect.position.y, 70.0, ground_y - rect.position.y), Color(0.9, 0.92, 1.0, 0.08))
+	draw_circle(rect.position + Vector2(rect.size.x * 0.72, 42.0), 14.0, Color("f7f1df"))
+	_peak(rect, ground_y, 0.78, 90.0)
+
+
+func _scene_omen(rect: Rect2, ground_y: float, time: float) -> void:
+	_sky(rect, ground_y, Color("140c10"), Color("4a2430"), Color("100e12"))
+	var moon := rect.position + Vector2(rect.size.x * 0.76, 70.0)
+	draw_circle(moon, 34.0, Color("8d3a32"))
+	draw_circle(moon + Vector2(-8.0, -4.0), 28.0, Color("c45a48"))
+	draw_colored_polygon(PackedVector2Array([
+		Vector2(rect.position.x, ground_y),
+		Vector2(rect.position.x + rect.size.x * 0.28, ground_y - 200.0),
+		Vector2(rect.position.x + rect.size.x * 0.55, ground_y),
+	]), Color("0c0a0c"))
+	for i in 6:
+		var x := rect.position.x + fmod(float(i) * 180.0 + time * 40.0, rect.size.x)
+		var y := rect.position.y + fmod(float(i) * 70.0 + time * 55.0, ground_y - rect.position.y)
+		draw_circle(Vector2(x, y), 1.8, Color(0.85, 0.25, 0.18, 0.7))
+
+
+func _scene_banners(rect: Rect2, ground_y: float, time: float) -> void:
+	_sky(rect, ground_y, Color("e7c9a4"), Color("c47a62"), Color("5a4636"))
+	var far := rect.position + Vector2(rect.size.x * 0.5, ground_y - 64.0)
+	draw_colored_polygon(PackedVector2Array([
+		far + Vector2(-22.0, 0.0),
+		far + Vector2(22.0, 0.0),
+		Vector2(rect.end.x - 16.0, ground_y),
+		Vector2(rect.position.x + 16.0, ground_y),
+	]), Color("6a5344"))
+	for i in 5:
+		var t := float(i) / 4.0
+		var y := lerpf(far.y, ground_y, t)
+		var spread := lerpf(18.0, rect.size.x * 0.38, t)
+		var cloth := Color("8d2f28") if i % 2 == 0 else Color("c44536")
+		_banner(Vector2(far.x - spread, y), cloth, time + float(i))
+		_banner(Vector2(far.x + spread, y), cloth.darkened(0.1), time + float(i) + 0.4)
+	_dust(rect, ground_y, time)
+
+
+func _scene_ash(rect: Rect2, ground_y: float, time: float) -> void:
+	_sky(rect, ground_y, Color("8a8680"), Color("c4beb4"), Color("5c5852"))
+	for i in 5:
+		var x := rect.position.x + 40.0 + float(i) * 70.0
+		draw_line(Vector2(x, ground_y - 2.0), Vector2(x + 16.0, ground_y - 2.0), Color("2a241c"), 2.0)
+		draw_line(Vector2(x + 8.0, ground_y - 8.0), Vector2(x + 22.0, ground_y - 8.0), Color("2a241c"), 2.0)
+	for i in 16:
+		var x := rect.position.x + fmod(float(i) * 83.0 + time * 16.0, rect.size.x)
+		var y := rect.position.y + fmod(float(i) * 47.0 + time * 26.0, ground_y - rect.position.y)
+		draw_rect(Rect2(x, y, 3.0, 2.0), Color(0.78, 0.75, 0.7, 0.5))
+
+
+func _scene_low(rect: Rect2, ground_y: float, time: float) -> void:
+	_sky(rect, ground_y, Color("d5dde4"), Color("e7d8c4"), Color("6a6258"))
+	var far_y := ground_y - 110.0
+	draw_rect(Rect2(rect.position.x, far_y, rect.size.x, ground_y - far_y), Color("8a9a78"))
+	var shop := Vector2(rect.position.x + rect.size.x * 0.68, far_y)
+	draw_rect(Rect2(shop.x, shop.y - 52.0, 84.0, 52.0), Color("5c4034"))
+	draw_colored_polygon(PackedVector2Array([
+		Vector2(shop.x - 8.0, shop.y - 48.0),
+		Vector2(shop.x + 42.0, shop.y - 78.0),
+		Vector2(shop.x + 92.0, shop.y - 48.0),
+	]), Color("3a3228"))
+	draw_rect(Rect2(shop.x + 62.0, shop.y - 110.0, 12.0, 40.0), Color("2a241c"))
+	draw_rect(Rect2(shop.x + 22.0, shop.y - 28.0, 14.0, 12.0), Color("e24b3b"))
+	var rise := fmod(time * 14.0, 48.0)
+	draw_circle(shop + Vector2(68.0, -116.0 - rise), 12.0 + rise * 0.2, Color(0.25, 0.22, 0.2, 0.35))
+	draw_line(Vector2(rect.position.x + 24.0, ground_y - 4.0), Vector2(shop.x, far_y), Color("5c564c"), 5.0)
+
+
+func _scene_bury(rect: Rect2, ground_y: float) -> void:
+	_sky(rect, ground_y, Color("6a6248"), Color("c4b49a"), Color("4a4034"))
+	_house(rect.position + Vector2(rect.size.x * 0.08, ground_y), 70.0, false)
+	for i in 3:
+		var x := rect.position.x + rect.size.x * (0.48 + float(i) * 0.14)
+		draw_colored_polygon(PackedVector2Array([
+			Vector2(x - 28.0, ground_y),
+			Vector2(x, ground_y - 22.0),
+			Vector2(x + 28.0, ground_y),
+		]), Color("5c5348"))
+		draw_line(Vector2(x, ground_y - 22.0), Vector2(x + 8.0, ground_y - 36.0), Color("8d5a4a"), 3.0)
+		draw_line(Vector2(x + 8.0, ground_y - 36.0), Vector2(x + 16.0, ground_y - 24.0), Color("8d5a4a"), 3.0)
+
+
+func _scene_between(rect: Rect2, ground_y: float, time: float) -> void:
+	_sky(rect, ground_y, Color("3a3040"), Color("c4a090"), Color("3e3832"))
+	draw_rect(Rect2(rect.position.x, rect.position.y, rect.size.x * 0.34, ground_y - rect.position.y), Color(0.08, 0.05, 0.1, 0.45))
+	draw_rect(Rect2(rect.position.x + rect.size.x * 0.66, rect.position.y, rect.size.x * 0.34, ground_y - rect.position.y), Color(0.7, 0.32, 0.22, 0.28))
+	draw_rect(Rect2(rect.position.x + rect.size.x * 0.38, ground_y - 12.0, rect.size.x * 0.24, 16.0), Color("8a8176"))
+	_banner(rect.position + Vector2(rect.size.x * 0.86, ground_y), Color("c44536"), time)
+	var horn := rect.position + Vector2(rect.size.x * 0.12, ground_y - 130.0)
+	draw_colored_polygon(PackedVector2Array([
+		horn + Vector2(-16.0, 28.0),
+		horn + Vector2(-28.0, -6.0),
+		horn + Vector2(0.0, 8.0),
+		horn + Vector2(28.0, -6.0),
+		horn + Vector2(16.0, 28.0),
+	]), Color("141018"))
+	draw_circle(horn + Vector2(-8.0, 10.0), 3.0, Color("8d2f28"))
+	draw_circle(horn + Vector2(8.0, 10.0), 3.0, Color("8d2f28"))
+
+
+func _scene_cliff(rect: Rect2, ground_y: float, time: float) -> void:
+	_sky(rect, ground_y, Color("d5e4ef"), Color("f7f1df"), Color("5c564c"))
+	var drop_x := rect.position.x + rect.size.x * 0.58
+	var valley_y := ground_y + 64.0
+	draw_rect(Rect2(drop_x, rect.position.y, rect.end.x - drop_x, valley_y - rect.position.y), Color("d5e4ef"))
+	for i in 6:
+		var stripe := Color("7d8f62") if i % 2 == 0 else Color("c4b48a")
+		var y := valley_y + float(i) * ((rect.end.y - valley_y) / 6.0)
+		draw_rect(Rect2(drop_x + 8.0, y, rect.end.x - drop_x - 16.0, (rect.end.y - valley_y) / 6.0 + 1.0), stripe)
+	draw_line(Vector2(drop_x + 70.0, valley_y + 18.0), Vector2(rect.end.x - 30.0, valley_y + 46.0), Color("7aa0b8"), 5.0)
+	draw_colored_polygon(PackedVector2Array([
+		Vector2(drop_x - 8.0, ground_y),
+		Vector2(drop_x + 36.0, valley_y),
+		Vector2(drop_x - 20.0, rect.end.y),
+		Vector2(drop_x - 80.0, rect.end.y),
+	]), Color("5c564c"))
+	var face := int((valley_y - ground_y) / 14.0)
+	for i in face:
+		var y := ground_y + 12.0 + float(i) * 14.0
+		draw_line(Vector2(drop_x - 36.0, y), Vector2(drop_x + 10.0, y + 6.0), Color("3e3832"), 2.0)
+	_far_village(Vector2(drop_x + rect.size.x * 0.16, valley_y + 36.0))
+	_wind(rect, ground_y, time)
+
+
+func _scene_war(rect: Rect2, ground_y: float, time: float) -> void:
+	_sky(rect, ground_y, Color("5c6060"), Color("c4a090"), Color("4a4038"))
+	draw_rect(Rect2(rect.position.x, ground_y - 16.0, rect.size.x * 0.42, rect.end.y - ground_y + 16.0), Color("2a2428"))
+	draw_rect(Rect2(rect.position.x + rect.size.x * 0.58, ground_y - 16.0, rect.size.x * 0.42, rect.end.y - ground_y + 16.0), Color("6a4034"))
+	_smoke(rect, ground_y, time)
+	_banner(rect.position + Vector2(rect.size.x * 0.1, ground_y), Color("1c140e"), time)
+	_banner(rect.position + Vector2(rect.size.x * 0.9, ground_y), Color("8d2f28"), time + 0.5)
+	var mid := rect.position.x + rect.size.x * 0.5
+	draw_line(Vector2(mid - 30.0, ground_y - 6.0), Vector2(mid + 10.0, ground_y - 28.0), Color("8a8176"), 3.0)
+	for i in 6:
+		var x := rect.position.x + 30.0 + float(i) * (rect.size.x / 7.0)
+		draw_line(Vector2(x, ground_y - 2.0), Vector2(x + 18.0, ground_y - 2.0), Color("2a241c"), 2.0)
+
+
+func _scene_road(rect: Rect2, ground_y: float, time: float) -> void:
+	_sky(rect, ground_y, Color("d7cfc4"), Color("c4b4a4"), Color("4a4034"))
+	_lane_marks(rect, ground_y)
+	_gate_far(rect.position + Vector2(rect.size.x * 0.9, ground_y))
+	var lintel := rect.position + Vector2(rect.size.x * 0.9, ground_y - 78.0)
+	draw_line(Vector2(lintel.x + 8.0, lintel.y + 4.0), Vector2(lintel.x + 28.0, lintel.y + 16.0), Color("3a3228"), 4.0)
+	_dust(rect, ground_y, time)
 
 
 func _frame(rect: Rect2) -> void:
@@ -439,15 +694,15 @@ func _vignette(rect: Rect2) -> void:
 
 func _mood_pitch(place: String) -> float:
 	match place:
-		"village":
+		"village", "lone", "vow", "bury":
 			return 0.82
-		"night", "banners":
+		"night", "banners", "omen", "ash", "low":
 			return 0.7
-		"war":
+		"war", "between":
 			return 0.64
-		"cliff", "mountain":
+		"cliff", "mountain", "quiet", "mist", "stone", "climb":
 			return 1.12
-		"camp":
+		"camp", "council":
 			return 0.96
 		_:
 			return 0.9

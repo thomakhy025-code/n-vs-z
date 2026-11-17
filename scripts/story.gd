@@ -141,6 +141,28 @@ static func outro_id(level_index: int) -> String:
 	return ""
 
 
+static func _card_place(index: int) -> String:
+	match index:
+		3, 6, 8, 15, 57:
+			return "road"
+		5, 17:
+			return "mist"
+		10, 11, 59:
+			return "night"
+		13:
+			return "stone"
+		19, 53:
+			return "quiet"
+		47, 48:
+			return "ash"
+		54:
+			return "low"
+		56:
+			return "bury"
+		_:
+			return "council"
+
+
 static func intro_panels(level_index: int) -> Array:
 	var id := intro_id(level_index)
 	if id == "":
@@ -151,7 +173,7 @@ static func intro_panels(level_index: int) -> Array:
 		return _return()
 	if id == "leave":
 		return _leave()
-	return [_panel("mountain", str(_CARDS[level_index]), [
+	return [_panel(_card_place(level_index), str(_CARDS[level_index]), [
 		_fig("hero", 0.34, "pace", false, false),
 		_fig("sword", 0.62, "low", false, false),
 	])]
@@ -188,18 +210,18 @@ static func _prologue() -> Array:
 			_fig("hero", 0.36, "still", false, false),
 			_fig("sword", 0.58, "low", false, false),
 		]),
-		_panel("camp", "For a while, the wind was the only visitor.", [
+		_panel("lone", "For a while, the wind was the only visitor.", [
 			_fig("hero", 0.42, "still", false, false),
 		]),
 		_panel("night", "Then shapes came up the lower road.", [
 			_fig("walker", 0.58, "creep", true, true),
 			_fig("brute", 0.76, "creep", true, true),
 		], "", true),
-		_panel("night", "We only know this.", [
+		_panel("vow", "We only know this.", [
 			_fig("hero", 0.34, "vow", false, false),
 			_fig("sword", 0.52, "offer", false, false),
 		], "The sword."),
-		_panel("night", "The mountain learned their names too.", [
+		_panel("omen", "The mountain learned their names too.", [
 			_fig("hero", 0.3, "still", false, false),
 			_fig("oni", 0.72, "loom", true, true),
 		]),
@@ -269,7 +291,7 @@ static func _learn_tale(id: String) -> String:
 
 static func _quiet() -> Array:
 	return [
-		_panel("mountain", "Months pass. The monsters stop coming.", [
+		_panel("quiet", "Months pass. The monsters stop coming.", [
 			_fig("hero", 0.4, "still", false, false),
 			_fig("berserker", 0.62, "wide", false, false),
 		]),
@@ -287,17 +309,17 @@ static func _quiet() -> Array:
 
 static func _return() -> Array:
 	return [
-		_panel("night", "The monsters come back up the mountain.", [
+		_panel("omen", "The monsters come back up the mountain.", [
 			_fig("hero", 0.28, "guard", false, false),
 			_fig("brute", 0.62, "creep", true, true),
 			_fig("oni", 0.8, "loom", true, true),
 		], "", true),
-		_panel("camp", "The clan asks why monsters and human soldiers have both come for them.", [
+		_panel("council", "The clan asks why monsters and human soldiers have both come for them.", [
 			_fig("hero", 0.34, "ask", false, false),
 			_fig("shield", 0.52, "brace", false, false),
 			_fig("heal", 0.7, "mend", false, false),
 		]),
-		_panel("camp", "They cannot prove it. They say the soldiers made the monsters and sent them.", [
+		_panel("council", "They cannot prove it. They say the soldiers made the monsters and sent them.", [
 			_fig("hero", 0.4, "ask", false, false),
 		], "A human hand."),
 	]
@@ -305,16 +327,16 @@ static func _return() -> Array:
 
 static func _leave() -> Array:
 	return [
-		_panel("camp", "They will not wait for the next wave to explain itself.", [
+		_panel("depart", "They will not wait for the next wave to explain itself.", [
 			_fig("hero", 0.36, "still", false, false),
 			_fig("saber", 0.56, "weigh", false, false),
 		]),
-		_panel("climb", "They leave their gate, to see the world, and walk toward the village where they were born.", [
+		_panel("descent", "They leave their gate, to see the world, and walk toward the village where they were born.", [
 			_fig("hero", 0.28, "pace", false, false),
 			_fig("sword", 0.44, "low", false, false),
 			_fig("horse", 0.64, "rein", false, false),
 		]),
-		_panel("road", "On that road, both armies find them.", [
+		_panel("between", "On that road, both armies find them.", [
 			_fig("brute", 0.22, "creep", false, true),
 			_fig("hero", 0.48, "guard", false, false),
 			_fig("walker", 0.74, "parade", true, false, true),

@@ -46,15 +46,15 @@ func stop_mood() -> void:
 
 func _mood_id(place: String) -> String:
 	match place:
-		"village":
+		"village", "lone", "vow", "bury":
 			return "story_lonely"
-		"camp":
+		"camp", "council":
 			return "story_hearth"
-		"night", "banners":
+		"night", "banners", "omen", "ash", "low":
 			return "story_dread"
-		"war":
+		"war", "between":
 			return "story_war"
-		"cliff", "mountain":
+		"cliff", "mountain", "quiet", "mist", "stone", "climb":
 			return "story_high"
 		_:
 			return "story_road"
