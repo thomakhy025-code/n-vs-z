@@ -1448,6 +1448,7 @@ func _show_upgrade() -> void:
 	screen = "upgrade"
 	var box := _open_page("Upgrade")
 	var purse := UiSkin.label("Coins  %d" % coins, 22, Color("1c140e"))
+	purse.name = "UpgradeCoins"
 	purse.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	purse.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(purse)
@@ -1472,6 +1473,7 @@ func _show_upgrade() -> void:
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	box.add_child(scroll)
 	var list := VBoxContainer.new()
+	list.name = "UpgradeList"
 	list.add_theme_constant_override("separation", 8)
 	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(list)
@@ -1483,35 +1485,86 @@ func _show_upgrade() -> void:
 
 
 func _upgrade_row(id: String) -> HBoxContainer:
-	var rank := _rank_of(id)
 	var who := "Hero"
 	if id != "hero":
 		var entry: Dictionary = Catalog.find_in(roster, id)
 		who = str(entry.get("name", id))
 	var row := HBoxContainer.new()
+	row.set_meta("rank_id", id)
+	row.set_meta("rank_who", who)
 	row.add_theme_constant_override("separation", 12)
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	var words := VBoxContainer.new()
 	words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	words.add_theme_constant_override("separation", 0)
-	var title := UiSkin.label("%s    rank %d of 20" % [who, rank], 16, Color("1c140e"))
+	var title := UiSkin.label("", 16, Color("1c140e"))
+	title.name = "RankTitle"
 	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	words.add_child(title)
+	var price := UiSkin.label("", 15, Color("8d2f28"))
+	price.name = "RankPrice"
+	price.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	words.add_child(price)
+	row.add_child(words)
+	var button := _menu_button("Rank up", Color("c44536"), _buy_rank.bind(id), 168, 16)
+	button.name = "RankPay"
+	button.custom_minimum_size = Vector2(168, 48)
+	row.add_child(button)
+	_paint_upgrade_row(row)
+	return row
+
+
+func _paint_upgrade_row(row: HBoxContainer) -> void:
+	var id := str(row.get_meta("rank_id", ""))
+	var who := str(row.get_meta("rank_who", id))
+	var rank := _rank_of(id)
+	var title := row.find_child("RankTitle", true, false) as Label
+	var price := row.find_child("RankPrice", true, false) as Label
+	var button := row.find_child("RankPay", true, false) as Button
+	if title != null:
+		title.text = "%s    rank %d of 20" % [who, rank]
 	var cost := 0
 	var pay := "Rank 20. Nothing left to pay."
 	if rank < 20:
 		cost = _rank_cost(rank)
 		pay = "Rank %d costs %d coins" % [rank + 1, cost]
-	var price := UiSkin.label(pay, 15, Color("8d2f28"))
-	price.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	words.add_child(price)
-	row.add_child(words)
-	var button := _menu_button("Rank up", Color("c44536"), _buy_rank.bind(id), 168, 16)
-	button.custom_minimum_size = Vector2(168, 48)
+	if price != null:
+		price.text = pay
+	if button == null:
+		return
 	button.disabled = rank >= 20 or coins < cost
 	button.text = "Full" if rank >= 20 else "%d coins" % cost
-	row.add_child(button)
-	return row
+
+
+func _paint_upgrade_page() -> bool:
+	var purse := find_child("UpgradeCoins", true, false) as Label
+	var list := find_child("UpgradeList", true, false) as VBoxContainer
+	if purse == null or list == null:
+		return false
+	purse.text = "Coins  %d" % coins
+	for child in list.get_children():
+		if child is HBoxContainer:
+			_paint_upgrade_row(child)
+	return true
+
+
+func _keep_upgrade_place() -> void:
+	var scroller := _find_scroll(self)
+	var kept := 0
+	if scroller != null:
+		kept = scroller.scroll_vertical
+	var list := find_child("UpgradeList", true, false) as VBoxContainer
+	if list != null and list.get_child_count() == _rank_ids().size() and _paint_upgrade_page():
+		return
+	_show_upgrade()
+	var fresh := _find_scroll(self)
+	if fresh == null or kept <= 0:
+		return
+	fresh.scroll_vertical = kept
+	get_tree().process_frame.connect(func() -> void:
+		if is_instance_valid(fresh):
+			fresh.scroll_vertical = kept
+	, CONNECT_ONE_SHOT)
 
 
 func _buy_rank(id: String) -> void:
@@ -1526,7 +1579,7 @@ func _buy_rank(id: String) -> void:
 	coins -= cost
 	upgrades[id] = rank + 1
 	_save_progress()
-	_show_upgrade()
+	_keep_upgrade_place()
 
 
 func _duel_terms_line() -> String:
@@ -1820,7 +1873,7 @@ func _merge_from_cloud(data: Dictionary) -> void:
 	elif screen == "skin":
 		_show_skin()
 	elif screen == "upgrade":
-		_show_upgrade()
+		_keep_upgrade_place()
 
 
 func _needs_name() -> bool:
@@ -2753,6 +2806,8 @@ func _battle_node() -> Node:
 
 
 func _find_scroll(node: Node) -> ScrollContainer:
+	if node.is_queued_for_deletion():
+		return null
 	if node is ScrollContainer:
 		return node as ScrollContainer
 	for child in node.get_children():
