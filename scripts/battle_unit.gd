@@ -68,6 +68,8 @@ var sit_left: float = 0.0
 var rounds: int = 4
 var loading: float = 0.0
 var smoke_tick: float = 0.15
+var _picture_stamp: String = ""
+var _pose_nudge: float = 0.0
 
 
 func setup(field, entry: Dictionary, which_side: int) -> void:
@@ -115,6 +117,7 @@ func setup(field, entry: Dictionary, which_side: int) -> void:
 	if role == "buck":
 		rounds = 4
 	bob_time = randf() * TAU
+	_pose_nudge = fposmod(bob_time, 0.1)
 
 
 func damage_rating() -> float:
@@ -212,11 +215,11 @@ func _process(delta: float) -> void:
 		if not alive:
 			fall_t += delta
 			modulate.a = maxf(0.0, 1.0 - fall_t * 1.65)
-			queue_redraw()
+			_keep_picture()
 			if modulate.a <= 0.0:
 				queue_free()
 			return
-		queue_redraw()
+		_keep_picture()
 		return
 	gust_lock = maxf(0.0, gust_lock - delta)
 	if gust_lock > 0.0:
@@ -236,12 +239,12 @@ func _process(delta: float) -> void:
 	if not alive:
 		fall_t += delta
 		modulate.a = maxf(0.0, 1.0 - fall_t * 1.65)
-		queue_redraw()
+		_keep_picture()
 		if modulate.a <= 0.0:
 			queue_free()
 		return
 	if battle.finished or battle.paused:
-		queue_redraw()
+		_keep_picture()
 		return
 	attack_timer -= delta
 	loading = maxf(0.0, loading - delta)
@@ -251,7 +254,7 @@ func _process(delta: float) -> void:
 			hp = 0.0
 			alive = false
 			_report_down()
-			queue_redraw()
+			_keep_picture()
 			return
 	blink_wait = maxf(0.0, blink_wait - delta)
 	bob_time += delta
@@ -287,7 +290,7 @@ func _process(delta: float) -> void:
 		z_index = int(battle.lane_ys[battle.lane_ys.size() - 1]) + 24
 	else:
 		z_index = int(position.y)
-	queue_redraw()
+	_keep_picture()
 
 
 func _fight(delta: float) -> void:
@@ -1228,6 +1231,148 @@ func _body_shift(sc: float) -> float:
 	if not _spans_roads():
 		return 0.0
 	return -0.5 * (BERSERK_TOP + BERSERK_BOTTOM) * sc
+
+
+# A crowded fight used to rebuild every body from polygons on every frame.
+# Hold that picture until the walk or attack frame, facing, skin, or hurt flash changes.
+func _keep_picture() -> void:
+	var stamp := _picture_key()
+	if stamp == _picture_stamp:
+		return
+	_picture_stamp = stamp
+	queue_redraw()
+
+
+func _picture_key() -> String:
+	var pose := _pose()
+	var phase := str(pose["phase"])
+	var along := float(pose["t"])
+	var beat := int(pose["beat"])
+	var clock := float(pose["clock"])
+	var frame := _held_frame(phase, along, beat, clock)
+	var skin: Color = look["skin"]
+	var cloth: Color = look["cloth"]
+	var trim: Color = look["trim"]
+	var flash_on := 0
+	if float(pose["flash"]) > 0.04:
+		flash_on = 1
+	var face := 1
+	if facing < 0.0:
+		face = -1
+	var weapon := str(look.get("weapon", ""))
+	var paint := str(look.get("paint", ""))
+	var faction := str(look.get("faction", ""))
+	var horns := 0
+	if bool(look.get("horns", false)):
+		horns = 1
+	var sash := 0
+	if bool(look.get("sash", false)):
+		sash = 1
+	var sheet := 0
+	if bool(look.get("sheet", false)):
+		sheet = 1
+	var helm := str(look.get("helm", ""))
+	var mount := 0
+	if bool(look.get("mount", false)):
+		mount = 1
+	var sc := int(round(_body_scale() * 20.0))
+	var hang_i := int(clampf(hang, 0.0, 1.0) * 4.0)
+	var roost_on := 0
+	if float(pose["roost"]) > 0.05:
+		roost_on = 1
+	var calling := 0
+	if bool(pose["calling"]):
+		calling = 1
+	var spears := int(pose["spears"])
+	var loading_on := 0
+	if float(pose["loading"]) > 0.05:
+		loading_on = 1
+	var sit_on := 0
+	if float(pose["sit"]) > 0.05:
+		sit_on = 1
+	var hp_i := int(round(hp))
+	var max_i := int(round(max_hp))
+	var stacks := level_stacks
+	var blink_on := 0
+	if role == "assassin" and blink_wait <= 0.0:
+		blink_on = 1
+	var bolt_on := 0
+	if bolt_t > 0.02:
+		bolt_on = 1
+	var bone_on := 0
+	if bone_t > 0.02:
+		bone_on = 1
+	var numb_on := 0
+	if numb > 0.02:
+		numb_on = 1
+	var strike_on := 0
+	if show_strike and lunge > 0.05:
+		strike_on = 1
+	var link := _link_stamp()
+	return "%s.%d.%d.%s.%s.%s.%s.%s.%s.%s.%d.%d.%d.%d.%d.%d.%d.%d.%d.%d.%d.%d.%d.%d.%d.%d.%d.%d.%d.%d.%s" % [
+		phase, frame, face,
+		skin.to_html(false), cloth.to_html(false), trim.to_html(false),
+		paint, weapon, faction, helm,
+		flash_on, horns, sash, sheet, mount, sc, hang_i, roost_on, calling,
+		spears, loading_on, sit_on, hp_i, max_i, stacks,
+		blink_on, bolt_on, bone_on, numb_on, strike_on,
+		link,
+	]
+
+
+func _held_frame(phase: String, along: float, beat: int, clock: float) -> int:
+	var paint := str(data.get("paint", ""))
+	var rate := 8.0
+	if paint == "runner" or paint == "scout":
+		rate = 11.0
+	if phase == "march":
+		return mini(7, int(fposmod(clock * rate, TAU) / TAU * 8.0))
+	if phase == "act":
+		var u := (float(beat) + clampf(along, 0.0, 0.999)) * 0.25
+		var wobble := _pose_nudge
+		var shown := clampf(u - wobble, 0.0, 0.999)
+		var shown_beat := mini(3, int(shown * 4.0))
+		var shown_t := shown * 4.0 - float(shown_beat)
+		var swing := shown_beat * 2 + mini(1, int(shown_t * 2.0))
+		if paint == "runner" or paint == "scout" or paint == "horse":
+			swing += mini(3, int(fposmod(clock * rate, TAU) / TAU * 4.0)) * 8
+		return swing
+	if phase == "idle":
+		var breath := mini(3, int(fposmod(clock * 2.1, TAU) / TAU * 4.0))
+		return breath + _prop_frame(paint) * 4
+	return mini(3, int(clampf(along, 0.0, 0.999) * 4.0)) + _prop_frame(paint) * 4
+
+
+func _prop_frame(paint: String) -> int:
+	if paint == "crow" or paint == "cow" or paint == "storm" or paint == "viper":
+		return mini(5, int(fposmod(bob_time * 6.0, TAU) / TAU * 6.0))
+	return 0
+
+
+func _link_stamp() -> String:
+	var text := ""
+	var spot := Vector2.ZERO
+	if role == "drum":
+		for marked in drum_targets:
+			if marked != null and is_instance_valid(marked) and marked.alive:
+				spot = marked.position
+				text += _cell(spot)
+	elif support_target != null and is_instance_valid(support_target) and support_target.alive:
+		spot = support_target.position
+		text = _cell(spot)
+	if bolt_t > 0.02:
+		for bolt_at in bolt_marks:
+			spot = bolt_at
+			text += _cell(spot)
+	if _is_boss():
+		for mark in boss_marks:
+			spot = mark
+			text += _cell(spot)
+	return text
+
+
+func _cell(at: Vector2) -> String:
+	return "%d,%d;" % [int(at.x) >> 3, int(at.y) >> 3]
 
 
 func _draw() -> void:
