@@ -81,13 +81,13 @@ func setup(field, entry: Dictionary, which_side: int) -> void:
 	hp = max_hp
 	attack_reach = float(entry["reach"])
 	look = Painter.look(str(entry["paint"]))
-	if battle != null and not battle.duel:
+	if battle != null and not battle.duel and side != 0:
 		var faction := ""
 		if battle.rules is Dictionary:
 			faction = str(battle.rules.get("faction", ""))
 		if bool(entry.get("trial", false)) or faction == "monster":
 			look = Painter.as_monster(look)
-		elif faction == "human" and not Painter.is_human_body(str(entry.get("paint", ""))):
+		elif faction == "human":
 			look = Painter.as_human(look)
 	attack_timer = 0.55 if role == "berserker" or role == "aoe" else 0.22
 	if role == "suicide":

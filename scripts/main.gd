@@ -3260,6 +3260,8 @@ class Portrait:
 			origin_y = size.y - 4.0 - foot_y * zoom
 		var origin := Vector2(size.x * 0.46, origin_y)
 		var look: Dictionary = Painter.look_as(kind, sheet, false)
+		if not Painter.wears_own(kind):
+			look = Painter.dress_foe(look)
 		draw_set_transform(origin, 0.0, Vector2(zoom, zoom))
 		Painter.paint_local(self, look, {
 			"phase": "model",
