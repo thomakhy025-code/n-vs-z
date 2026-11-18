@@ -440,8 +440,8 @@ static func _sheet_row(kind: String) -> Dictionary:
 			return {}
 
 
-# Every fighter uses this one body. A crowded fight used to rebuild a different
-# pile of polygons for each skin. These few boxes and one circle are the picture.
+# The roster shares one small body so a crowded fight stays light.
+# The sword soldier is the sample in the chunky icon style. Everyone else stays here.
 
 static func tale_span(name: String) -> float:
 	match name:
@@ -478,10 +478,13 @@ static func paint_local(ci: CanvasItem, look: Dictionary, pose: Dictionary) -> v
 		hip = Vector2(-1.0, 7.0)
 	elif phase == "debut":
 		hip.y = lerpf(16.0, 4.0, along)
-	var belt := _belt_color(look, trim)
 	var steel := _steel_color(look, trim)
-	var weapon := str(pose.get("tool", look.get("weapon", "katana")))
 	var paint := str(look.get("paint", ""))
+	if paint == "sword":
+		_paint_sword(ci, hip, step, chop, skin, cloth, trim, steel, phase, flash)
+		return
+	var belt := _belt_color(look, trim)
+	var weapon := str(pose.get("tool", look.get("weapon", "katana")))
 	_shadow(ci, hip)
 	if bool(look.get("mount", false)):
 		_mount(ci, cloth, trim, step)
@@ -725,4 +728,188 @@ static func _staff(ci: CanvasItem, paint: String, hand: Vector2, trim: Color, cl
 		ci.draw_rect(Rect2(hand.x - 4.0, hand.y - 7.0, 10.0, 8.0), cloth.lightened(0.15), true)
 		return
 	_bone(ci, hand, -1.15, 22.0, 2.8, trim)
+
+
+# The sword soldier only. Big rounded-square head, small body, one leg,
+# two arm segments, a plain sword, and a couple of flat clothing marks.
+static func _paint_sword(ci: CanvasItem, hip: Vector2, step: float, chop: float, skin: Color, cloth: Color, trim: Color, steel: Color, phase: String, flash: float) -> void:
+	var wash := clampf(flash * 4.0, 0.0, 0.72)
+	var ink := Color("1c140e").lerp(Color.WHITE, wash * 0.4)
+	var hair := Color("241c16").lerp(Color.WHITE, wash)
+	var collar := Color("d24b3c").lerp(Color.WHITE, wash)
+	var sash := Color("e2b034").lerp(Color.WHITE, wash)
+	var boot := cloth.lerp(Color("8a6244"), 0.72)
+	var sleeve := cloth.lightened(0.08)
+	var arm_skin := skin.darkened(0.04)
+	var skin_shade := skin.darkened(0.16)
+	var cloth_shade := cloth.darkened(0.22)
+	var hurt := phase == "hurt" or phase == "fall"
+	var boot_top := hip.y - 4.0
+	ci.draw_rect(Rect2(hip.x - 11.0, boot_top + 11.2, 24.0, 4.2), Color(0, 0, 0, 0.32), true)
+	var leg := Rect2(hip.x - 10.0 + step * 3.4, boot_top - 2.0, 20.0, 15.0)
+	var leg_pts := _turn(_squircle(leg, 4.5), Vector2(hip.x, boot_top), step * 0.36)
+	_paint_poly(ci, leg_pts, boot, ink, 2.5)
+	var body := Rect2(hip.x - 9.0, hip.y - 22.0, 18.0, 18.0)
+	_chunk(ci, body, 4.2, cloth, ink, 2.5)
+	_chunk(ci, Rect2(body.position.x + 2.2, body.position.y + 9.0, body.size.x - 4.4, 7.0), 2.2, cloth_shade, cloth_shade, 0.0)
+	_chunk(ci, Rect2(hip.x - 7.2, hip.y - 11.0, 14.4, 3.5), 1.3, sash, ink, 1.3)
+	var upper_angle := 0.05 - chop * 0.95 + step * 0.18
+	var shoulder := hip + Vector2(8.0, -9.0)
+	var elbow := _segment(ci, shoulder, upper_angle, 10.0, 7.0, sleeve, ink, 2.3)
+	var fore_angle := upper_angle - 0.62
+	var grip := _segment(ci, elbow, fore_angle, 9.4, 5.6, arm_skin, ink, 2.1)
+	var head := Rect2(hip.x - 17.0, hip.y - 48.0, 33.0, 30.0)
+	_chunk(ci, head, 7.6, skin, ink, 2.7)
+	_chunk(ci, Rect2(head.position.x + 3.2, head.position.y + 15.5, 10.0, 11.0), 3.0, skin_shade, skin_shade, 0.0)
+	_chunk(ci, Rect2(head.position.x + 2.2, head.position.y + 2.0, head.size.x - 4.4, 10.5), 4.6, hair, hair, 0.0)
+	_chunk(ci, Rect2(head.position.x + 2.2, head.position.y + 8.0, 8.0, 13.0), 2.8, hair, hair, 0.0)
+	var crest := PackedVector2Array()
+	var crown_y := head.position.y
+	crest.append(Vector2(head.position.x + 3.5, crown_y + 1.2))
+	crest.append(Vector2(head.position.x + 0.5, crown_y - 10.0))
+	crest.append(Vector2(head.position.x + 12.0, crown_y + 0.6))
+	var plume := trim.lerp(Color("f6f2e8"), 0.78).lerp(Color.WHITE, wash * 0.35)
+	_paint_poly(ci, crest, plume, ink, 2.0)
+	var eye_y := head.position.y + 14.6
+	var far_eye := Rect2(head.position.x + 12.5, eye_y, 5.5, 5.8)
+	var near_eye := Rect2(head.position.x + 20.2, eye_y - 0.3, 6.6, 6.4)
+	var brow := ink
+	if hurt:
+		_segment(ci, far_eye.position + Vector2(0.0, 2.0), 0.12, far_eye.size.x, 2.0, brow, brow, 0.0)
+		_segment(ci, near_eye.position + Vector2(0.0, 2.0), 0.02, near_eye.size.x, 2.1, brow, brow, 0.0)
+	else:
+		_segment(ci, far_eye.position + Vector2(-0.3, -3.2), -0.46, 6.2, 2.3, brow, brow, 0.0)
+		_segment(ci, near_eye.position + Vector2(-0.2, -3.4), -0.22, 7.2, 2.5, brow, brow, 0.0)
+		_chunk(ci, far_eye, 1.7, ink, ink, 1.15)
+		_chunk(ci, near_eye, 1.9, ink, ink, 1.25)
+		ci.draw_rect(Rect2(far_eye.position.x + 2.5, far_eye.position.y + 1.1, 1.5, 1.5), Color("fff6ea"), true)
+		ci.draw_rect(Rect2(near_eye.position.x + 3.4, near_eye.position.y + 1.15, 1.8, 1.8), Color("fff6ea"), true)
+	_chunk(ci, Rect2(far_eye.end.x - 0.2, eye_y + 5.0, 2.3, 3.4), 1.0, skin.darkened(0.2), skin.darkened(0.2), 0.0)
+	var mouth := Color("8d403c").lerp(Color.WHITE, wash)
+	_segment(ci, Vector2(near_eye.position.x - 0.4, eye_y + 9.2), 0.06, 6.0, 2.15, mouth, mouth, 0.0)
+	_chunk(ci, Rect2(hip.x - 6.0, head.end.y - 1.5, 12.5, 4.4), 1.5, collar, ink, 1.4)
+	_sword_weapon(ci, grip, fore_angle + 0.06, steel, ink, wash)
+
+
+static func _sword_weapon(ci: CanvasItem, hand: Vector2, angle: float, steel: Color, ink: Color, wash: float) -> void:
+	var dir := Vector2(cos(angle), sin(angle))
+	var side := Vector2(-dir.y, dir.x)
+	var grip := Color("3b291c").lerp(Color.WHITE, wash)
+	var guard := Color("e2b034").lerp(Color.WHITE, wash)
+	_segment(ci, hand - dir * 6.2, angle, 6.2, 3.5, grip, ink, 1.6)
+	_segment(ci, hand - side * 4.8, angle + PI * 0.5, 9.6, 3.2, guard, ink, 1.6)
+	var base := hand + dir * 2.8
+	var tip := hand + dir * 20.0
+	var blade := PackedVector2Array()
+	blade.append(base + side * 2.6)
+	blade.append(tip)
+	blade.append(base - side * 2.6)
+	_paint_poly(ci, blade, steel.darkened(0.14), ink, 1.7)
+	var shine := PackedVector2Array()
+	shine.append(base + side * 0.7 + dir * 1.4)
+	shine.append(tip - dir * 2.2)
+	shine.append(base - side * 0.2 + dir * 1.4)
+	ci.draw_colored_polygon(shine, steel.lightened(0.18))
+
+
+static func _chunk(ci: CanvasItem, rect: Rect2, cut: float, fill: Color, ink: Color, outline: float) -> void:
+	if outline > 0.2:
+		var grown := Rect2(rect.position - Vector2(outline, outline), rect.size + Vector2(outline, outline) * 2.0)
+		ci.draw_colored_polygon(_squircle(grown, cut + outline), ink)
+	ci.draw_colored_polygon(_squircle(rect, cut), fill)
+
+
+static func _paint_poly(ci: CanvasItem, pts: PackedVector2Array, fill: Color, ink: Color, outline: float) -> void:
+	if pts.size() < 3:
+		return
+	if outline > 0.15:
+		ci.draw_colored_polygon(_inflate(pts, outline), ink)
+	ci.draw_colored_polygon(pts, fill)
+
+
+static func _segment(ci: CanvasItem, origin: Vector2, angle: float, length: float, thick: float, fill: Color, ink: Color, outline: float) -> Vector2:
+	var cut := minf(thick * 0.46, length * 0.34)
+	var limb := Rect2(0.0, -thick * 0.5, length, thick)
+	if outline > 0.2:
+		var grown := Rect2(-outline, -thick * 0.5 - outline, length + outline * 2.0, thick + outline * 2.0)
+		ci.draw_colored_polygon(_place(_squircle(grown, cut + outline), origin, angle), ink)
+	ci.draw_colored_polygon(_place(_squircle(limb, cut), origin, angle), fill)
+	return origin + Vector2(cos(angle), sin(angle)) * length
+
+
+static func _squircle(rect: Rect2, cut: float) -> PackedVector2Array:
+	var pts := PackedVector2Array()
+	var radius := cut
+	var limit := minf(rect.size.x, rect.size.y) * 0.48
+	if radius > limit:
+		radius = limit
+	if radius < 0.4:
+		pts.append(rect.position)
+		pts.append(Vector2(rect.end.x, rect.position.y))
+		pts.append(rect.end)
+		pts.append(Vector2(rect.position.x, rect.end.y))
+		return pts
+	var corners := PackedVector2Array()
+	corners.append(rect.position + Vector2(radius, radius))
+	corners.append(Vector2(rect.end.x - radius, rect.position.y + radius))
+	corners.append(rect.end - Vector2(radius, radius))
+	corners.append(Vector2(rect.position.x + radius, rect.end.y - radius))
+	var arcs := PackedFloat32Array()
+	arcs.append(PI)
+	arcs.append(PI * 1.5)
+	arcs.append(0.0)
+	arcs.append(PI * 0.5)
+	var steps := 4
+	for corner_i in 4:
+		var center: Vector2 = corners[corner_i]
+		var a0 := arcs[corner_i]
+		for step_i in steps:
+			var u := float(step_i) / float(steps)
+			var a := a0 + u * PI * 0.5
+			pts.append(center + Vector2(cos(a), sin(a)) * radius)
+	return pts
+
+
+static func _place(pts: PackedVector2Array, origin: Vector2, angle: float) -> PackedVector2Array:
+	var spun := PackedVector2Array()
+	spun.resize(pts.size())
+	var c := cos(angle)
+	var s := sin(angle)
+	for i in pts.size():
+		var point: Vector2 = pts[i]
+		spun[i] = origin + Vector2(point.x * c - point.y * s, point.x * s + point.y * c)
+	return spun
+
+
+static func _turn(pts: PackedVector2Array, pivot: Vector2, angle: float) -> PackedVector2Array:
+	if absf(angle) < 0.001:
+		return pts
+	var spun := PackedVector2Array()
+	spun.resize(pts.size())
+	var c := cos(angle)
+	var s := sin(angle)
+	for i in pts.size():
+		var point: Vector2 = pts[i]
+		var delta := point - pivot
+		spun[i] = pivot + Vector2(delta.x * c - delta.y * s, delta.x * s + delta.y * c)
+	return spun
+
+
+static func _inflate(pts: PackedVector2Array, amount: float) -> PackedVector2Array:
+	var center := Vector2.ZERO
+	var count := pts.size()
+	for point in pts:
+		center += point
+	center /= float(maxi(count, 1))
+	var grown := PackedVector2Array()
+	grown.resize(count)
+	for i in count:
+		var point: Vector2 = pts[i]
+		var delta := point - center
+		var span := delta.length()
+		if span < 0.001:
+			grown[i] = point
+		else:
+			grown[i] = point + delta * (amount / span)
+	return grown
 
