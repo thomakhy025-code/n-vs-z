@@ -127,6 +127,8 @@ static func _painted(kind: String) -> Dictionary:
 			return _look(Color("e7c2a4"), Color("6a3a55"), Color("e6c36a"), "staff", false, "court")
 		"crow":
 			return _look(Color("1c1e24"), Color("16181e"), Color("e6c36a"), "spear", false, "court")
+		"cow":
+			return _look(Color("8a5a32"), Color("f0e2c8"), Color("f4efe4"), "spear", false, "court")
 		"smog":
 			return _look(Color("e7c2a4"), Color("c9a227"), Color("f4efe4"), "staff", false, "court")
 		"buck":
@@ -211,6 +213,8 @@ static func call_id(paint: String) -> String:
 			return "call_spear"
 		"crow":
 			return "call_horse"
+		"cow":
+			return "call_heavy"
 		"smog", "aria":
 			return "call_magic"
 		"buck":
@@ -320,6 +324,8 @@ static func call_pitch(paint: String) -> float:
 			return 1.08
 		"crow":
 			return 1.18
+		"cow":
+			return 0.82
 		"smog":
 			return 0.9
 		"buck":
@@ -2653,7 +2659,7 @@ static func beat_open(chop: float) -> bool:
 
 
 static func _is_court(paint: String) -> bool:
-	return paint == "knives" or paint == "firebow" or paint == "fan" or paint == "ward" or paint == "javelin" or paint == "drum" or paint == "crow" or paint == "smog" or paint == "buck" or paint == "scope" or paint == "aria"
+	return paint == "knives" or paint == "firebow" or paint == "fan" or paint == "ward" or paint == "javelin" or paint == "drum" or paint == "crow" or paint == "cow" or paint == "smog" or paint == "buck" or paint == "scope" or paint == "aria"
 
 
 static func _paint_court(ci: CanvasItem, paint: String, phase: String, beat: int, t: float, clock: float, pose: Dictionary) -> void:
@@ -2686,6 +2692,8 @@ static func _paint_court(ci: CanvasItem, paint: String, phase: String, beat: int
 			_court_drum(ci, step, chop, phase, clock)
 		"crow":
 			_court_crow(ci, phase, chop, step, roost, clock)
+		"cow":
+			_court_cow(ci, phase, chop, step, roost, clock)
 		"smog":
 			_court_smog(ci, step, chop, phase, clock)
 		"buck":
@@ -2923,6 +2931,46 @@ static func _court_crow(ci: CanvasItem, phase: String, chop: float, step: float,
 		_dot(ci, hub, 1.6, Color("e6c36a"))
 	if phase == "act" and chop > 0.4:
 		_line(ci, body + Vector2(10, 0), body + Vector2(24, 2), Color("ff7a2a"), 2.2)
+
+
+static func _court_cow(ci: CanvasItem, phase: String, chop: float, step: float, roost: float, clock: float) -> void:
+	var hide := Color("8a5a32")
+	var belly := Color("f0e2c8")
+	var hoof := Color("2a2420")
+	var lunge := 0.0
+	if phase == "act":
+		lunge = clampf(chop, 0.0, 1.0) * 14.0
+	var bob := 0.0
+	if phase == "march":
+		bob = step * 2.2
+	var dip := 6.0 if roost > 0.0 else 0.0
+	var lift := 0.0
+	if phase == "march":
+		lift = step * 5.0
+	elif roost > 0.0:
+		lift = maxf(0.0, sin(clock * 7.0)) * 5.0
+	_ellipse(ci, Vector2(4, 18), 18, 3.4, Color(0, 0, 0, 0.28))
+	var body := Vector2(lunge * 0.3, -2.0 + bob)
+	_line(ci, body + Vector2(-12, 6), body + Vector2(-14, 16 - lift), hoof, 3.0)
+	_line(ci, body + Vector2(-6, 6), body + Vector2(-5, 16 + lift), hoof, 3.0)
+	_line(ci, body + Vector2(8, 6), body + Vector2(10, 16 - lift), hoof, 3.0)
+	_line(ci, body + Vector2(14, 6), body + Vector2(16, 16 + lift), hoof, 3.0)
+	_ellipse(ci, body + Vector2(2, 1), 18, 9.0, hide)
+	_ellipse(ci, body + Vector2(3, 5.6), 8.5, 3.2, belly)
+	var flick := sin(clock * 5.0) * 2.2
+	_line(ci, body + Vector2(-15, -2), body + Vector2(-22, 4 + flick), hide, 1.8)
+	_ellipse(ci, body + Vector2(-22, 6 + flick), 2.4, 2.8, hoof)
+	var head := body + Vector2(17 + lunge * 0.45, -6 + dip)
+	if phase == "act" and chop > 0.28:
+		head.y += 5.0
+	_ellipse(ci, head, 6.6, 5.4, hide)
+	_ellipse(ci, head + Vector2(5.2, 1.2), 3.6, 2.5, Color("c47a6a"))
+	_dot(ci, head + Vector2(2.2, -1.1), 0.95, Color("1c140e"))
+	_ellipse(ci, head + Vector2(-1.6, -4.2), 2.4, 1.5, hide)
+	_line(ci, head + Vector2(-1, -4), head + Vector2(-5, -13), Color("f4efe4"), 1.9)
+	_line(ci, head + Vector2(2.2, -4.2), head + Vector2(7, -12), Color("f4efe4"), 1.9)
+	if phase == "act" and chop > 0.45:
+		_line(ci, head + Vector2(7, 1), head + Vector2(16, 3), Color("ffd9a0"), 1.6)
 
 
 static func _dire_stripe(ci: CanvasItem) -> void:

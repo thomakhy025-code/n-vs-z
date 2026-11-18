@@ -102,8 +102,10 @@ func setup(field, entry: Dictionary, which_side: int) -> void:
 		attack_timer = float(entry["interval"])
 	if role == "herald":
 		call_left = 3.0
-	if role == "crow":
+	if role == "crow" or role == "cow":
 		roost = 3.0
+		if entry.has("roost_time"):
+			roost = float(entry["roost_time"])
 		crow_fresh = true
 		attack_timer = 0.05
 	if role == "javelin":
@@ -266,7 +268,7 @@ func _process(delta: float) -> void:
 		moving = false
 	if gust_lock > 0.0 or numb > 0.0:
 		moving = false
-	elif role == "crow" and roost > 0.0:
+	elif (role == "crow" or role == "cow") and roost > 0.0:
 		roost -= delta
 		moving = false
 	elif role == "smog":
@@ -601,7 +603,7 @@ func _resolve_strike() -> void:
 		return
 	if role == "glut":
 		amount = float(data.get("chew", 16.0)) * damage_multiplier
-	if role == "crow" and crow_fresh and foe != null and _along(foe) <= reach + 8.0:
+	if (role == "crow" or role == "cow") and crow_fresh and foe != null and _along(foe) <= reach + 8.0:
 		amount = float(data.get("opening", amount)) * damage_multiplier
 		crow_fresh = false
 	if foe != null and _along(foe) <= reach + 8.0:

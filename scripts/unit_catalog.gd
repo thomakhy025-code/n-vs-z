@@ -49,7 +49,8 @@ static func enemy_roster() -> Array:
 		_e("ward", "Ward", 11, 7.0, 624, 5, 1.35, 72.0, 70.0, "melee", 26, 1.42, 7),
 		_mark(_e("javelin", "Javelin", 9, 4.5, 192, 44, 1.5, 80.0, 330.0, "javelin", 58, 1.2, 5), "sword", 14),
 		_e("drum", "Drum", 12, 8.0, 67, 0, 1.0, 70.0, 330.0, "drum", 50, 1.12, 6),
-		_mark(_e("crow", "Crow", 14, 8.0, 120, 35, 1.0, 70.0, 70.0, "crow", 128, 1.12, 6), "opening", 83),
+		_charge(_e("crow", "Crow", 14, 8.0, 120, 35, 1.0, 70.0, 70.0, "crow", 128, 1.12, 6), 83, 3.0),
+		_charge(_e("cow", "Cow", 12, 8.0, 72, 18, 1.25, 62.0, 62.0, "cow", 78, 1.28, 4), 40, 4.0),
 		_e("smog", "Smog", 6, 4.0, 52, 0, 1.0, 70.0, 70.0, "smog", 50, 1.12, 4),
 		_e("buck", "Buck", 8, 4.5, 155, 42, 1.0, 80.0, 100.0, "buck", 52, 1.16, 5),
 		_e("scope", "Scope", 12, 7.0, 70, 64, 3.0, 70.0, 330.0, "scope", 40, 1.12, 6),
@@ -146,4 +147,10 @@ static func _swing(row: Dictionary, swing: int) -> Dictionary:
 
 static func _mark(row: Dictionary, key: String, value: int) -> Dictionary:
 	row[key] = value
+	return row
+
+
+static func _charge(row: Dictionary, opening: int, wait: float) -> Dictionary:
+	row["opening"] = opening
+	row["roost_time"] = wait
 	return row

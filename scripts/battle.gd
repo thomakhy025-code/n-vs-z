@@ -549,9 +549,9 @@ static func enemy_ids(level_no: int, rules: Dictionary, battle_time: float) -> A
 		if modern:
 			options = ["scope", "aria", "smog", "crow", "buck", "ward", "fan"]
 		elif human:
-			options = ["crow", "drum", "fan", "ward", "javelin", "firebow", "knives"]
+			options = ["cow", "drum", "fan", "ward", "javelin", "firebow", "knives"]
 		elif dire:
-			options = ["glut", "oni", "brood", "elder", "moth", "howler", "storm"]
+			options = ["glut", "oni", "brood", "elder", "moth", "howler", "storm", "crow"]
 		else:
 			options = ["oni", "howler", "storm", "herald", "reaver", "shell", "walker", "runner"]
 	elif battle_time >= brute_at:
