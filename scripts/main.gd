@@ -28,7 +28,7 @@ The other gate calls its own fighters. On monster levels they are walkers, runne
 
 Play lists seventy levels. The first is open. Winning a level opens the next. Levels 1 to 20 are monsters, and that is where each soldier is learned. Levels 21 to 40 are human soldiers. Levels 41 to 60 are monsters again, and the new monsters begin. Levels 61 to 70 alternate, monster then soldier, starting with monsters. The new soldiers begin on the soldier turns. Your purse stays the same. Theirs gets heavier as the levels climb, and it eases a little when the soldiers first arrive. Before you choose who to bring, the level shows the other side, each fighter with a skin and a name. Press a name to read blood, damage, attacking distance, attacking range, speed, and the special skill.
 
-Each level you open pays 100 diamonds. Clearing a level also pays coins. The base is 200 coins times the level. Three minutes or less doubles that, five minutes or less adds half, six minutes or less pays the base, and a longer clear pays half. On a level you have not cleared, the fight also pays 0.25% of that base each second it is still going. Those coins stay if your gate falls. A level you have already cleared does not pay this. On a cleared level, Automatic finish skips the fight. There is a 50% chance it pays the coins from your last clear of that level. A miss pays nothing. Until a clear is remembered, the stake is the base. Coins are not diamonds. Home has Upgrade. The hero and each soldier you have learned can be ranked 20 times. Each rank adds 5% of that character's blood and damage. Reach, cost, and speed stay the same.
+Each level you open pays 100 diamonds. Clearing a level also pays coins. The base is 200 coins times the level. Three minutes or less doubles that, five minutes or less adds half, six minutes or less pays the base, and a longer clear pays half. On a level you have not cleared, the fight also pays 0.25% of that base each second it is still going. Those coins stay if your gate falls. A level you have already cleared does not pay this. On a cleared level, Automatic finish skips the fight and pays the coins from your last clear. You can take that 50 times. While any are missing, 5 return every half hour. Until a clear is remembered, the stake is the base. Coins are not diamonds. Home has Upgrade. The hero and each soldier you have learned can be ranked 20 times. Each rank adds 5% of that character's blood and damage. Reach, cost, and speed stay the same.
 
 Home is the night gate: Shop, Skin, Upgrade, the levels, and How to play are there, and the diamond count hangs by the lantern. During a fight, Home at the top returns you there.
 
@@ -57,6 +57,8 @@ var story_layer: CanvasLayer = null
 var diamonds: int = 0
 var coins: int = 0
 var level_pay: Dictionary = {}
+var auto_left: int = 50
+var auto_at: float = 0.0
 var auto_line: String = ""
 var hold_fraction: float = 0.0
 var held_now: int = 0
@@ -94,6 +96,9 @@ var profile_from_rank: bool = false
 var profile_own: bool = false
 var was_cloud_signed: bool = false
 const ROAD_DIAMONDS := 100
+const AUTO_STOCK := 50
+const AUTO_RETURN := 5
+const AUTO_WAIT := 1800.0
 const SKIN_COST := 200
 const VIP_CODE := "tomissogood0205"
 const VIP_DIAMONDS := 100000000
@@ -954,10 +959,12 @@ func _show_foes() -> void:
 		for row in band["rows"]:
 			list.add_child(_foe_row(str(row["id"]), str(row["kind"])))
 	if not picking_duel and chosen_level >= 1 and chosen_level <= cleared:
+		_refresh_auto()
 		var stake := _pay_of(chosen_level)
-		var note := "One press. A 50%% chance to pay the %d coins from your last clear." % stake
-		if not level_pay.has(chosen_level):
-			note = "One press. A 50%% chance to pay the %d coins of this level." % stake
+		var source := "from your last clear" if level_pay.has(chosen_level) else "of this level"
+		var note := "%d left. One press pays the %d coins %s." % [auto_left, stake, source]
+		if auto_left < AUTO_STOCK:
+			note += " " + _auto_wait_text()
 		var hint := UiSkin.label(note, 16, Color("2c2118"))
 		hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -1686,8 +1693,8 @@ func _pay_of(level_index: int) -> int:
 	return 200 * maxi(1, level_index)
 
 
-func _auto_gain(level_index: int, hit: bool) -> int:
-	if level_index < 1 or level_index > cleared or not hit:
+func _auto_gain(level_index: int) -> int:
+	if level_index < 1 or level_index > cleared:
 		return 0
 	var room := 20000000 - coins
 	var gained := mini(_pay_of(level_index), maxi(0, room))
@@ -1696,16 +1703,63 @@ func _auto_gain(level_index: int, hit: bool) -> int:
 	return gained
 
 
+func _refresh_auto() -> void:
+	var now := Time.get_unix_time_from_system()
+	auto_left = clampi(auto_left, 0, AUTO_STOCK)
+	if auto_left >= AUTO_STOCK:
+		auto_at = now
+		return
+	if auto_at <= 0.0:
+		auto_at = now
+		return
+	var steps := int(floor((now - auto_at) / AUTO_WAIT))
+	if steps <= 0:
+		return
+	auto_left = mini(AUTO_STOCK, auto_left + steps * AUTO_RETURN)
+	if auto_left >= AUTO_STOCK:
+		auto_at = now
+	else:
+		auto_at += float(steps) * AUTO_WAIT
+
+
+func _auto_seconds() -> int:
+	if auto_left >= AUTO_STOCK:
+		return 0
+	if auto_at <= 0.0:
+		return int(AUTO_WAIT)
+	var elapsed := Time.get_unix_time_from_system() - auto_at
+	var remain := AUTO_WAIT - fmod(maxf(0.0, elapsed), AUTO_WAIT)
+	if remain < 1.0:
+		return 0
+	return int(ceil(remain))
+
+
+func _auto_wait_text() -> String:
+	var left := _auto_seconds()
+	if left <= 0:
+		return "5 return now."
+	if left >= 60:
+		return "5 more in %d min." % int(ceil(float(left) / 60.0))
+	return "5 more in %d sec." % left
+
+
 func _auto_finish() -> void:
 	if chosen_level < 1 or chosen_level > cleared:
 		return
-	var gained := _auto_gain(chosen_level, randi() % 2 == 0)
-	if gained > 0:
-		auto_line = "The road paid +%d coins. Coins %d." % [gained, coins]
-		Sfx.play("buff", 1.0, -4.0)
-		_save_progress()
-	else:
-		auto_line = "The road paid nothing this time. Coins %d." % coins
+	_refresh_auto()
+	if auto_left <= 0:
+		auto_line = _auto_wait_text()
+		_show_foes()
+		return
+	var gained := _auto_gain(chosen_level)
+	if gained <= 0:
+		auto_line = "The purse is full. Coins %d." % coins
+		_show_foes()
+		return
+	auto_left -= 1
+	auto_line = "The road paid +%d coins. %d left." % [gained, auto_left]
+	Sfx.play("buff", 1.0, -4.0)
+	_save_progress()
 	_show_foes()
 
 
@@ -2013,6 +2067,8 @@ func _load_progress() -> void:
 	diamonds = 0
 	coins = 0
 	level_pay = {}
+	auto_left = AUTO_STOCK
+	auto_at = 0.0
 	upgrades = {}
 	saber_skin = false
 	saber_worn = "none"
@@ -2033,6 +2089,9 @@ func _load_progress() -> void:
 		diamonds = maxi(0, int(cfg.get_value("progress", "diamonds", 0)))
 		coins = maxi(0, int(cfg.get_value("progress", "coins", 0)))
 		level_pay = _unpack_pay(str(cfg.get_value("progress", "level_pay", "")))
+		if cfg.has_section_key("progress", "auto_left"):
+			auto_left = clampi(int(cfg.get_value("progress", "auto_left", AUTO_STOCK)), 0, AUTO_STOCK)
+			auto_at = float(cfg.get_value("progress", "auto_at", 0.0))
 		upgrades = _unpack_ranks(str(cfg.get_value("progress", "upgrades", "")))
 		saber_skin = bool(cfg.get_value("progress", "saber_skin", false))
 		if cfg.has_section_key("progress", "saber_worn"):
@@ -2062,6 +2121,8 @@ func _load_progress() -> void:
 			rank_cleared = 0
 			rank_time = 0.0
 			level_pay = {}
+			auto_left = AUTO_STOCK
+			auto_at = 0.0
 		if stored_story < Story.VERSION:
 			story_seen = {}
 			story_version = Story.VERSION
@@ -2074,6 +2135,7 @@ func _load_progress() -> void:
 		if Story.duel_open(cleared) and not duel_celebrated:
 			duel_celebrate = true
 	_normalize_progress()
+	_refresh_auto()
 	var paid := _take_road_pay()
 	_apply_skins()
 	if paid or _navy_dirty or migrated or duel_mark:
@@ -2114,6 +2176,7 @@ func _normalize_progress() -> void:
 		favorite = ""
 		favorite_skin = ""
 	coins = clampi(coins, 0, 20000000)
+	auto_left = clampi(auto_left, 0, AUTO_STOCK)
 	_trim_ranks()
 
 
@@ -2124,6 +2187,8 @@ func _save_progress() -> void:
 	cfg.set_value("progress", "diamonds", diamonds)
 	cfg.set_value("progress", "coins", coins)
 	cfg.set_value("progress", "level_pay", _pack_pay())
+	cfg.set_value("progress", "auto_left", auto_left)
+	cfg.set_value("progress", "auto_at", auto_at)
 	cfg.set_value("progress", "upgrades", _pack_ranks())
 	cfg.set_value("progress", "saber_skin", saber_skin)
 	cfg.set_value("progress", "saber_worn", saber_worn)
