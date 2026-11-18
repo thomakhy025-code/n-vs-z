@@ -18,10 +18,33 @@ const Levels = preload("res://scripts/levels.gd")
 
 const PLAYER_START := 16.0
 const PLAYER_INCOME := 3.6
+const CASTLE_BLOOD := 2000
+const CASTLE_STEP := 200
+const RANK_CAP := 20
 const ENEMY_START := 22.0
 const ENEMY_INCOME_BASE := 7.2
 const ENEMY_GROWTH := 0.065
 const MAX_SIDE := 24
+
+
+static func castle_blood(rank: int) -> int:
+	return CASTLE_BLOOD + CASTLE_STEP * (clampi(rank, 1, RANK_CAP) - 1)
+
+
+static func income_tenths(rank: int) -> int:
+	return 36 + (clampi(rank, 1, RANK_CAP) - 1)
+
+
+static func income_rate(rank: int) -> float:
+	return float(income_tenths(rank)) / 10.0
+
+
+static func income_line(rate: float) -> String:
+	var tenths := int(round(rate * 10.0))
+	var whole := int(float(tenths) / 10.0)
+	var frac := tenths - whole * 10
+	return "+%d.%d each second" % [whole, frac]
+
 
 var mode: String = ""
 var rules: Dictionary = {}
@@ -30,6 +53,7 @@ var loadout: Array = []
 var finished: bool = false
 var paused: bool = false
 var player_value: float = PLAYER_START
+var player_income: float = PLAYER_INCOME
 var enemy_value: float = ENEMY_START
 var enemy_income: float = ENEMY_INCOME_BASE
 var battle_time: float = 0.0
@@ -127,6 +151,7 @@ func start(chosen: Array, run_mode: String, level_index: int = 1) -> void:
 			host.begin_hold()
 	enemy_value = float(rules["start"])
 	enemy_income = float(rules["income"])
+	player_income = _income_for(0)
 	player_roster = Catalog.player_roster()
 	enemy_roster = Catalog.enemy_roster()
 	for entry in player_roster:
@@ -164,7 +189,7 @@ func begin_duel(local_ids: Array, other_ids: Array, side: int, runs_world: bool,
 	skin_right = right_raw if right_raw is Dictionary else {}
 	start(local_ids, "duel", 1)
 	enemy_value = PLAYER_START
-	enemy_income = PLAYER_INCOME
+	enemy_income = _income_for(1)
 	enemy_cd.clear()
 	for entry in player_roster:
 		enemy_cd[str(entry["id"])] = 0.0
@@ -216,6 +241,7 @@ func _build_world() -> void:
 	enemy_gate = GateScript.new()
 	enemy_gate.setup(self, 1, Vector2(enemy_front + CASTLE_HALF, ground_y), enemy_front)
 	add_child(enemy_gate)
+	_apply_castles()
 	world = Node2D.new()
 	add_child(world)
 	var veil = SmokeVeil.new()
@@ -250,12 +276,12 @@ func _build_hud() -> void:
 	hurt_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hurt_flash.color = Color(0, 0, 0, 0)
 	hud.add_child(hurt_flash)
-	player_hp_label = _plain("2000", 22, Color("f3e6c8"))
-	enemy_hp_label = _plain("2000", 22, Color("f3e6c8"))
+	player_hp_label = _plain(str(int(round(player_gate.hp))), 22, Color("f3e6c8"))
+	enemy_hp_label = _plain(str(int(round(enemy_gate.hp))), 22, Color("f3e6c8"))
 	enemy_hp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	value_label = _plain("Value  16", 32, Color("e6c36a"))
 	value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	income_label = _plain("+3.6 each second", 16, Color("f3e6c8"))
+	income_label = _plain(income_line(_shown_income()), 16, Color("f3e6c8"))
 	income_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	level_label = _plain("Level %d  ·  %s" % [level_no, str(rules["name"])], 18, Color("f3e6c8"))
 	level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -447,11 +473,11 @@ func _process(delta: float) -> void:
 			player_cd[id] = maxf(0.0, float(player_cd[id]) - delta)
 		for id in enemy_cd.keys():
 			enemy_cd[id] = maxf(0.0, float(enemy_cd[id]) - delta)
-		player_value += PLAYER_INCOME * delta
+		player_value += player_income * delta
 		_tick_hazards(delta)
 		_tick_smokes(delta)
 		if duel:
-			enemy_value += PLAYER_INCOME * delta
+			enemy_value += enemy_income * delta
 			if hand_seen >= 0.0 and battle_time - hand_seen > 0.45 and foe != null:
 				foe.pointer_sword = false
 				foe.pointer_shoot = false
@@ -779,7 +805,7 @@ func rank_factor(unit_id: String, side: int) -> float:
 
 
 func _parse_ranks(raw: String) -> Dictionary:
-	var known: Array = ["hero", "sword", "archer", "shield", "saber", "lancer", "berserker", "horse", "suicide", "assassin", "heal", "level"]
+	var known: Array = ["hero", "sword", "archer", "shield", "saber", "lancer", "berserker", "horse", "suicide", "assassin", "heal", "level", "gate", "income"]
 	var out: Dictionary = {}
 	for piece in raw.split(",", false):
 		var bits: PackedStringArray = piece.split(":")
@@ -790,6 +816,44 @@ func _parse_ranks(raw: String) -> Dictionary:
 			continue
 		out[unit_id] = clampi(int(bits[1]), 1, 20)
 	return out
+
+
+func _side_rank(side: int, id: String) -> int:
+	if rank_mode == "max":
+		return RANK_CAP
+	var table := rank_left
+	if duel and side == 1:
+		table = rank_right
+	if table.has(id):
+		return clampi(int(table[id]), 1, RANK_CAP)
+	return 1
+
+
+func _castle_for(side: int) -> int:
+	return castle_blood(_side_rank(side, "gate"))
+
+
+func _income_for(side: int) -> float:
+	return income_rate(_side_rank(side, "income"))
+
+
+func _shown_income() -> float:
+	if duel and local_side == 1:
+		return _income_for(1)
+	return player_income
+
+
+func _apply_castles() -> void:
+	_set_castle(player_gate, _castle_for(0))
+	if duel:
+		_set_castle(enemy_gate, _castle_for(1))
+
+
+func _set_castle(gate, blood: int) -> void:
+	if gate == null:
+		return
+	gate.max_hp = float(blood)
+	gate.hp = float(blood)
 
 
 func _ranked(entry: Dictionary, side: int) -> Dictionary:
@@ -1373,7 +1437,7 @@ func _update_hud(delta: float) -> void:
 		enemy_hp_label.text = "Cursed gate  %d" % int(round(enemy_gate.hp))
 	player_hp_label.add_theme_color_override("font_color", Color("ffb4a8") if player_ratio < 0.3 else Color("f3e6c8"))
 	value_label.text = "Value  %d" % int(floor(player_value))
-	income_label.text = "+%.1f each second" % PLAYER_INCOME
+	income_label.text = income_line(_shown_income())
 	if level_label != null and not duel:
 		var hold := ""
 		if mode == "":

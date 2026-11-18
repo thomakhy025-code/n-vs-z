@@ -28,7 +28,7 @@ The other gate calls its own fighters. On monster levels they are walkers, runne
 
 Play lists seventy levels. The first is open. Winning a level opens the next. Levels 1 to 20 are monsters, and that is where each soldier is learned. Levels 21 to 40 are human soldiers. Levels 41 to 60 are monsters again, and the new monsters begin. Levels 61 to 70 alternate, monster then soldier, starting with monsters. The new soldiers begin on the soldier turns. Your purse stays the same. Theirs gets heavier as the levels climb, and it eases a little when the soldiers first arrive. Before you choose who to bring, the level shows the other side, each fighter with a skin and a name. Press a name to read blood, damage, attacking distance, attacking range, speed, and the special skill.
 
-Each level you open pays 100 diamonds. Clearing a level also pays coins. The base is 200 coins times the level. Three minutes or less doubles that, five minutes or less adds half, six minutes or less pays the base, and a longer clear pays half. On a level you have not cleared, the fight also pays 0.25% of that base each second it is still going. Those coins stay if your gate falls. A level you have already cleared does not pay this. On a cleared level, Automatic finish skips the fight and pays the coins from your last clear. You can take that 50 times. While any are missing, 5 return every half hour. Until a clear is remembered, the stake is the base. Coins are not diamonds. Home has Upgrade. The hero and each soldier you have learned can be ranked 20 times. Each rank adds 5% of that character's blood and damage. Reach, cost, and speed stay the same.
+Each level you open pays 100 diamonds. Clearing a level also pays coins. The base is 200 coins times the level. Three minutes or less doubles that, five minutes or less adds half, six minutes or less pays the base, and a longer clear pays half. On a level you have not cleared, the fight also pays 0.25% of that base each second it is still going. Those coins stay if your gate falls. A level you have already cleared does not pay this. On a cleared level, Automatic finish skips the fight and pays the coins from your last clear. You can take that 50 times. While any are missing, 5 return every half hour. Until a clear is remembered, the stake is the base. Coins are not diamonds. Home has Upgrade. The hero and each soldier you have learned can be ranked 20 times. Each rank adds 5% of that character's blood and damage. Reach, cost, and speed stay the same. Upgrade can also raise your castle blood by 200 a time, and your value by 0.1 each second a time. Twenty is the last.
 
 Home is the night gate: Shop, Skin, Upgrade, the levels, and How to play are there, and the diamond count hangs by the lantern. During a fight, Home at the top returns you there.
 
@@ -1852,7 +1852,7 @@ func coin_line() -> String:
 
 
 func _rank_ids() -> Array:
-	var ids: Array = ["hero"]
+	var ids: Array = ["hero", "gate", "income"]
 	for id in Story.known_ids(cleared):
 		ids.append(str(id))
 	return ids
@@ -1877,7 +1877,7 @@ func _pack_ranks() -> String:
 
 func _unpack_ranks(raw: String) -> Dictionary:
 	var out: Dictionary = {}
-	var known: Array = ["hero", "sword", "archer", "shield", "saber", "lancer", "berserker", "horse", "suicide", "assassin", "heal", "level"]
+	var known: Array = ["hero", "sword", "archer", "shield", "saber", "lancer", "berserker", "horse", "suicide", "assassin", "heal", "level", "gate", "income"]
 	for piece in raw.split(",", false):
 		var bits: PackedStringArray = piece.split(":")
 		if bits.size() != 2:
@@ -1916,7 +1916,7 @@ func _show_upgrade() -> void:
 	purse.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	purse.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(purse)
-	var lead := UiSkin.label("Each rank adds 5% blood and damage. Rank 20 is the last. Every fighter pays the coins below.", 15, Color("6b3a32"))
+	var lead := UiSkin.label("Each fighter rank adds 5% blood and damage. Castle blood rises by 200 a time. Value rises by 0.1 each second. Rank 20 is the last. Every row pays the coins below.", 15, Color("6b3a32"))
 	lead.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lead.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	lead.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1948,11 +1948,27 @@ func _show_upgrade() -> void:
 	box.add_child(back)
 
 
+func _upgrade_who(id: String) -> String:
+	if id == "gate":
+		return "Castle blood"
+	if id == "income":
+		return "Value each second"
+	if id == "hero":
+		return "Hero"
+	var entry: Dictionary = Catalog.find_in(roster, id)
+	return str(entry.get("name", id))
+
+
+func _rank_heading(who: String, id: String, rank: int) -> String:
+	if id == "gate":
+		return "%s    %d blood    rank %d of 20" % [who, BattleScript.castle_blood(rank), rank]
+	if id == "income":
+		return "%s    %s    rank %d of 20" % [who, BattleScript.income_line(BattleScript.income_rate(rank)), rank]
+	return "%s    rank %d of 20" % [who, rank]
+
+
 func _upgrade_row(id: String) -> HBoxContainer:
-	var who := "Hero"
-	if id != "hero":
-		var entry: Dictionary = Catalog.find_in(roster, id)
-		who = str(entry.get("name", id))
+	var who := _upgrade_who(id)
 	var row := HBoxContainer.new()
 	row.set_meta("rank_id", id)
 	row.set_meta("rank_who", who)
@@ -1986,7 +2002,7 @@ func _paint_upgrade_row(row: HBoxContainer) -> void:
 	var price := row.find_child("RankPrice", true, false) as Label
 	var button := row.find_child("RankPay", true, false) as Button
 	if title != null:
-		title.text = "%s    rank %d of 20" % [who, rank]
+		title.text = _rank_heading(who, id, rank)
 	var cost := 0
 	var pay := "Rank 20. Nothing left to pay."
 	if rank < 20:
