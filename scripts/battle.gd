@@ -587,52 +587,18 @@ func _enemy_options() -> Array:
 	return enemy_ids(level_no, rules, battle_time)
 
 
-static func enemy_ids(level_no: int, rules: Dictionary, battle_time: float) -> Array:
+static func enemy_ids(level_no: int, rules: Dictionary, _battle_time: float) -> Array:
+	# The whole roster this level already had. Time does not add or remove anyone.
 	var human := str(rules.get("faction", "")) == "human"
 	var modern := human and level_no >= 61
 	var dire := (not human) and level_no >= 41
-	var options: Array = ["knives", "knives", "firebow"] if human else ["walker", "walker", "runner"]
 	if modern:
-		options = ["knives", "buck", "firebow"]
-	elif dire:
-		options = ["walker", "runner", "moth"]
-	var oni_at := 50.0
-	var brute_at := 24.0
-	var spitter_at := 12.0
-	if rules.has("oni_at"):
-		oni_at = float(rules["oni_at"])
-	if rules.has("brute_at"):
-		brute_at = float(rules["brute_at"])
-	if rules.has("spitter_at"):
-		spitter_at = float(rules["spitter_at"])
-	if battle_time >= oni_at:
-		if modern:
-			options = ["scope", "aria", "smog", "crow", "buck", "ward", "fan"]
-		elif human:
-			options = ["cow", "drum", "fan", "ward", "javelin", "firebow", "knives"]
-		elif dire:
-			options = ["glut", "oni", "brood", "elder", "moth", "howler", "storm", "crow"]
-		else:
-			options = ["oni", "howler", "storm", "herald", "reaver", "shell", "walker", "runner"]
-	elif battle_time >= brute_at:
-		if modern:
-			options = ["smog", "aria", "buck", "javelin", "ward", "fan"]
-		elif human:
-			options = ["fan", "drum", "javelin", "ward", "knives"]
-		elif dire:
-			options = ["brood", "elder", "moth", "howler", "reaver", "viper", "walker"]
-		else:
-			options = ["howler", "herald", "reaver", "shell", "viper", "walker", "runner"]
-	elif battle_time >= spitter_at:
-		if modern:
-			options = ["buck", "knives", "firebow", "javelin", "ward"]
-		elif human:
-			options = ["knives", "firebow", "javelin", "ward"]
-		elif dire:
-			options = ["moth", "viper", "shell", "walker", "runner"]
-		else:
-			options = ["viper", "shell", "walker", "runner"]
-	return options
+		return ["knives", "buck", "firebow", "javelin", "ward", "smog", "aria", "fan", "scope", "crow"]
+	if human:
+		return ["knives", "firebow", "javelin", "ward", "fan", "drum", "cow"]
+	if dire:
+		return ["walker", "runner", "moth", "viper", "shell", "brood", "elder", "howler", "reaver", "glut", "oni", "storm", "crow"]
+	return ["walker", "runner", "viper", "shell", "howler", "herald", "reaver", "oni", "storm"]
 
 
 static func faced_enemy(entry: Dictionary, rules: Dictionary) -> Dictionary:
