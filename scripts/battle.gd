@@ -1922,31 +1922,72 @@ func spread_road(road: int, toward_x: float) -> void:
 	queue_redraw()
 
 
-func blow_road(road: int, attacker_side: int, amount: float, from_id: String) -> void:
-	var mid := (player_front + enemy_front) * 0.5
-	var castle_x := player_front + 18.0
-	if attacker_side == 0:
-		castle_x = enemy_front - 18.0
-	for body in hostile_targets(attacker_side):
-		var on_road := int(body.lane) == road or is_berserker(body) or is_boss(body)
-		if not on_road:
+func blow_road(road: int, attacker_side: int, amount: float, from_id: String, fan_x: float) -> void:
+	var road_len := absf(enemy_front - player_front)
+	var push := road_len * 0.25
+	var moved_any := false
+	var bodies: Array = []
+	for unit in units:
+		if is_instance_valid(unit) and unit.alive:
+			bodies.append(unit)
+	if hero != null and is_instance_valid(hero) and hero.alive:
+		bodies.append(hero)
+	if foe != null and is_instance_valid(foe) and foe.alive:
+		bodies.append(foe)
+	for body in bodies:
+		if not _on_fan_road(body, road) or sheltered(body):
 			continue
-		var passed := float(body.position.x) > mid
-		if attacker_side == 0:
-			passed = float(body.position.x) < mid
-		var dest := mid if passed else castle_x
-		if body.has_method("take_damage"):
+		var bx := float(body.position.x)
+		if bx >= fan_x - 0.01:
+			continue
+		if int(body.side) != attacker_side and body.has_method("take_damage"):
 			body.take_damage(amount, true, from_id, 1200.0)
-		if body.has_method("catch_blow"):
-			body.catch_blow(dest)
-	spread_road(road, castle_x)
+		if _shove_home(body, push):
+			moved_any = true
+	if moved_any:
+		var home_x := player_front + 18.0
+		if attacker_side == 0:
+			home_x = enemy_front - 18.0
+		spread_road(road, home_x)
 	var puff_y := lane_y(road)
-	var span := maxf(1.0, enemy_front - player_front)
-	for puff_i in 5:
-		var px := player_front + span * (float(puff_i) + 0.5) / 5.0
+	var reach := minf(push, maxf(1.0, fan_x - player_front))
+	for puff_i in 4:
+		var px := fan_x - reach * (float(puff_i) + 0.5) / 4.0
 		poof(Vector2(px, puff_y), Color("d5e6f2"))
 	Sfx.play("wind", 0.92, -6.0)
-	float_text(Vector2(mid, puff_y - 28.0), "WIND", Color("d5e6f2"))
+	float_text(Vector2(fan_x - reach * 0.5, puff_y - 28.0), "WIND", Color("d5e6f2"))
+
+
+func _on_fan_road(body, road: int) -> bool:
+	if body == null or not is_instance_valid(body):
+		return false
+	if is_berserker(body) or is_boss(body):
+		return true
+	if not ("lane" in body):
+		return false
+	return int(body.lane) == road
+
+
+func _shove_home(body, push: float) -> bool:
+	var bx := float(body.position.x)
+	var dest := bx
+	if int(body.side) == 0:
+		if bx <= player_front + 0.5:
+			return false
+		dest = maxf(player_front, bx - push)
+		if dest >= bx - 0.5:
+			return false
+	else:
+		if bx >= enemy_front - 0.5:
+			return false
+		dest = minf(enemy_front, bx + push)
+		if dest <= bx + 0.5:
+			return false
+	if body.has_method("catch_blow"):
+		body.catch_blow(dest)
+	else:
+		body.position.x = dest
+	return true
 
 
 func drop_smoke(at: Vector2, _lane: int) -> void:

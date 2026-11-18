@@ -636,7 +636,7 @@ func _fan(delta: float) -> void:
 
 func _strike_fan(amount: float) -> void:
 	lunge = 1.0
-	battle.blow_road(lane, side, amount, str(data.get("id", "")))
+	battle.blow_road(lane, side, amount, str(data.get("id", "")), position.x)
 
 
 func _loose_shot(amount: float, foe, gate) -> void:
@@ -1443,17 +1443,15 @@ func _draw() -> void:
 		for marked in drum_targets:
 			if marked != null and is_instance_valid(marked) and marked.alive:
 				draw_line(Vector2(0, -20), to_local(marked.global_position), Color(0.9, 0.76, 0.42, 0.85), 2.0)
-		for note_i in 3:
-			var nx := sin(bob_time * 3.0 + float(note_i)) * 8.0 + float(note_i) * 9.0
-			var ny := -52.0 - float(note_i) * 7.0 + sin(bob_time * 5.0 + float(note_i)) * 3.0
-			draw_circle(Vector2(nx, ny), 3.0, Color("f4efe4"))
-			draw_line(Vector2(nx + 2.6, ny), Vector2(nx + 2.6, ny - 11.0), Color("f4efe4"), 1.3)
 	elif support_target != null and is_instance_valid(support_target) and support_target.alive:
 		var to: Vector2 = to_local(support_target.global_position)
 		var line := Color("8ee0a2") if role == "heal" else Color("e6c36a")
 		draw_line(Vector2(0, -20), to, Color(line.r, line.g, line.b, 0.85), 2.0)
 	if role == "fan" and lunge > 0.08:
 		var gust := clampf(lunge, 0.0, 1.0)
+		var gust_len := 180.0
+		if battle != null:
+			gust_len = absf(float(battle.enemy_front) - float(battle.player_front)) * 0.25
 		for gust_i in 4:
 			var gy := -30.0 + float(gust_i) * 12.0
-			draw_line(Vector2(0, gy), Vector2(facing * 240.0, gy - 4.0), Color(0.75, 0.9, 0.86, gust * 0.75), 2.0)
+			draw_line(Vector2(0, gy), Vector2(facing * gust_len, gy - 4.0), Color(0.75, 0.9, 0.86, gust * 0.75), 2.0)
