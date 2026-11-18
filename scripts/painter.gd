@@ -730,86 +730,109 @@ static func _staff(ci: CanvasItem, paint: String, hand: Vector2, trim: Color, cl
 	_bone(ci, hand, -1.15, 22.0, 2.8, trim)
 
 
-# The sword soldier only. Big rounded-square head, small body, one leg,
-# two arm segments, a plain sword, and a couple of flat clothing marks.
+# Shop Sword only. Cube head with a front face, gold-trimmed helmet, feather crest,
+# short body, one boot, two arm segments, and a small sword.
 static func _paint_sword(ci: CanvasItem, hip: Vector2, step: float, chop: float, skin: Color, cloth: Color, trim: Color, steel: Color, phase: String, flash: float) -> void:
 	var wash := clampf(flash * 4.0, 0.0, 0.72)
-	var ink := Color("1c140e").lerp(Color.WHITE, wash * 0.4)
-	var hair := Color("241c16").lerp(Color.WHITE, wash)
-	var collar := Color("d24b3c").lerp(Color.WHITE, wash)
-	var sash := Color("e2b034").lerp(Color.WHITE, wash)
-	var boot := cloth.lerp(Color("8a6244"), 0.72)
-	var sleeve := cloth.lightened(0.08)
-	var arm_skin := skin.darkened(0.04)
-	var skin_shade := skin.darkened(0.16)
-	var cloth_shade := cloth.darkened(0.22)
+	var kept := skin.a * cloth.a * trim.a * steel.a
+	var ink := Color("1a120e").lerp(Color.WHITE, wash * kept)
+	var face := Color("f7d2ae").lerp(Color.WHITE, wash)
+	var side := Color("e2b08a").lerp(Color.WHITE, wash)
+	var metal := Color("5a6570").lerp(Color.WHITE, wash)
+	var metal_shade := Color("414a54").lerp(Color.WHITE, wash)
+	var metal_deep := Color("353d46").lerp(Color.WHITE, wash)
+	var gold := Color("f2b428").lerp(Color.WHITE, wash)
+	var gold_deep := Color("d49216").lerp(Color.WHITE, wash)
+	var plume := Color("f0e7b8").lerp(Color.WHITE, wash)
+	var plume_side := Color("ddd4a4").lerp(Color.WHITE, wash)
+	var blade := Color("e7eef6").lerp(steel, 0.16).lerp(Color.WHITE, wash)
+	var blade_lit := Color("f8fbfc").lerp(Color.WHITE, wash)
 	var hurt := phase == "hurt" or phase == "fall"
-	var boot_top := hip.y - 4.0
-	ci.draw_rect(Rect2(hip.x - 11.0, boot_top + 11.2, 24.0, 4.2), Color(0, 0, 0, 0.32), true)
-	var leg := Rect2(hip.x - 10.0 + step * 3.4, boot_top - 2.0, 20.0, 15.0)
-	var leg_pts := _turn(_squircle(leg, 4.5), Vector2(hip.x, boot_top), step * 0.36)
-	_paint_poly(ci, leg_pts, boot, ink, 2.5)
-	var body := Rect2(hip.x - 9.0, hip.y - 22.0, 18.0, 18.0)
-	_chunk(ci, body, 4.2, cloth, ink, 2.5)
-	_chunk(ci, Rect2(body.position.x + 2.2, body.position.y + 9.0, body.size.x - 4.4, 7.0), 2.2, cloth_shade, cloth_shade, 0.0)
-	_chunk(ci, Rect2(hip.x - 7.2, hip.y - 11.0, 14.4, 3.5), 1.3, sash, ink, 1.3)
-	var upper_angle := 0.05 - chop * 0.95 + step * 0.18
-	var shoulder := hip + Vector2(8.0, -9.0)
-	var elbow := _segment(ci, shoulder, upper_angle, 10.0, 7.0, sleeve, ink, 2.3)
-	var fore_angle := upper_angle - 0.62
-	var grip := _segment(ci, elbow, fore_angle, 9.4, 5.6, arm_skin, ink, 2.1)
-	var head := Rect2(hip.x - 17.0, hip.y - 48.0, 33.0, 30.0)
-	_chunk(ci, head, 7.6, skin, ink, 2.7)
-	_chunk(ci, Rect2(head.position.x + 3.2, head.position.y + 15.5, 10.0, 11.0), 3.0, skin_shade, skin_shade, 0.0)
-	_chunk(ci, Rect2(head.position.x + 2.2, head.position.y + 2.0, head.size.x - 4.4, 10.5), 4.6, hair, hair, 0.0)
-	_chunk(ci, Rect2(head.position.x + 2.2, head.position.y + 8.0, 8.0, 13.0), 2.8, hair, hair, 0.0)
-	var crest := PackedVector2Array()
-	var crown_y := head.position.y
-	crest.append(Vector2(head.position.x + 3.5, crown_y + 1.2))
-	crest.append(Vector2(head.position.x + 0.5, crown_y - 10.0))
-	crest.append(Vector2(head.position.x + 12.0, crown_y + 0.6))
-	var plume := trim.lerp(Color("f6f2e8"), 0.78).lerp(Color.WHITE, wash * 0.35)
-	_paint_poly(ci, crest, plume, ink, 2.0)
-	var eye_y := head.position.y + 14.6
-	var far_eye := Rect2(head.position.x + 12.5, eye_y, 5.5, 5.8)
-	var near_eye := Rect2(head.position.x + 20.2, eye_y - 0.3, 6.6, 6.4)
+	var head := Rect2(hip.x - 20.0, hip.y - 46.0, 40.0, 32.0)
+	var helm := Rect2(hip.x - 17.0, hip.y - 58.0, 34.0, 17.0)
+	var body := Rect2(hip.x - 12.0, hip.y - 17.0, 24.0, 11.0)
+	var plate := Rect2(hip.x - 4.0, hip.y - 14.8, 8.4, 6.6)
+	var boot := Rect2(hip.x - 8.5, hip.y - 7.6, 17.0, 5.2)
+	var crown := Vector2(helm.position.x + helm.size.x * 0.5, helm.position.y + 1.5)
+	_chunk(ci, Rect2(hip.x - 13.0, hip.y - 2.6, 26.0, 4.4), 2.1, Color(0, 0, 0, 0.24), Color(0, 0, 0, 0), 0.0)
+	var boot_pivot := Vector2(boot.position.x + boot.size.x * 0.5, boot.position.y + 0.4)
+	var boot_pts := _turn(_squircle(boot, 3.0), boot_pivot, step * 0.3)
+	_paint_poly(ci, boot_pts, metal_deep, ink, 2.4)
+	_chunk(ci, body, 4.4, metal, ink, 2.5)
+	_chunk(ci, Rect2(body.position.x + 11.5, body.position.y + 2.6, 9.6, 6.2), 2.4, metal_shade, metal_shade, 0.0)
+	_chunk(ci, plate, 2.2, gold, ink, 2.0)
+	_chunk(ci, head, 8.8, face, ink, 2.6)
+	_chunk(ci, Rect2(head.position.x + 2.6, head.position.y + 12.5, 9.2, 16.2), 2.4, side, side, 0.0)
+	_framed(ci, helm, 7.4, metal, gold, ink, 2.3, 2.5)
+	_chunk(ci, Rect2(helm.position.x + 15.0, helm.position.y + 4.0, 14.0, 8.0), 3.0, metal_shade, metal_shade, 0.0)
+	_sword_blade(ci, crown + Vector2(-1.2, 2.2), -2.22, 14.5, 3.3, 0.45, plume_side, plume_side, ink, 2.1)
+	_sword_blade(ci, crown + Vector2(1.6, 2.2), -0.94, 14.0, 3.1, 0.4, plume_side, plume_side, ink, 2.1)
+	_sword_blade(ci, crown + Vector2(0.0, 1.2), -1.57, 16.5, 3.5, 0.5, plume, plume, ink, 2.1)
+	var eye_far := Rect2(hip.x - 3.2, hip.y - 33.2, 6.4, 7.2)
+	var eye_near := Rect2(hip.x + 5.4, hip.y - 32.8, 6.8, 7.6)
 	var brow := ink
+	var upper_angle := 0.48 - chop * 1.35 + step * 0.14
+	var fore_angle := 0.39 - chop * 1.54 + step * 0.1
+	var shoulder := hip + Vector2(11.0, -14.0)
 	if hurt:
-		_segment(ci, far_eye.position + Vector2(0.0, 2.0), 0.12, far_eye.size.x, 2.0, brow, brow, 0.0)
-		_segment(ci, near_eye.position + Vector2(0.0, 2.0), 0.02, near_eye.size.x, 2.1, brow, brow, 0.0)
+		_segment(ci, eye_far.position + Vector2(0.2, 2.8), 0.06, eye_far.size.x, 2.0, brow, brow, 0.0)
+		_segment(ci, eye_near.position + Vector2(0.2, 3.0), -0.05, eye_near.size.x, 2.1, brow, brow, 0.0)
 	else:
-		_segment(ci, far_eye.position + Vector2(-0.3, -3.2), -0.46, 6.2, 2.3, brow, brow, 0.0)
-		_segment(ci, near_eye.position + Vector2(-0.2, -3.4), -0.22, 7.2, 2.5, brow, brow, 0.0)
-		_chunk(ci, far_eye, 1.7, ink, ink, 1.15)
-		_chunk(ci, near_eye, 1.9, ink, ink, 1.25)
-		ci.draw_rect(Rect2(far_eye.position.x + 2.5, far_eye.position.y + 1.1, 1.5, 1.5), Color("fff6ea"), true)
-		ci.draw_rect(Rect2(near_eye.position.x + 3.4, near_eye.position.y + 1.15, 1.8, 1.8), Color("fff6ea"), true)
-	_chunk(ci, Rect2(far_eye.end.x - 0.2, eye_y + 5.0, 2.3, 3.4), 1.0, skin.darkened(0.2), skin.darkened(0.2), 0.0)
-	var mouth := Color("8d403c").lerp(Color.WHITE, wash)
-	_segment(ci, Vector2(near_eye.position.x - 0.4, eye_y + 9.2), 0.06, 6.0, 2.15, mouth, mouth, 0.0)
-	_chunk(ci, Rect2(hip.x - 6.0, head.end.y - 1.5, 12.5, 4.4), 1.5, collar, ink, 1.4)
-	_sword_weapon(ci, grip, fore_angle + 0.06, steel, ink, wash)
+		_segment(ci, eye_far.position + Vector2(-0.2, -3.0), 0.36, 6.6, 2.1, brow, brow, 0.0)
+		_segment(ci, eye_near.position + Vector2(0.2, -3.2), -0.32, 6.8, 2.2, brow, brow, 0.0)
+		_chunk(ci, eye_far, 2.2, Color("fff8ef"), ink, 1.7)
+		_chunk(ci, eye_near, 2.3, Color("fff8ef"), ink, 1.7)
+		_chunk(ci, Rect2(eye_far.position.x + 2.2, eye_far.position.y + 2.4, 2.5, 3.1), 1.0, ink, ink, 0.0)
+		_chunk(ci, Rect2(eye_near.position.x + 2.4, eye_near.position.y + 2.5, 2.6, 3.2), 1.0, ink, ink, 0.0)
+		ci.draw_rect(Rect2(eye_far.position.x + 2.4, eye_far.position.y + 2.6, 1.15, 1.15), Color("fffdf8"), true)
+		ci.draw_rect(Rect2(eye_near.position.x + 2.6, eye_near.position.y + 2.7, 1.2, 1.2), Color("fffdf8"), true)
+	var mouth := Rect2(hip.x + 2.4, hip.y - 23.6, 6.0, 2.3)
+	_chunk(ci, mouth, 1.1, Color("c45c58").lerp(Color.WHITE, wash), ink, 1.3)
+	var elbow := _segment(ci, shoulder, upper_angle, 8.4, 6.4, metal, ink, 2.4)
+	var grip := _segment(ci, elbow, fore_angle, 7.4, 5.2, metal_deep, ink, 2.3)
+	_sword_weapon(ci, grip, fore_angle, ink, gold, gold_deep, blade, blade_lit)
 
 
-static func _sword_weapon(ci: CanvasItem, hand: Vector2, angle: float, steel: Color, ink: Color, wash: float) -> void:
+static func _framed(ci: CanvasItem, rect: Rect2, cut: float, fill: Color, trim: Color, ink: Color, ring: float, edge: float) -> void:
+	var outer := ring + edge
+	var big := Rect2(rect.position - Vector2(outer, outer), rect.size + Vector2(outer, outer) * 2.0)
+	var mid := Rect2(rect.position - Vector2(ring, ring), rect.size + Vector2(ring, ring) * 2.0)
+	ci.draw_colored_polygon(_squircle(big, cut + outer), ink)
+	ci.draw_colored_polygon(_squircle(mid, cut + ring), trim)
+	ci.draw_colored_polygon(_squircle(rect, cut), fill)
+
+
+static func _sword_weapon(ci: CanvasItem, hand: Vector2, angle: float, ink: Color, gold: Color, gold_deep: Color, blade: Color, blade_lit: Color) -> void:
 	var dir := Vector2(cos(angle), sin(angle))
 	var side := Vector2(-dir.y, dir.x)
-	var grip := Color("3b291c").lerp(Color.WHITE, wash)
-	var guard := Color("e2b034").lerp(Color.WHITE, wash)
-	_segment(ci, hand - dir * 6.2, angle, 6.2, 3.5, grip, ink, 1.6)
-	_segment(ci, hand - side * 4.8, angle + PI * 0.5, 9.6, 3.2, guard, ink, 1.6)
-	var base := hand + dir * 2.8
-	var tip := hand + dir * 20.0
-	var blade := PackedVector2Array()
-	blade.append(base + side * 2.6)
-	blade.append(tip)
-	blade.append(base - side * 2.6)
-	_paint_poly(ci, blade, steel.darkened(0.14), ink, 1.7)
+	_segment(ci, hand - dir * 4.2, angle, 4.4, 3.1, gold_deep, ink, 1.7)
+	_sword_blade(ci, hand + dir * 1.6, angle, 15.5, 1.45, 0.38, blade, blade_lit, ink, 1.7)
+	_segment(ci, hand - side * 3.2, angle + PI * 0.5, 6.4, 2.5, gold, ink, 1.7)
+
+
+static func _sword_blade(ci: CanvasItem, origin: Vector2, angle: float, length: float, base_w: float, tip_w: float, fill: Color, shade: Color, ink: Color, outline: float) -> void:
+	var dir := Vector2(cos(angle), sin(angle))
+	var side := Vector2(-dir.y, dir.x)
+	var tip := origin + dir * length
+	if outline > 0.15:
+		var ring := PackedVector2Array()
+		ring.append(origin - dir * outline + side * (base_w + outline))
+		ring.append(tip + dir * outline * 0.7 + side * (tip_w + outline))
+		ring.append(tip + dir * outline * 0.7 - side * (tip_w + outline))
+		ring.append(origin - dir * outline - side * (base_w + outline))
+		ci.draw_colored_polygon(ring, ink)
+	var steel := PackedVector2Array()
+	steel.append(origin + side * base_w)
+	steel.append(tip + side * tip_w)
+	steel.append(tip - side * tip_w)
+	steel.append(origin - side * base_w)
+	ci.draw_colored_polygon(steel, fill)
 	var shine := PackedVector2Array()
-	shine.append(base + side * 0.7 + dir * 1.4)
-	shine.append(tip - dir * 2.2)
-	shine.append(base - side * 0.2 + dir * 1.4)
-	ci.draw_colored_polygon(shine, steel.lightened(0.18))
+	shine.append(origin + dir * 1.8 + side * 0.35)
+	shine.append(tip - dir * 2.4 + side * 0.15)
+	shine.append(tip - dir * 2.4 - side * 0.35)
+	shine.append(origin + dir * 1.8 - side * 0.45)
+	ci.draw_colored_polygon(shine, shade)
 
 
 static func _chunk(ci: CanvasItem, rect: Rect2, cut: float, fill: Color, ink: Color, outline: float) -> void:
@@ -859,7 +882,7 @@ static func _squircle(rect: Rect2, cut: float) -> PackedVector2Array:
 	arcs.append(PI * 1.5)
 	arcs.append(0.0)
 	arcs.append(PI * 0.5)
-	var steps := 4
+	var steps := 8
 	for corner_i in 4:
 		var center: Vector2 = corners[corner_i]
 		var a0 := arcs[corner_i]
