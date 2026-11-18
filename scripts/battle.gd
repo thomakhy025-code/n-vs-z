@@ -121,6 +121,10 @@ func start(chosen: Array, run_mode: String, level_index: int = 1) -> void:
 	mode = run_mode
 	rules = Levels.level(level_index)
 	level_no = int(rules["index"])
+	if mode == "" and not duel:
+		var host := get_parent()
+		if host != null and host.has_method("begin_hold"):
+			host.begin_hold()
 	enemy_value = float(rules["start"])
 	enemy_income = float(rules["income"])
 	player_roster = Catalog.player_roster()
@@ -404,8 +408,8 @@ func _layout_hud() -> void:
 	income_label.position = Vector2(size.x * 0.5 - 170.0, top + 50.0)
 	income_label.size = Vector2(340, 24)
 	if level_label != null:
-		level_label.position = Vector2(size.x * 0.5 - 240.0, top + 76.0)
-		level_label.size = Vector2(480, 26)
+		level_label.position = Vector2(size.x * 0.5 - 360.0, top + 76.0)
+		level_label.size = Vector2(720, 26)
 	hint.position = Vector2(size.x * 0.5 - 280.0, top + 104.0)
 	hint.size = Vector2(560, 48)
 	down_label.position = Vector2(size.x * 0.5 - 180.0, top + 156.0)
@@ -435,6 +439,10 @@ func _process(delta: float) -> void:
 		_run_harness()
 		return
 	if not finished and not paused:
+		if not duel and mode == "":
+			var host := get_parent()
+			if host != null and host.has_method("note_hold"):
+				host.note_hold(level_no, delta)
 		for id in player_cd.keys():
 			player_cd[id] = maxf(0.0, float(player_cd[id]) - delta)
 		for id in enemy_cd.keys():
@@ -1165,6 +1173,10 @@ func _finish_battle(defender_side: int) -> void:
 	if duel:
 		won = defender_side != local_side
 	Sfx.play("win" if won else "lose", 1.0, -2.0)
+	if not duel:
+		var purse := get_parent()
+		if purse != null and purse.has_method("flush_hold"):
+			purse.flush_hold()
 	if mode != "" and mode != "duel":
 		return
 	_close_pause()
@@ -1212,6 +1224,12 @@ func _present_end(defender_side: int) -> void:
 		if level_no < Levels.count():
 			var nxt: Dictionary = Levels.level(level_no + 1)
 			body += " Level %d, %s, is open." % [int(nxt["index"]), str(nxt["name"])]
+	elif not duel:
+		var payer := get_parent()
+		if payer != null and payer.has_method("held_line"):
+			var held := str(payer.held_line())
+			if held != "":
+				body += " " + held
 	var actions: Array = []
 	if won and not duel and level_no < Levels.count():
 		actions.append({"text": "Next level", "color": Color("c44536"), "call": Callable(get_parent(), "next_level")})
@@ -1241,6 +1259,8 @@ func _toggle_pause() -> void:
 
 func _go_home() -> void:
 	var host := get_parent()
+	if host != null and host.has_method("flush_hold"):
+		host.flush_hold()
 	if host != null and host.has_method("show_title"):
 		host.show_title()
 
@@ -1328,6 +1348,18 @@ func _update_hud(delta: float) -> void:
 	player_hp_label.add_theme_color_override("font_color", Color("ffb4a8") if player_ratio < 0.3 else Color("f3e6c8"))
 	value_label.text = "Value  %d" % int(floor(player_value))
 	income_label.text = "+%.1f each second" % PLAYER_INCOME
+	if level_label != null and not duel:
+		var hold := ""
+		if mode == "":
+			var host := get_parent()
+			if host != null and host.has_method("hold_hud"):
+				hold = str(host.hold_hud(level_no))
+		if hold == "":
+			level_label.text = "Level %d  ·  %s" % [level_no, str(rules["name"])]
+			level_label.add_theme_font_size_override("font_size", 18)
+		else:
+			level_label.text = "Level %d  ·  %s  ·  %s" % [level_no, str(rules["name"]), hold]
+			level_label.add_theme_font_size_override("font_size", 15)
 	player_bar_fill.size.x = 220.0 * clampf(player_ratio, 0.0, 1.0)
 	enemy_bar_fill.size.x = 220.0 * clampf(enemy_ratio, 0.0, 1.0)
 	player_bar_fill.color = Color("7dce6a") if player_ratio > 0.3 else Color("e24b3b")
