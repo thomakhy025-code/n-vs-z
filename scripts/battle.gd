@@ -525,10 +525,36 @@ func _try_enemy(id: String, ignore_cd: bool = false) -> bool:
 	var cooling := float(enemy_cd[id]) > 0.0 and not ignore_cd
 	if cooling or enemy_value < float(entry["cost"]) or _count(1) >= MAX_SIDE:
 		return false
+	var road := -1
+	if id == "fan":
+		road = _fan_road()
+		if road < 0:
+			return false
 	enemy_value -= float(entry["cost"])
 	enemy_cd[id] = float(entry["cooldown"])
-	_spawn(_scaled_enemy(entry), 1)
+	_spawn(_scaled_enemy(entry), 1, road)
 	return true
+
+
+func _fans_on(road: int) -> int:
+	var total := 0
+	for unit in units:
+		if not is_instance_valid(unit) or not unit.alive or unit.side != 1:
+			continue
+		if str(unit.data.get("id", "")) != "fan" or int(unit.lane) != road:
+			continue
+		total += 1
+	return total
+
+
+func _fan_road() -> int:
+	var roads := maxi(lane_ys.size(), 1)
+	for step in roads:
+		var road := (lane_tick + step) % roads
+		if _fans_on(road) < 2:
+			lane_tick = road + 1
+			return road
+	return -1
 
 
 func _enemy_options() -> Array:
