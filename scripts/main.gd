@@ -28,7 +28,7 @@ The other gate calls its own fighters. On monster levels they are walkers, runne
 
 Play lists seventy levels. The first is open. Winning a level opens the next. Levels 1 to 20 are monsters, and that is where each soldier is learned. Levels 21 to 40 are human soldiers. Levels 41 to 60 are monsters again, and the new monsters begin. Levels 61 to 70 alternate, monster then soldier, starting with monsters. The new soldiers begin on the soldier turns. Your purse stays the same. Theirs gets heavier as the levels climb, and it eases a little when the soldiers first arrive. Before you choose who to bring, the level shows the other side, each fighter with a skin and a name. Press a name to read blood, damage, attacking distance, attacking range, speed, and the special skill.
 
-Each level you open pays 100 diamonds. Clearing a level also pays coins. The base is 200 coins times the level. Three minutes or less doubles that, five minutes or less adds half, six minutes or less pays the base, and a longer clear pays half. On a level you have not cleared, the fight also pays 0.1% of that base each second it is still going. Those coins stay if your gate falls. A level you have already cleared does not pay this. On a cleared level, Automatic finish skips the fight. There is a 50% chance it pays the coins from your last clear of that level. A miss pays nothing. Until a clear is remembered, the stake is the base. Coins are not diamonds. Home has Upgrade. The hero and each soldier you have learned can be ranked 20 times. Each rank adds 5% of that character's blood and damage. Reach, cost, and speed stay the same.
+Each level you open pays 100 diamonds. Clearing a level also pays coins. The base is 200 coins times the level. Three minutes or less doubles that, five minutes or less adds half, six minutes or less pays the base, and a longer clear pays half. On a level you have not cleared, the fight also pays 0.25% of that base each second it is still going. Those coins stay if your gate falls. A level you have already cleared does not pay this. On a cleared level, Automatic finish skips the fight. There is a 50% chance it pays the coins from your last clear of that level. A miss pays nothing. Until a clear is remembered, the stake is the base. Coins are not diamonds. Home has Upgrade. The hero and each soldier you have learned can be ranked 20 times. Each rank adds 5% of that character's blood and damage. Reach, cost, and speed stay the same.
 
 Home is the night gate: Shop, Skin, Upgrade, the levels, and How to play are there, and the diamond count hangs by the lantern. During a fight, Home at the top returns you there.
 
@@ -1736,10 +1736,14 @@ func begin_hold() -> void:
 	held_now = 0
 
 
+func _hold_rate(level_index: int) -> float:
+	return float(200 * maxi(1, level_index)) * 0.0025
+
+
 func note_hold(level_index: int, delta: float) -> void:
 	if level_index <= cleared or level_index < 1 or delta <= 0.0:
 		return
-	hold_fraction += float(200 * maxi(1, level_index)) * 0.001 * delta
+	hold_fraction += _hold_rate(level_index) * delta
 	hold_wait += delta
 	var whole := int(floor(hold_fraction))
 	if whole > 0:
@@ -1765,7 +1769,7 @@ func flush_hold() -> void:
 func hold_hud(level_index: int) -> String:
 	if level_index <= cleared or level_index < 1:
 		return ""
-	var rate := float(200 * maxi(1, level_index)) * 0.001
+	var rate := _hold_rate(level_index)
 	var shown := str(int(rate))
 	if not is_equal_approx(rate, float(int(rate))):
 		shown = "%.1f" % rate
