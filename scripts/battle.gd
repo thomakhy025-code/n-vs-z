@@ -1874,7 +1874,8 @@ func lay_hazard(kind: String, road: int, at: Vector2, seconds: float, amount: fl
 	queue_redraw()
 
 
-func spread_road(road: int, toward_x: float) -> void:
+func spread_road(road: int, toward_x: float, walls: Array) -> void:
+	var stop_x := _gust_stop(toward_x, walls)
 	for patch in hazards:
 		if int(patch.get("lane", -1)) != road:
 			continue
@@ -1882,8 +1883,13 @@ func spread_road(road: int, toward_x: float) -> void:
 		if kind != "fire" and kind != "ice":
 			continue
 		var origin := float(patch.get("origin", toward_x))
-		patch["x0"] = minf(origin, toward_x)
-		patch["x1"] = maxf(origin, toward_x)
+		var end_x := toward_x
+		if toward_x < origin:
+			if _lee_of_wall(origin, walls):
+				continue
+			end_x = stop_x
+		patch["x0"] = minf(origin, end_x)
+		patch["x1"] = maxf(origin, end_x)
 		patch["left"] = float(patch.get("left", 0.0)) + 2.0
 	queue_redraw()
 
@@ -1892,6 +1898,7 @@ func blow_road(road: int, attacker_side: int, amount: float, from_id: String, fa
 	var road_len := absf(enemy_front - player_front)
 	var push := road_len * 0.25
 	var moved_any := false
+	var walls := _gust_walls(road)
 	var bodies: Array = []
 	for unit in units:
 		if is_instance_valid(unit) and unit.alive:
@@ -1908,13 +1915,16 @@ func blow_road(road: int, attacker_side: int, amount: float, from_id: String, fa
 			continue
 		if int(body.side) != attacker_side and body.has_method("take_damage"):
 			body.take_damage(amount, true, from_id, 1200.0)
+		# The shove and the fire stretch stop on a berserker, and on anyone already downwind of him.
+		if _gust_spares(body, walls):
+			continue
 		if _shove_home(body, push):
 			moved_any = true
 	if moved_any:
 		var home_x := player_front + 18.0
 		if attacker_side == 0:
 			home_x = enemy_front - 18.0
-		spread_road(road, home_x)
+		spread_road(road, home_x, walls)
 	var puff_y := lane_y(road)
 	var reach := minf(push, maxf(1.0, fan_x - player_front))
 	for puff_i in 4:
@@ -1922,6 +1932,60 @@ func blow_road(road: int, attacker_side: int, amount: float, from_id: String, fa
 		poof(Vector2(px, puff_y), Color("d5e6f2"))
 	Sfx.play("wind", 0.92, -6.0)
 	float_text(Vector2(fan_x - reach * 0.5, puff_y - 28.0), "WIND", Color("d5e6f2"))
+
+
+func _living_berserker(unit) -> bool:
+	if unit == null or not is_instance_valid(unit) or not unit.alive:
+		return false
+	return _unit_id(unit) == "berserker"
+
+
+func _berserker_blocks(unit, road: int) -> bool:
+	if not _living_berserker(unit):
+		return false
+	# A real berserker is drawn from the top road to the bottom road, so he blocks every road.
+	# A trial berserker keeps a normal body and stands on one road.
+	if is_berserker(unit):
+		return true
+	if not ("lane" in unit):
+		return false
+	return int(unit.lane) == road
+
+
+func _gust_walls(road: int) -> Array:
+	var found: Array = []
+	for unit in units:
+		if _berserker_blocks(unit, road):
+			found.append(float(unit.position.x))
+	return found
+
+
+func _gust_spares(body, walls: Array) -> bool:
+	if _living_berserker(body):
+		return true
+	var bx := float(body.position.x)
+	for raw_wall in walls:
+		var wall_x := float(raw_wall)
+		if wall_x > bx + 0.01:
+			return true
+	return false
+
+
+func _gust_stop(toward_x: float, walls: Array) -> float:
+	var stop := toward_x
+	for raw_wall in walls:
+		var wall_x := float(raw_wall)
+		if wall_x > toward_x:
+			stop = maxf(stop, wall_x)
+	return stop
+
+
+func _lee_of_wall(origin: float, walls: Array) -> bool:
+	for raw_wall in walls:
+		var wall_x := float(raw_wall)
+		if wall_x >= origin - 0.01:
+			return true
+	return false
 
 
 func _on_fan_road(body, road: int) -> bool:
