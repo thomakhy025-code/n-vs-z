@@ -524,6 +524,10 @@ func _try_enemy(id: String, ignore_cd: bool = false) -> bool:
 
 
 func _enemy_options() -> Array:
+	return enemy_ids(level_no, rules, battle_time)
+
+
+static func enemy_ids(level_no: int, rules: Dictionary, battle_time: float) -> Array:
 	var human := str(rules.get("faction", "")) == "human"
 	var modern := human and level_no >= 61
 	var dire := (not human) and level_no >= 41
@@ -532,7 +536,16 @@ func _enemy_options() -> Array:
 		options = ["knives", "buck", "firebow"]
 	elif dire:
 		options = ["walker", "runner", "moth"]
-	if battle_time >= _rule_f("oni_at", 50.0):
+	var oni_at := 50.0
+	var brute_at := 24.0
+	var spitter_at := 12.0
+	if rules.has("oni_at"):
+		oni_at = float(rules["oni_at"])
+	if rules.has("brute_at"):
+		brute_at = float(rules["brute_at"])
+	if rules.has("spitter_at"):
+		spitter_at = float(rules["spitter_at"])
+	if battle_time >= oni_at:
 		if modern:
 			options = ["scope", "aria", "smog", "crow", "buck", "ward", "fan"]
 		elif human:
@@ -541,7 +554,7 @@ func _enemy_options() -> Array:
 			options = ["glut", "oni", "brood", "elder", "moth", "howler", "storm"]
 		else:
 			options = ["oni", "howler", "storm", "herald", "reaver", "shell", "walker", "runner"]
-	elif battle_time >= _rule_f("brute_at", 24.0):
+	elif battle_time >= brute_at:
 		if modern:
 			options = ["smog", "aria", "buck", "javelin", "ward", "fan"]
 		elif human:
@@ -550,7 +563,7 @@ func _enemy_options() -> Array:
 			options = ["brood", "elder", "moth", "howler", "reaver", "viper", "walker"]
 		else:
 			options = ["howler", "herald", "reaver", "shell", "viper", "walker", "runner"]
-	elif battle_time >= _rule_f("spitter_at", 12.0):
+	elif battle_time >= spitter_at:
 		if modern:
 			options = ["buck", "knives", "firebow", "javelin", "ward"]
 		elif human:
@@ -562,11 +575,16 @@ func _enemy_options() -> Array:
 	return options
 
 
-func _scaled_enemy(entry: Dictionary) -> Dictionary:
+static func faced_enemy(entry: Dictionary, rules: Dictionary) -> Dictionary:
 	var copy: Dictionary = entry.duplicate()
-	var mult := _rule_f("dmg_mult", 1.0)
+	var mult := 1.0
+	var hp_mult := 1.0
+	if rules.has("dmg_mult"):
+		mult = float(rules["dmg_mult"])
+	if rules.has("hp_mult"):
+		hp_mult = float(rules["hp_mult"])
 	var kind := str(copy.get("id", ""))
-	copy["hp"] = maxi(1, int(round(float(copy["hp"]) * _rule_f("hp_mult", 1.0))))
+	copy["hp"] = maxi(1, int(round(float(copy["hp"]) * hp_mult)))
 	if kind == "ward":
 		copy["damage"] = 5
 	elif kind == "fan":
@@ -586,6 +604,10 @@ func _scaled_enemy(entry: Dictionary) -> Dictionary:
 	if copy.has("chew"):
 		copy["chew"] = maxi(1, int(round(float(copy["chew"]) * mult)))
 	return copy
+
+
+func _scaled_enemy(entry: Dictionary) -> Dictionary:
+	return faced_enemy(entry, rules)
 
 
 func _rule_f(key: String, fallback: float) -> float:

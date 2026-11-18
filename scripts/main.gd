@@ -26,7 +26,7 @@ When their gate is down to a quarter of its blood, they immediately gain their s
 
 The other gate calls its own fighters. On monster levels they are walkers, runners, a howler, a viper, a storm, a herald, a shell, a reaver, and later an oni. From level 41 those monsters are faster and harder, and Moth, Elder, Glut, and Brood join them. The howler hangs from the curse. Only an archer can hit it there. It swings once onto an archer, a leveling caster, or a healing caster, then stays on the road. The viper's bite holds one fighter still for 2 seconds, so they cannot move or strike, until a healing caster clears it. If two fighters are in front, it bites the one who hits harder and does not hold them. Most blows miss the viper. The storm waits 4 seconds, then lightning hits the fighter in front and four others on any road, and holds each for 1 second. The herald calls two other monsters every 3 seconds. The shell is slow, hits softly, and carries a great deal of blood. The reaver is a harder hitter for a moderate call. Moth flies on one road. A short weapon cannot hit it, and those fighters stop beneath it, though they still fight a closer fighter on the ground. Elder appears somewhere on the road, strikes whoever is nearest, friend or foe, and fades after 15 seconds. Many blows miss Elder. Glut is very slow. It eats the fighter in front, except a berserker or a flyer, then sits for 5 seconds and heals. Brood bites, and when it dies three quick Lings crawl out. On soldier levels they wear modern kit, and they hit harder than before. Knives match the sword soldier. The firebow is thin-blooded and hits hard, then leaves fire on that spot for 3 seconds. The fan is thin-blooded, barely hurts, and once every 4 seconds blows its whole road: fighters past the middle go back to the middle, and fighters who have not reached the middle go back to their castle. That gust also stretches any fire or ice on the road from where it started out to the castle and keeps it burning 2 seconds longer. The ward carries a great shield, a great deal of blood, and hits for 5. The javelin throws five long heavy shots, then fights up close with a short sword. The drum lifts three allies at once, the way a leveling caster lifts one. The crow waits 3 seconds, strikes the first enemy hard, then fights like the horse rider. From level 61, Smog, Buck, Scope, and Aria join them. Smog deals no damage and lays smoke where it walks. The smoke hides that stretch for 10 seconds. Buck fires a shotgun once a second, four times, then reloads for 2 seconds. Scope fires a long heavy shot every 3 seconds and has little blood. Aria sings, and the lift is half of a leveling caster, on every ally on every road at once. Level 40's general is an officer.
 
-Play lists seventy levels. The first is open. Winning a level opens the next. Levels 1 to 20 are monsters, and that is where each soldier is learned. Levels 21 to 40 are human soldiers. Levels 41 to 60 are monsters again, and the new monsters begin. Levels 61 to 70 alternate, monster then soldier, starting with monsters. The new soldiers begin on the soldier turns. Your purse stays the same. Theirs gets heavier as the levels climb, and it eases a little when the soldiers first arrive.
+Play lists seventy levels. The first is open. Winning a level opens the next. Levels 1 to 20 are monsters, and that is where each soldier is learned. Levels 21 to 40 are human soldiers. Levels 41 to 60 are monsters again, and the new monsters begin. Levels 61 to 70 alternate, monster then soldier, starting with monsters. The new soldiers begin on the soldier turns. Your purse stays the same. Theirs gets heavier as the levels climb, and it eases a little when the soldiers first arrive. Before you choose who to bring, the level shows the other side, each fighter with a skin and a name. Press a name to read blood, damage, attacking distance, attacking range, speed, and the special skill.
 
 Each level you open pays 100 diamonds. Clearing a level also pays coins. The base is 200 coins times the level. Three minutes or less doubles that, five minutes or less adds half, six minutes or less pays the base, and a longer clear pays half. Coins are not diamonds. Home has Upgrade. The hero and each soldier you have learned can be ranked 20 times. Each rank adds 5% of that character's blood and damage. Reach, cost, and speed stay the same.
 
@@ -226,6 +226,7 @@ const WEB_NAME_CLOSE := """
 })();
 """
 var chosen_level: int = 1
+var foe_return: bool = false
 var screen: String = "menu"
 var layout_account: bool = false
 var picking_duel: bool = false
@@ -340,11 +341,14 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif screen == "duel":
 		show_title()
 		get_viewport().set_input_as_handled()
+	elif screen == "foe_detail":
+		_show_foes()
+		get_viewport().set_input_as_handled()
+	elif screen == "foe":
+		_show_levels()
+		get_viewport().set_input_as_handled()
 	elif screen == "select":
-		if picking_duel:
-			_show_duel()
-		else:
-			_show_levels()
+		_leave_select()
 		get_viewport().set_input_as_handled()
 
 
@@ -913,7 +917,266 @@ func _pick_level(index: int) -> void:
 	if index > unlocked or index < 1:
 		return
 	chosen_level = index
-	_show_select()
+	foe_return = true
+	_show_foes()
+
+
+func _show_foes() -> void:
+	screen = "foe"
+	if not picking_duel:
+		_prepare_loadout()
+	var rules: Dictionary = Levels.level(chosen_level)
+	var box := _open_page("Level %d · %s" % [int(rules["index"]), str(rules["name"])])
+	var intro := UiSkin.label("These fighters are on the other road. Press a name to read one.", 16, Color("2c2118"))
+	intro.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(intro)
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	box.add_child(scroll)
+	var list := VBoxContainer.new()
+	list.add_theme_constant_override("separation", 8)
+	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(list)
+	for band in _foe_bands(chosen_level):
+		var when := UiSkin.label(str(band["when"]), 20, Color("6b3a32"))
+		when.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		list.add_child(when)
+		for row in band["rows"]:
+			list.add_child(_foe_row(str(row["id"]), str(row["kind"])))
+	var actions := HBoxContainer.new()
+	actions.alignment = BoxContainer.ALIGNMENT_CENTER
+	actions.add_theme_constant_override("separation", 12)
+	box.add_child(actions)
+	var back := _menu_button("Back", Color("e6c36a"), _show_levels)
+	back.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	actions.add_child(back)
+	var choose := _menu_button("Choose fighters", Color("1c140e"), _show_select, 220, 18)
+	actions.add_child(choose)
+	if _squad_ok():
+		actions.add_child(_menu_button("Start battle", Color("c44536"), _begin_from_select, 220, 18))
+
+
+func _foe_row(id: String, kind: String) -> HBoxContainer:
+	var entry := _foe_entry(id, kind)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	row.alignment = BoxContainer.ALIGNMENT_BEGIN
+	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var portrait := _foe_portrait(str(entry.get("paint", id)), 128, 136)
+	row.add_child(portrait)
+	var column := VBoxContainer.new()
+	column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	column.add_theme_constant_override("separation", 2)
+	row.add_child(column)
+	var name_button := _menu_button(str(entry.get("name", id)), Color("1c140e"), _show_foe_detail.bind(id, kind), 360, 20)
+	name_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	column.add_child(name_button)
+	var facts := UiSkin.label("Blood %d · Damage %d" % [int(entry.get("hp", 0)), int(entry.get("damage", 0))], 15, Color("2c2118"))
+	facts.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	column.add_child(facts)
+	return row
+
+
+func _foe_portrait(kind: String, wide: float, tall: float) -> Portrait:
+	var portrait := Portrait.new()
+	portrait.kind = kind
+	portrait.fit = true
+	portrait.custom_minimum_size = Vector2(wide, tall)
+	portrait.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	return portrait
+
+
+func _show_foe_detail(id: String, kind: String) -> void:
+	screen = "foe_detail"
+	var entry := _foe_entry(id, kind)
+	var box := _open_page(str(entry.get("name", id)))
+	var where := UiSkin.label("Level %d · %s" % [chosen_level, str(Levels.level(chosen_level)["name"])], 16, Color("6b3a32"))
+	where.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(where)
+	var frame := CenterContainer.new()
+	frame.custom_minimum_size = Vector2(0, 150)
+	frame.add_child(_foe_portrait(str(entry.get("paint", id)), 220, 140))
+	box.add_child(frame)
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	box.add_child(scroll)
+	var column := VBoxContainer.new()
+	column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(column)
+	var body := UiSkin.label(_foe_detail_text(entry, kind), 18, Color("2c2118"))
+	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	body.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	column.add_child(body)
+	var pad := Control.new()
+	pad.custom_minimum_size = Vector2(0, 8)
+	pad.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	column.add_child(pad)
+	scroll.resized.connect(_fit_scroll_label.bind(scroll, body))
+	var back := _menu_button("Back", Color("e6c36a"), _show_foes)
+	back.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	box.add_child(back)
+
+
+func _foe_bands(level_index: int) -> Array:
+	var rules: Dictionary = Levels.level(level_index)
+	var seen: Dictionary = {}
+	var bands: Array = []
+	_collect_band(bands, seen, "From the start", BattleScript.enemy_ids(level_index, rules, 0.0))
+	_collect_band(bands, seen, "After a short while", BattleScript.enemy_ids(level_index, rules, float(rules["spitter_at"])))
+	_collect_band(bands, seen, "The harder wave", BattleScript.enemy_ids(level_index, rules, float(rules["brute_at"])))
+	_collect_band(bands, seen, "The last wave", BattleScript.enemy_ids(level_index, rules, float(rules["oni_at"])))
+	if bool(seen.get("brood", false)):
+		bands.append({"when": "When Brood dies", "rows": [{"id": "ling", "kind": "road"}]})
+	var lesson := str(rules.get("lesson", ""))
+	if lesson != "":
+		bands.append({"when": "When their gate breaks", "rows": [{"id": lesson, "kind": "lesson"}]})
+	elif bool(rules.get("boss", false)):
+		bands.append({"when": "When their gate breaks", "rows": [{"id": "boss", "kind": "boss"}]})
+	return bands
+
+
+func _collect_band(bands: Array, seen: Dictionary, when: String, ids: Array) -> void:
+	var rows: Array = []
+	for id in ids:
+		var key := str(id)
+		if bool(seen.get(key, false)):
+			continue
+		seen[key] = true
+		rows.append({"id": key, "kind": "road"})
+	if rows.is_empty():
+		return
+	bands.append({"when": when, "rows": rows})
+
+
+func _foe_entry(id: String, kind: String) -> Dictionary:
+	var rules: Dictionary = Levels.level(chosen_level)
+	if kind == "lesson":
+		var lesson := Catalog.lesson_foe(id, chosen_level)
+		if lesson.is_empty():
+			return {"id": id, "name": id, "paint": id, "hp": 1, "damage": 1}
+		return lesson
+	if kind == "boss":
+		var boss := Catalog.find_in(Catalog.enemy_roster(), "boss")
+		if boss.is_empty():
+			return {"id": "boss", "name": "General", "paint": "general", "hp": 1000, "damage": 200}
+		boss = boss.duplicate()
+		if str(rules.get("faction", "")) == "human":
+			boss["paint"] = "general"
+			boss["name"] = "General"
+		return boss
+	var entry := Catalog.find_in(Catalog.enemy_roster(), id)
+	if entry.is_empty():
+		return {"id": id, "name": id, "paint": id, "hp": 1, "damage": 1}
+	return BattleScript.faced_enemy(entry, rules)
+
+
+func _foe_detail_text(entry: Dictionary, kind: String) -> String:
+	var distance := float(entry.get("engage", 0.0))
+	var reach := float(entry.get("reach", 0.0))
+	var speed := float(entry.get("speed", 0.0))
+	var lines: PackedStringArray = PackedStringArray()
+	lines.append("Blood  %d" % int(entry.get("hp", 0)))
+	lines.append("Damage  %d" % int(entry.get("damage", 0)))
+	lines.append("Attacking distance  %s · %s. How close a foe must be before this one steps in." % [_num(distance), _reach_words(distance)])
+	lines.append("Attacking range  %s · %s. How far the blow itself lands." % [_num(reach), _reach_words(reach)])
+	lines.append("Speed  %s · %s" % [_num(speed), _speed_word(speed)])
+	lines.append("Time between strikes  %ss" % _num(float(entry.get("interval", 0.0))))
+	var foe_id := str(entry.get("id", ""))
+	if kind == "road" and foe_id != "ling":
+		lines.append("The other gate spends %d value, then waits %ss." % [int(entry.get("cost", 0)), _num(float(entry.get("cooldown", 0.0)))])
+	if int(entry.get("bounty", 0)) > 0 and kind != "boss":
+		lines.append("Beating one pays %d value." % int(entry.get("bounty", 0)))
+	lines.append("")
+	lines.append("Special skill")
+	lines.append(_foe_skill(entry, kind))
+	return "\n".join(lines)
+
+
+func _reach_words(value: float) -> String:
+	if value >= 1000.0:
+		return "the whole road"
+	if value >= 300.0:
+		return "long"
+	if value >= 140.0:
+		return "mid"
+	return "short"
+
+
+func _speed_word(value: float) -> String:
+	if value < 40.0:
+		return "slow"
+	if value < 80.0:
+		return "steady"
+	if value < 120.0:
+		return "quick"
+	return "fast"
+
+
+func _foe_skill(entry: Dictionary, kind: String) -> String:
+	var id := str(entry.get("id", ""))
+	if kind == "lesson":
+		return "Nine of these walk out when the gate breaks, three on each road. Kill all nine and this call is yours. The numbers above are what those nine have."
+	if kind == "boss" or id == "boss":
+		return "Walks out when the gate breaks. The level ends when this one dies."
+	match id:
+		"walker":
+			return "Walks one road and strikes one fighter at short range."
+		"runner":
+			return "Faster than a walker, and the next blow comes sooner."
+		"howler":
+			return "Hangs from the curse. Only an archer can hit it there. It swings once for %d onto an archer, a leveling caster, or a healing caster, then stays on the road." % int(entry.get("swing", 0))
+		"viper":
+			return "The bite holds one fighter still for 2 seconds, so they cannot move or strike, until a healing caster clears it. If two fighters are in front, it bites the one who hits harder and does not hold them. Most blows miss the viper."
+		"storm":
+			return "Waits, then lightning hits the fighter in front and four others on any road, and holds each for 1 second."
+		"herald":
+			return "Calls two other monsters every few seconds. Those calls pay no value when they fall."
+		"shell":
+			return "Slow, hits softly, and carries a great deal of blood."
+		"reaver":
+			return "A harder hitter for a moderate call. One target."
+		"oni":
+			return "A heavy blow that hits everyone in range on its road. Slow, and very hard to bring down."
+		"moth":
+			return "Flies on one road. A short weapon cannot hit it, and those fighters stop beneath it, though they still fight a closer fighter on the ground."
+		"elder":
+			return "Appears somewhere on the road, strikes whoever is nearest, friend or foe, and fades after 15 seconds. Many blows miss Elder."
+		"glut":
+			return "Very slow. It eats the fighter in front, except a berserker or a flyer, then sits for 5 seconds and heals. The bite deals %d. It deals no ordinary damage." % int(entry.get("chew", 0))
+		"brood":
+			return "Bites one fighter. When it dies, three quick Lings crawl out."
+		"ling":
+			return "A small fast biter that crawls out of Brood. It does not split again."
+		"knives":
+			return "Matches the sword soldier. One target, at short range."
+		"firebow":
+			return "Thin blood and a hard shot, then fire stays on that spot for 3 seconds and deals %d." % int(entry.get("burn", 0))
+		"fan":
+			return "Thin blood. The hit stays at 3. Once every 4 seconds it blows the whole road: fighters past the middle go back to the middle, and the others go back to their castle. The gust also stretches any fire or ice and keeps it burning 2 seconds longer."
+		"ward":
+			return "A great shield and a great deal of blood. The hit stays at 5."
+		"javelin":
+			return "Throws five long heavy shots, then fights up close. The short sword deals %d." % int(entry.get("sword", 0))
+		"drum":
+			return "Deals no damage. It lifts three allies at once, the way a leveling caster lifts one."
+		"crow":
+			return "Waits, then the first strike deals %d. After that it fights up close like the horse rider." % int(entry.get("opening", 0))
+		"smog":
+			return "Deals no damage. Smoke follows where it walks and hides that stretch for 10 seconds."
+		"buck":
+			return "Fires a shotgun once a second, four times, then reloads for 2 seconds. The shot reaches 100."
+		"scope":
+			return "Fires one long heavy shot every 3 seconds, and has little blood."
+		"aria":
+			return "Deals no damage. The song lifts every ally on every road at once, at half the strength of a leveling caster. A second song does not stack."
+		_:
+			return "Strikes one fighter on its own road."
 
 
 func _open_page(heading: String) -> VBoxContainer:
@@ -1191,6 +1454,9 @@ func _leave_select() -> void:
 	if picking_duel:
 		_show_duel()
 		return
+	if foe_return:
+		_show_foes()
+		return
 	_show_levels()
 
 
@@ -1291,6 +1557,7 @@ func change_squad() -> void:
 		Net.announce_reselect()
 		return
 	_drop_battle()
+	foe_return = false
 	_show_select()
 
 
@@ -1314,11 +1581,9 @@ func next_level() -> void:
 		show_title()
 		return
 	chosen_level = nxt
-	if _squad_ok():
-		_start_battle(loadout, "", nxt)
-	else:
-		_drop_battle()
-		_show_select()
+	_drop_battle()
+	foe_return = true
+	_show_foes()
 
 
 func _drop_battle() -> void:
@@ -2958,9 +3223,12 @@ class Portrait:
 	var kind: String = "sword"
 	var sheet: bool = false
 	var navy: bool = false
+	var fit: bool = false
 
 	func _ready() -> void:
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		if fit:
+			clip_contents = true
 		resized.connect(queue_redraw)
 
 	func _draw() -> void:
@@ -2971,9 +3239,20 @@ class Portrait:
 			head_y = -42.0
 			foot_y = 26.0
 			span_x = 104.0
+		elif kind == "moth" or kind == "glut" or kind == "brood" or kind == "oni" or kind == "crow" or kind == "elder" or kind == "shell" or kind == "general":
+			head_y = -56.0
+			foot_y = 32.0
+			span_x = 120.0
+		if fit:
+			head_y = -52.0
+			foot_y = 28.0
+			span_x = 104.0
 		var span_y := foot_y - head_y
 		var zoom := minf((size.x - 12.0) / span_x, (size.y - 8.0) / span_y)
-		zoom = clampf(zoom, 3.2, 8.2)
+		if fit:
+			zoom = clampf(zoom, 0.35, 4.0)
+		else:
+			zoom = clampf(zoom, 3.2, 8.2)
 		var origin_y := 4.0 - head_y * zoom
 		if origin_y + foot_y * zoom > size.y - 4.0:
 			origin_y = size.y - 4.0 - foot_y * zoom
