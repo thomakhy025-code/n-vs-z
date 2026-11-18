@@ -63,7 +63,7 @@ func _process(delta: float) -> void:
 			if "lane" in foe:
 				road = int(foe.lane)
 			_drop_hazard(Vector2(float(foe.position.x), battle.lane_y(road)), road)
-			foe.take_damage(damage, false, from_id)
+			foe.take_damage(damage, false, from_id, max_dist)
 			_end()
 			return
 	if not hits_gate:

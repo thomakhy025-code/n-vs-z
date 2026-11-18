@@ -127,6 +127,24 @@ static func _painted(kind: String) -> Dictionary:
 			return _look(Color("e7c2a4"), Color("6a3a55"), Color("e6c36a"), "staff", false, "court")
 		"crow":
 			return _look(Color("1c1e24"), Color("16181e"), Color("e6c36a"), "spear", false, "court")
+		"smog":
+			return _look(Color("e7c2a4"), Color("c9a227"), Color("f4efe4"), "staff", false, "court")
+		"buck":
+			return _look(Color("e7c2a4"), Color("3a4654"), Color("d7b56a"), "crossbow", false, "court")
+		"scope":
+			return _look(Color("e7c2a4"), Color("3d4a38"), Color("8d97a3"), "bow", false, "court")
+		"aria":
+			return _look(Color("e7c2a4"), Color("6a3a55"), Color("f4efe4"), "staff", false, "court")
+		"moth":
+			return _look(Color("d7c4a2"), Color("5c4a38"), Color("e6c36a"), "spear", false, "beast")
+		"elder":
+			return _look(Color("e6d3c0"), Color("4a4038"), Color("c9c3b2"), "hammer", false, "beast")
+		"glut":
+			return _look(Color("c4a070"), Color("6a4030"), Color("e24b3b"), "hammer", false, "beast")
+		"brood":
+			return _look(Color("2a2428"), Color("3a3038"), Color("c44536"), "dagger", false, "beast")
+		"ling":
+			return _look(Color("2a2428"), Color("4a3840"), Color("e24b3b"), "dagger", false, "beast")
 		_:
 			return _look(Color("f0c9a0"), Color("1a1e28"), Color("c5ccd6"), "katana", false, "ninja")
 
@@ -193,6 +211,18 @@ static func call_id(paint: String) -> String:
 			return "call_spear"
 		"crow":
 			return "call_horse"
+		"smog", "aria":
+			return "call_magic"
+		"buck":
+			return "call_bow"
+		"scope":
+			return "call_spear"
+		"moth", "ling":
+			return "call_blade"
+		"elder":
+			return "call_dead"
+		"glut", "brood":
+			return "call_heavy"
 		"hero":
 			return "call_hero"
 		_:
@@ -290,6 +320,24 @@ static func call_pitch(paint: String) -> float:
 			return 1.08
 		"crow":
 			return 1.18
+		"smog":
+			return 0.9
+		"buck":
+			return 0.86
+		"scope":
+			return 0.78
+		"aria":
+			return 1.14
+		"moth":
+			return 1.2
+		"elder":
+			return 0.84
+		"glut":
+			return 0.7
+		"brood":
+			return 0.92
+		"ling":
+			return 1.28
 		_:
 			return 1.0
 
@@ -2341,7 +2389,7 @@ static func _ellipse(ci: CanvasItem, center: Vector2, rx: float, ry: float, colo
 
 
 static func _is_beast(paint: String) -> bool:
-	return paint == "howler" or paint == "viper" or paint == "storm" or paint == "herald" or paint == "shell" or paint == "reaver"
+	return paint == "howler" or paint == "viper" or paint == "storm" or paint == "herald" or paint == "shell" or paint == "reaver" or paint == "moth" or paint == "elder" or paint == "glut" or paint == "brood" or paint == "ling" or paint == "walker" or paint == "runner" or paint == "oni"
 
 
 static func paint_ailment(ci: CanvasItem, bone: float, still: float, clock: float) -> void:
@@ -2387,6 +2435,24 @@ static func _paint_beast(ci: CanvasItem, paint: String, phase: String, beat: int
 			_beast_shell(ci, phase, chop, step)
 		"reaver":
 			_beast_reaver(ci, phase, chop, step)
+		"moth":
+			_beast_moth(ci, phase, chop, step)
+		"elder":
+			_beast_elder(ci, phase, chop, step)
+		"glut":
+			_beast_glut(ci, phase, chop, step, pose)
+		"brood":
+			_beast_brood(ci, phase, chop, step, false)
+		"ling":
+			_beast_brood(ci, phase, chop, step, true)
+		"walker":
+			_beast_walker(ci, phase, chop, step)
+		"runner":
+			_beast_runner(ci, phase, chop, step)
+		"oni":
+			_beast_oni(ci, phase, chop, step)
+	if paint == "howler" or paint == "viper" or paint == "storm" or paint == "herald" or paint == "shell" or paint == "reaver":
+		_dire_stripe(ci)
 	_tilt = 0.0
 
 
@@ -2587,7 +2653,7 @@ static func beat_open(chop: float) -> bool:
 
 
 static func _is_court(paint: String) -> bool:
-	return paint == "knives" or paint == "firebow" or paint == "fan" or paint == "ward" or paint == "javelin" or paint == "drum" or paint == "crow"
+	return paint == "knives" or paint == "firebow" or paint == "fan" or paint == "ward" or paint == "javelin" or paint == "drum" or paint == "crow" or paint == "smog" or paint == "buck" or paint == "scope" or paint == "aria"
 
 
 static func _paint_court(ci: CanvasItem, paint: String, phase: String, beat: int, t: float, clock: float, pose: Dictionary) -> void:
@@ -2619,34 +2685,61 @@ static func _paint_court(ci: CanvasItem, paint: String, phase: String, beat: int
 		"drum":
 			_court_drum(ci, step, chop, phase, clock)
 		"crow":
-			_court_crow(ci, phase, chop, step, roost)
+			_court_crow(ci, phase, chop, step, roost, clock)
+		"smog":
+			_court_smog(ci, step, chop, phase, clock)
+		"buck":
+			_court_buck(ci, step, chop, phase, pose)
+		"scope":
+			_court_scope(ci, step, chop, phase, pose)
+		"aria":
+			_court_aria(ci, step, chop, phase, clock)
 	_tilt = 0.0
 
 
 static func _court_person(ci: CanvasItem, cloth: Color, trim: Color, step: float) -> Vector2:
 	var skin := Color("e7c2a4")
-	var boot := Color("2a2118")
+	var boot := Color("1c1e22")
+	var helm := Color("2a3038")
 	_ellipse(ci, Vector2(0, 18), 16, 4.2, Color(0, 0, 0, 0.28))
-	_line(ci, Vector2(-5, 2), Vector2(-7 + step * 4.0, 16), boot, 3.4)
-	_line(ci, Vector2(5, 2), Vector2(7 - step * 4.0, 16), boot, 3.4)
+	_line(ci, Vector2(-5, 4), Vector2(-7 + step * 4.0, 16), boot, 4.2)
+	_line(ci, Vector2(5, 4), Vector2(7 - step * 4.0, 16), boot, 4.2)
 	_poly(ci, PackedVector2Array([
-		Vector2(-11, -24),
-		Vector2(11, -24),
-		Vector2(14, 8),
-		Vector2(-14, 8),
+		Vector2(-6, 2),
+		Vector2(-1, 2),
+		Vector2(-2 + step * 3.0, 15),
+		Vector2(-8 + step * 3.0, 15),
+	]), Color("2c3440"))
+	_poly(ci, PackedVector2Array([
+		Vector2(1, 2),
+		Vector2(6, 2),
+		Vector2(8 - step * 3.0, 15),
+		Vector2(2 - step * 3.0, 15),
+	]), Color("2c3440"))
+	_poly(ci, PackedVector2Array([
+		Vector2(-12, -22),
+		Vector2(12, -22),
+		Vector2(13, 6),
+		Vector2(-13, 6),
 	]), cloth)
 	_poly(ci, PackedVector2Array([
-		Vector2(-8, -24),
-		Vector2(8, -24),
-		Vector2(4, -14),
-		Vector2(-4, -14),
-	]), cloth.lightened(0.12))
-	_line(ci, Vector2(-6, -6), Vector2(6, 4), trim, 2.2)
-	_line(ci, Vector2(0, -22), Vector2(1, -30), skin, 3.2)
-	_ellipse(ci, Vector2(2, -36), 7.4, 8.0, skin)
-	_ellipse(ci, Vector2(2, -46), 3.4, 4.2, Color("1a120e"))
-	_dot(ci, Vector2(6.2, -36), 1.15, Color("1a120e"))
-	return Vector2(1, -16)
+		Vector2(-9, -20),
+		Vector2(9, -20),
+		Vector2(8, 2),
+		Vector2(-8, 2),
+	]), cloth.darkened(0.18))
+	_line(ci, Vector2(-8, -8), Vector2(8, 2), trim, 2.0)
+	_box(ci, Rect2(-14, -6, 5, 8), Color("1a1e22"))
+	_ellipse(ci, Vector2(1, -32), 7.2, 7.4, skin)
+	_poly(ci, PackedVector2Array([
+		Vector2(-8, -34),
+		Vector2(9, -34),
+		Vector2(8, -44),
+		Vector2(-7, -46),
+	]), helm)
+	_line(ci, Vector2(-6, -34), Vector2(7, -34), Color("111418"), 2.4)
+	_dot(ci, Vector2(5.4, -33), 1.1, Color("d7e6f2"))
+	return Vector2(1, -14)
 
 
 static func _court_blade(ci: CanvasItem, grip: Vector2, tip: Vector2) -> void:
@@ -2683,44 +2776,35 @@ static func _court_knives(ci: CanvasItem, step: float, chop: float) -> void:
 
 static func _court_firebow(ci: CanvasItem, step: float, beat: int, chop: float) -> void:
 	var chest := _court_person(ci, Color("2a2420"), Color("e24b3b"), step)
-	var grip := chest + Vector2(2, 2)
-	var bow_x := 8.0 if beat < 3 else 4.0
-	_arc(ci, grip + Vector2(bow_x, -2), 16.0, -1.15, 1.15, 12, Color("6b4226"), 2.4)
-	_line(ci, grip + Vector2(bow_x, -16), grip + Vector2(bow_x, 12), Color("c9b59a"), 1.2)
+	var grip := chest + Vector2(4, 2)
 	var pull := 0.0
 	if beat == 2:
 		pull = 0.35 + chop * 0.2
 	elif beat >= 3:
 		pull = 1.0
-	var nock := grip + Vector2(-4.0 - pull * 8.0, 0)
-	var tip := grip + Vector2(18.0 + pull * 16.0, -1)
-	_line(ci, nock, tip, Color("d7c4a2"), 1.6)
+	var tube := grip + Vector2(6.0 + pull * 4.0, -2)
+	_box(ci, Rect2(tube.x, tube.y - 4.0, 22.0, 8.0), Color("3a4048"))
+	_box(ci, Rect2(tube.x + 18.0, tube.y - 5.5, 8.0, 11.0), Color("5a3030"))
+	_line(ci, grip + Vector2(-2, 6), tube + Vector2(4, 2), Color("6a5438"), 2.2)
 	var flame := Color("ff7a2a")
 	var hot := Color("ffe08a")
-	_poly(ci, PackedVector2Array([
-		tip + Vector2(-3, 4),
-		tip + Vector2(3, 4),
-		tip + Vector2(0, -8 - pull * 6.0),
-	]), flame)
-	_dot(ci, tip + Vector2(0, -2), 2.2, hot)
+	if pull > 0.2:
+		_poly(ci, PackedVector2Array([
+			tube + Vector2(26, 4),
+			tube + Vector2(26, -4),
+			tube + Vector2(34 + pull * 10.0, 0),
+		]), flame)
+		_dot(ci, tube + Vector2(28, 0), 2.4, hot)
 
 
 static func _court_fan(ci: CanvasItem, step: float, chop: float, clock: float) -> void:
-	var chest := _court_person(ci, Color("efe2c4"), Color("5d8a48"), step)
+	var chest := _court_person(ci, Color("3a4650"), Color("5d8a48"), step)
 	var hand := chest + Vector2(4, 6)
 	var open := 0.35 + clampf(chop, 0.0, 1.0) * 0.85
-	var pivot := hand + Vector2(2, -2)
-	var leaf := PackedVector2Array()
-	leaf.append(pivot)
-	for rib in 8:
-		var ang := lerpf(-open, open, float(rib) / 7.0) - 1.15
-		leaf.append(pivot + Vector2(cos(ang), sin(ang)) * (20.0 + open * 10.0))
-	_poly(ci, leaf, Color("6e9a4a"))
-	_line(ci, hand + Vector2(-2, 4), pivot, Color("6a5438"), 2.6)
-	for rib_i in 8:
-		var ang_i := lerpf(-open, open, float(rib_i) / 7.0) - 1.15
-		var end := pivot + Vector2(cos(ang_i), sin(ang_i)) * (20.0 + open * 10.0)
-		_line(ci, pivot, end, Color("2f4a28"), 1.15)
+	var pivot := hand + Vector2(8, -2)
+	_box(ci, Rect2(hand.x - 6.0, hand.y - 6.0, 14.0, 12.0), Color("2c343c"))
+	_box(ci, Rect2(pivot.x, pivot.y - 3.5, 16.0 + open * 8.0, 7.0), Color("5a646e"))
+	_ellipse(ci, hand + Vector2(-8, 2), 5.0, 6.0, Color("3a4650"))
 	if open > 0.7:
 		var gust := 0.35 + 0.25 * sin(clock * 10.0)
 		_arc(ci, pivot + Vector2(18, -6), 14.0, -0.8, 0.7, 8, Color(0.75, 0.9, 0.86, gust), 2.0)
@@ -2730,25 +2814,27 @@ static func _court_fan(ci: CanvasItem, step: float, chop: float, clock: float) -
 static func _court_ward(ci: CanvasItem, step: float, chop: float) -> void:
 	var chest := _court_person(ci, Color("243044"), Color("d7b56a"), step)
 	var shove := clampf(chop, 0.0, 1.0) * 8.0
-	var shield := chest + Vector2(2.0 + shove, 4)
+	var shield := chest + Vector2(10.0 + shove, 2)
 	_poly(ci, PackedVector2Array([
-		shield + Vector2(-8, -34),
-		shield + Vector2(28, -30),
-		shield + Vector2(30, 22),
-		shield + Vector2(-10, 24),
+		shield + Vector2(-2, -16),
+		shield + Vector2(16, -14),
+		shield + Vector2(16, 16),
+		shield + Vector2(-2, 18),
 	]), Color("c4a574"))
 	_poly(ci, PackedVector2Array([
-		shield + Vector2(-4, -30),
-		shield + Vector2(24, -26),
-		shield + Vector2(25, 18),
-		shield + Vector2(-6, 20),
+		shield + Vector2(1, -12),
+		shield + Vector2(13, -11),
+		shield + Vector2(13, 12),
+		shield + Vector2(1, 14),
 	]), Color("e6d3a1"))
-	_ellipse(ci, shield + Vector2(10, -4), 7.0, 7.0, Color("8a6230"))
-	_ellipse(ci, shield + Vector2(10, -4), 3.0, 3.0, Color("f0e2b8"))
-	_line(ci, shield + Vector2(-6, -2), shield + Vector2(26, 0), Color("6a5030"), 2.4)
-	_ellipse(ci, Vector2(2, -36), 7.4, 8.0, Color("e7c2a4"))
-	_ellipse(ci, Vector2(2, -46), 3.4, 4.2, Color("1a120e"))
-	_dot(ci, Vector2(6.2, -36), 1.15, Color("1a120e"))
+	_box(ci, Rect2(shield.x + 4.0, shield.y - 4.0, 6.0, 8.0), Color("2a3038"))
+	_poly(ci, PackedVector2Array([
+		Vector2(-8, -34),
+		Vector2(9, -34),
+		Vector2(8, -44),
+		Vector2(-7, -46),
+	]), Color("2a3038"))
+	_dot(ci, Vector2(5.4, -33), 1.1, Color("d7e6f2"))
 
 
 static func _court_javelin(ci: CanvasItem, step: float, chop: float, phase: String, spears: int) -> void:
@@ -2813,57 +2899,295 @@ static func _court_note(ci: CanvasItem, at: Vector2) -> void:
 	_line(ci, at + Vector2(3, 0), at + Vector2(3, -12), ink, 1.3)
 
 
-static func _court_crow(ci: CanvasItem, phase: String, chop: float, step: float, roost: float) -> void:
-	var ink := Color("1a1c22")
-	var wing := Color("2c313c")
-	var beak := Color("e6c36a")
-	_ellipse(ci, Vector2(0, 16), 14, 3.6, Color(0, 0, 0, 0.28))
-	var lean := 0.0
+static func _court_crow(ci: CanvasItem, phase: String, chop: float, step: float, roost: float, clock: float) -> void:
+	var ink := Color("1c2228")
+	var arm := Color("8d97a3")
+	_ellipse(ci, Vector2(0, 16), 14, 3.2, Color(0, 0, 0, 0.28))
+	var body := Vector2(0, -6)
 	if phase == "march":
-		lean = 6.0
+		body.y += step * 2.0
 	if phase == "act":
-		lean = 10.0 + clampf(chop, 0.0, 1.0) * 8.0
-	var body := Vector2(lean * 0.2, -8)
+		body.x += clampf(chop, 0.0, 1.0) * 8.0
+		body.y += 4.0
 	if roost > 0.0:
-		_line(ci, body + Vector2(-4, 6), Vector2(-6, 16), ink, 2.2)
-		_line(ci, body + Vector2(3, 6), Vector2(5, 16), ink, 2.2)
-		_ellipse(ci, body, 14, 8, ink)
-		_ellipse(ci, body + Vector2(12, -6), 6.5, 5.5, ink)
+		body.y = 2.0
+	_box(ci, Rect2(body.x - 10.0, body.y - 6.0, 20.0, 12.0), ink)
+	_ellipse(ci, body + Vector2(8, 0), 3.2, 3.2, Color("7ec8ff"))
+	var spin := clock * (4.0 if roost <= 0.0 else 0.6)
+	var hubs: Array = [Vector2(-16, -10), Vector2(16, -10), Vector2(-16, 8), Vector2(16, 8)]
+	for hub_i in hubs.size():
+		var hub: Vector2 = body + (hubs[hub_i] as Vector2)
+		_line(ci, body, hub, arm, 1.6)
+		var blade := Vector2(cos(spin + float(hub_i)), sin(spin + float(hub_i))) * 7.0
+		_line(ci, hub - blade, hub + blade, Color("d7dde6"), 1.8)
+		_dot(ci, hub, 1.6, Color("e6c36a"))
+	if phase == "act" and chop > 0.4:
+		_line(ci, body + Vector2(10, 0), body + Vector2(24, 2), Color("ff7a2a"), 2.2)
+
+
+static func _dire_stripe(ci: CanvasItem) -> void:
+	_line(ci, Vector2(-8, -18), Vector2(10, -8), Color("c44536"), 2.2)
+	_poly(ci, PackedVector2Array([
+		Vector2(8, -28),
+		Vector2(14, -24),
+		Vector2(6, -20),
+	]), Color("2a3038"))
+
+
+static func _court_smog(ci: CanvasItem, step: float, chop: float, phase: String, clock: float) -> void:
+	var chest := _court_person(ci, Color("c9a227"), Color("f4efe4"), step)
+	_box(ci, Rect2(chest.x - 16.0, chest.y - 4.0, 8.0, 14.0), Color("b23a2f"))
+	_ellipse(ci, chest + Vector2(-12, -8), 4.0, 3.0, Color("d7dde6"))
+	var hose := chest + Vector2(-8, 2)
+	var nozzle := chest + Vector2(16.0 + clampf(chop, 0.0, 1.0) * 6.0, -4.0)
+	_line(ci, hose, nozzle, Color("2a3038"), 3.2)
+	_box(ci, Rect2(nozzle.x, nozzle.y - 3.0, 8.0, 6.0), Color("d7dde6"))
+	if phase == "march" or phase == "act":
+		var puff := 0.45 + 0.25 * sin(clock * 9.0)
+		_ellipse(ci, nozzle + Vector2(14, -6), 7.0, 5.0, Color(0.9, 0.91, 0.9, puff))
+		_ellipse(ci, nozzle + Vector2(22, -14), 5.0, 4.0, Color(0.82, 0.84, 0.84, puff * 0.8))
+
+
+static func _court_buck(ci: CanvasItem, step: float, chop: float, phase: String, pose: Dictionary) -> void:
+	var chest := _court_person(ci, Color("3a4654"), Color("d7b56a"), step)
+	var pump := 0.0
+	if phase == "act":
+		pump = clampf(chop, 0.0, 1.0) * 6.0
+	if float(pose.get("loading", 0.0)) > 0.05:
+		pump = 8.0
+	var stock := chest + Vector2(-8, 6)
+	var muzzle := chest + Vector2(18, -4)
+	_line(ci, stock + Vector2(0, 4), stock, Color("4a4034"), 4.0)
+	_line(ci, stock, muzzle, Color("2a3038"), 5.0)
+	_line(ci, stock + Vector2(6, 1), stock + Vector2(6 + pump, 7), Color("6a5438"), 3.2)
+	_box(ci, Rect2(muzzle.x - 1.0, muzzle.y - 4.0, 14.0, 8.0), Color("1c1e22"))
+	if phase == "act" and chop > 0.55:
 		_poly(ci, PackedVector2Array([
-			body + Vector2(16, -6),
-			body + Vector2(26, -4),
-			body + Vector2(16, -2),
-		]), beak)
-		_dot(ci, body + Vector2(14, -8), 1.2, Color("c44536"))
-		_poly(ci, PackedVector2Array([
-			body + Vector2(-2, -2),
-			body + Vector2(-14, 2),
-			body + Vector2(-2, 6),
-		]), wing)
-		return
+			muzzle + Vector2(10, 2),
+			muzzle + Vector2(10, -2),
+			muzzle + Vector2(20, 0),
+		]), Color("ffe08a"))
+
+
+static func _court_scope(ci: CanvasItem, step: float, chop: float, phase: String, pose: Dictionary) -> void:
+	var chest := _court_person(ci, Color("3d4a38"), Color("8d97a3"), step)
+	var stock := chest + Vector2(-12, 4)
+	var muzzle := chest + Vector2(26, -8)
+	if float(pose.get("loading", 0.0)) > 0.05 or (phase != "act" and float(pose.get("bolt", 0.0)) > 0.4):
+		muzzle.y += 3.0
+	_line(ci, stock + Vector2(-2, 6), stock, Color("3a4034"), 3.4)
+	_line(ci, stock, muzzle, Color("1c1e22"), 3.6)
+	_box(ci, Rect2(chest.x + 2.0, chest.y - 14.0, 16.0, 4.0), Color("2a3038"))
+	_line(ci, chest + Vector2(8, -10), chest + Vector2(8, -16), Color("8d97a3"), 1.8)
+	_box(ci, Rect2(muzzle.x, muzzle.y - 2.5, 12.0, 5.0), Color("3a4048"))
+	if phase == "act" and chop > 0.45:
+		_line(ci, muzzle, muzzle + Vector2(16, -1), Color("ffe08a"), 2.0)
+		_dot(ci, muzzle + Vector2(6, 0), 2.2, Color("ff7a2a"))
+
+
+static func _court_aria(ci: CanvasItem, step: float, chop: float, phase: String, clock: float) -> void:
+	var chest := _court_person(ci, Color("6a3a55"), Color("f4efe4"), step)
+	_ellipse(ci, Vector2(1, -30), 8.0, 6.0, Color("3a2418"))
+	_line(ci, Vector2(-6, -36), Vector2(-10, -28), Color("3a2418"), 2.4)
+	var hand := chest + Vector2(4, 2)
+	var mic := hand + Vector2(6.0, -16.0 - clampf(chop, 0.0, 1.0) * 4.0)
+	_line(ci, hand, mic, Color("8d98a6"), 2.0)
+	_ellipse(ci, mic, 3.4, 5.2, Color("d7dde6"))
+	_dot(ci, mic + Vector2(0, -1), 1.3, Color("2a3038"))
+	if phase == "act" or phase == "march":
+		var bob := sin(clock * 7.0) * 3.0
+		_court_note(ci, chest + Vector2(16, -24 + bob))
+		_court_note(ci, chest + Vector2(24, -12 - bob))
+
+
+static func _beast_walker(ci: CanvasItem, phase: String, chop: float, step: float) -> void:
+	var hide := Color("4e5a3a")
+	var plate := Color("2a3038")
+	_ellipse(ci, Vector2(0, 18), 16, 4.0, Color(0, 0, 0, 0.3))
+	_line(ci, Vector2(-4, 0), Vector2(-8 + step * 6.0, 16), plate, 4.0)
+	_line(ci, Vector2(4, 0), Vector2(8 - step * 6.0, 16), plate, 4.0)
+	_ellipse(ci, Vector2(0, -8), 9, 12, hide)
+	_line(ci, Vector2(-8, -10), Vector2(-14, 2), hide, 3.4)
+	_ellipse(ci, Vector2(2, -22), 6.2, 6.4, Color("d7c4a2"))
+	_poly(ci, PackedVector2Array([
+		Vector2(-6, -24),
+		Vector2(8, -22),
+		Vector2(7, -32),
+		Vector2(-5, -31),
+	]), plate)
+	_dot(ci, Vector2(5, -22), 1.2, Color("e24b3b"))
+	var hand := Vector2(8, -6)
+	var tip := hand + Vector2(8, 8)
+	if phase == "act":
+		tip = hand + Vector2(12.0 + clampf(chop, 0.0, 1.0) * 10.0, -8.0 + clampf(chop, 0.0, 1.0) * 14.0)
+	_line(ci, Vector2(6, -12), hand, hide, 3.2)
+	_court_blade(ci, hand, tip)
+
+
+static func _beast_runner(ci: CanvasItem, phase: String, chop: float, step: float) -> void:
+	var hide := Color("5c6844")
+	var lean := 8.0 if phase == "march" else 2.0
+	_ellipse(ci, Vector2(4, 18), 18, 3.6, Color(0, 0, 0, 0.28))
+	_line(ci, Vector2(-2, 0), Vector2(-10 + step * 6.0, 16), Color("1c1e22"), 3.2)
+	_line(ci, Vector2(6, -2), Vector2(14 - step * 4.0, 14), Color("1c1e22"), 3.2)
+	_ellipse(ci, Vector2(lean, -8), 12, 7, hide)
+	_ellipse(ci, Vector2(lean + 10, -16), 5.5, 5.0, Color("d7c4a2"))
+	_poly(ci, PackedVector2Array([
+		Vector2(lean + 6, -20),
+		Vector2(lean + 14, -18),
+		Vector2(lean + 12, -24),
+	]), Color("2a3038"))
+	var tip := Vector2(lean + 18.0 + clampf(chop, 0.0, 1.0) * 8.0, -4)
+	_court_blade(ci, Vector2(lean + 8, -6), tip)
+
+
+static func _beast_oni(ci: CanvasItem, phase: String, chop: float, step: float) -> void:
+	var hide := Color("6a3030")
+	var iron := Color("3a4048")
+	_ellipse(ci, Vector2(0, 20), 22, 5, Color(0, 0, 0, 0.32))
+	_line(ci, Vector2(-8, 4), Vector2(-10 + step * 3.0, 18), iron, 5.0)
+	_line(ci, Vector2(8, 4), Vector2(10 - step * 3.0, 18), iron, 5.0)
+	_ellipse(ci, Vector2(0, -6), 18, 16, hide)
+	_poly(ci, PackedVector2Array([
+		Vector2(-16, -8),
+		Vector2(-22, -20),
+		Vector2(-8, -14),
+	]), iron)
+	_poly(ci, PackedVector2Array([
+		Vector2(16, -8),
+		Vector2(24, -22),
+		Vector2(8, -14),
+	]), iron)
+	_ellipse(ci, Vector2(2, -24), 8, 8, Color("c4a070"))
+	_poly(ci, PackedVector2Array([
+		Vector2(-4, -30),
+		Vector2(-12, -42),
+		Vector2(0, -32),
+	]), Color("e6c36a"))
+	_poly(ci, PackedVector2Array([
+		Vector2(6, -30),
+		Vector2(14, -42),
+		Vector2(2, -32),
+	]), Color("e6c36a"))
+	_dot(ci, Vector2(5, -24), 1.3, Color("1a120e"))
+	var grip := Vector2(10, -4)
+	var tip := grip + Vector2(8.0, -22.0 + clampf(chop, 0.0, 1.0) * 28.0)
+	if phase != "act":
+		tip = grip + Vector2(6, -18)
+	_line(ci, grip, tip, Color("6a5438"), 3.4)
+	_poly(ci, PackedVector2Array([
+		tip + Vector2(-5, 2),
+		tip + Vector2(5, 2),
+		tip + Vector2(0, -10),
+	]), Color("d7dde6"))
+
+
+static func _beast_moth(ci: CanvasItem, phase: String, chop: float, step: float) -> void:
+	var wing := Color("c4a574")
+	var membrane := Color("e6d3a1")
+	var body := Color("5c4030")
 	var flap := step * 8.0
 	if phase == "act":
-		flap = 6.0 + clampf(chop, 0.0, 1.0) * 10.0
-	_ellipse(ci, body, 15, 8, ink)
+		flap = 2.0 + clampf(chop, 0.0, 1.0) * 14.0
+	_ellipse(ci, Vector2(4, 14), 8, 2.2, Color(0, 0, 0, 0.18))
+	_ellipse(ci, Vector2(-6, -16 - flap * 0.3), 10, 6, wing)
+	_ellipse(ci, Vector2(-14, -6 + flap * 0.2), 8, 4.5, membrane)
+	_ellipse(ci, Vector2(16, -14 - flap * 0.3), 10, 6, wing)
+	_ellipse(ci, Vector2(22, -4 + flap * 0.2), 7, 4, membrane)
+	_ellipse(ci, Vector2(2, -2), 5.5, 11, body)
+	_ellipse(ci, Vector2(8, -12), 4.2, 4.0, Color("e7d2b0"))
+	_dot(ci, Vector2(9.2, -12.4), 1.05, Color("1a120e"))
+	_dot(ci, Vector2(7.2, -13.2), 0.7, Color("1a120e"))
+	_line(ci, Vector2(6, -14), Vector2(12, -18), Color("2a2420"), 1.3)
+	_line(ci, Vector2(7, -13), Vector2(13, -15), Color("2a2420"), 1.3)
+	var sting := Vector2(2, 12)
+	if phase == "act":
+		sting = Vector2(14.0 + clampf(chop, 0.0, 1.0) * 10.0, 4.0)
+	_line(ci, Vector2(2, 8), sting, Color("2a2420"), 2.2)
+	_dot(ci, sting, 1.8, Color("c44536"))
+
+
+static func _beast_elder(ci: CanvasItem, phase: String, chop: float, step: float) -> void:
+	var coat := Color("4a4038")
+	var hair := Color("f4efe4")
+	_ellipse(ci, Vector2(0, 18), 14, 3.6, Color(0, 0, 0, 0.28))
+	var limp := step * 3.0
+	_line(ci, Vector2(-4, 2), Vector2(-8 + limp, 16), Color("1c1e22"), 3.0)
+	_line(ci, Vector2(3, 4), Vector2(2, 16), Color("1c1e22"), 3.0)
 	_poly(ci, PackedVector2Array([
-		body + Vector2(-8, -2),
-		body + Vector2(-2, -18 - flap),
-		body + Vector2(10, -4),
-		body + Vector2(2, 4),
-	]), wing)
-	_poly(ci, PackedVector2Array([
-		body + Vector2(-14, 2),
-		body + Vector2(-24, 6),
-		body + Vector2(-12, 6),
-	]), ink)
-	var head := body + Vector2(14 + lean * 0.15, -6)
-	_ellipse(ci, head, 6.2, 5.2, ink)
-	var peck := 8.0 if phase == "act" else 0.0
-	_poly(ci, PackedVector2Array([
-		head + Vector2(4, -1),
-		head + Vector2(14 + peck, 1),
-		head + Vector2(4, 3),
-	]), beak)
-	_dot(ci, head + Vector2(2, -2), 1.3, Color("c44536"))
-	_line(ci, body + Vector2(-2, 6), body + Vector2(-4, 14), ink, 2.0)
-	_line(ci, body + Vector2(4, 6), body + Vector2(7, 14), ink, 2.0)
+		Vector2(-8, -8),
+		Vector2(6, -18),
+		Vector2(8, 6),
+		Vector2(-10, 8),
+	]), coat)
+	_ellipse(ci, Vector2(4, -24), 6.5, 6.2, Color("e6d3c0"))
+	_ellipse(ci, Vector2(4, -30), 7.0, 3.4, hair)
+	_line(ci, Vector2(1, -24), Vector2(7, -24), hair, 1.4)
+	_dot(ci, Vector2(6, -24), 1.1, Color("f4efe4"))
+	var grip := Vector2(-6, 0)
+	var tip := grip + Vector2(-4, 14)
+	if phase == "act":
+		tip = grip + Vector2(16.0 * clampf(chop, 0.0, 1.0), -8.0 + clampf(chop, 0.0, 1.0) * 16.0)
+	_line(ci, grip, tip, Color("6a5438"), 3.0)
+	_ellipse(ci, tip, 4.2, 3.4, Color("8a9098"))
+
+
+static func _beast_glut(ci: CanvasItem, phase: String, chop: float, step: float, pose: Dictionary) -> void:
+	var hide := Color("8a5a3a")
+	var belly := Color("e7c2a4")
+	var sit := float(pose.get("sit", 0.0))
+	var drop := 10.0 if sit > 0.05 else 0.0
+	_ellipse(ci, Vector2(2, 20), 24, 5, Color(0, 0, 0, 0.32))
+	if sit <= 0.05:
+		_line(ci, Vector2(-10, 6), Vector2(-16 + step * 3.0, 18), hide, 6.0)
+		_line(ci, Vector2(8, 8), Vector2(16 - step * 3.0, 18), hide, 6.0)
+	else:
+		_ellipse(ci, Vector2(-12, 14), 8, 4, hide)
+		_ellipse(ci, Vector2(14, 14), 8, 4, hide)
+	_ellipse(ci, Vector2(0, 2 + drop), 20, 13, hide)
+	_ellipse(ci, Vector2(2, 4 + drop), 14, 10, belly)
+	_line(ci, Vector2(-16, -2 + drop), Vector2(-24, 6 + drop), hide, 4.0)
+	_ellipse(ci, Vector2(6, -14 + drop), 9, 8, Color("e7d2b0"))
+	_dot(ci, Vector2(9, -15 + drop), 1.15, Color("1a120e"))
+	var open := sit > 0.05 or (phase == "act" and chop > 0.15)
+	if open:
+		_ellipse(ci, Vector2(16, -8 + drop), 8, 7, Color("6a2030"))
+		_poly(ci, PackedVector2Array([
+			Vector2(10, -14 + drop),
+			Vector2(18, -15 + drop),
+			Vector2(14, -8 + drop),
+		]), Color("f4efe4"))
+		_poly(ci, PackedVector2Array([
+			Vector2(12, -2 + drop),
+			Vector2(20, -3 + drop),
+			Vector2(16, -9 + drop),
+		]), Color("f4efe4"))
+	else:
+		_line(ci, Vector2(12, -10 + drop), Vector2(18, -8 + drop), Color("6a2030"), 2.0)
+
+
+static func _beast_brood(ci: CanvasItem, phase: String, chop: float, step: float, small: bool) -> void:
+	var scale := 0.62 if small else 1.0
+	var ink := Color("2a2428")
+	var leg := Color("4a3840")
+	_ellipse(ci, Vector2(0, 16 * scale), 12 * scale, 3 * scale, Color(0, 0, 0, 0.28))
+	var body := Vector2(0, -2 * scale)
+	_ellipse(ci, body + Vector2(-6 * scale, 4 * scale), 9 * scale, 7 * scale, ink)
+	_ellipse(ci, body + Vector2(7 * scale, -2 * scale), 7 * scale, 6 * scale, ink.lightened(0.08))
+	for leg_i in 8:
+		var side := -1.0 if leg_i < 4 else 1.0
+		var slot := float(leg_i % 4)
+		var sway := step * 5.0 * side * (1.0 if int(slot) % 2 == 0 else -1.0)
+		if phase == "act":
+			sway = clampf(chop, 0.0, 1.0) * 7.0 * side
+		var hip := body + Vector2(side * 4.0 * scale, (-8.0 + slot * 5.0) * scale)
+		var knee := hip + Vector2(side * 8.0 * scale, -4.0 * scale)
+		var foot := hip + Vector2(side * (14.0 * scale + sway), 10.0 * scale)
+		_line(ci, hip, knee, leg, 1.8 if small else 2.4)
+		_line(ci, knee, foot, leg, 1.8 if small else 2.4)
+	var bite := body + Vector2(12 * scale, 0)
+	if phase == "act":
+		bite.x += clampf(chop, 0.0, 1.0) * 6.0 * scale
+	_line(ci, body + Vector2(4 * scale, -2 * scale), bite + Vector2(0, -3 * scale), Color("e7d2b0"), 1.6)
+	_line(ci, body + Vector2(4 * scale, 2 * scale), bite + Vector2(0, 3 * scale), Color("e7d2b0"), 1.6)
+	_dot(ci, body + Vector2(6 * scale, -3 * scale), 1.1, Color("c44536"))

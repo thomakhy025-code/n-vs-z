@@ -137,7 +137,7 @@ func show_bones() -> void:
 	bone_t = 0.9
 
 
-func take_damage(amount: float, quiet: bool = false, _from_id: String = "") -> bool:
+func take_damage(amount: float, quiet: bool = false, _from_id: String = "", _from_reach: float = -1.0) -> bool:
 	if not alive or invuln > 0.0:
 		return false
 	hp -= amount
@@ -296,7 +296,7 @@ func _land_hero() -> void:
 		Sfx.play(Painter.hit_id("katana"), randf_range(0.97, 1.05), -4.0)
 		var melee = _nearest(sword_reach())
 		if melee != null:
-			melee.take_damage(sword_damage * damage_multiplier, true, "hero")
+			melee.take_damage(sword_damage * damage_multiplier, true, "hero", sword_reach())
 		elif _gate_in(sword_reach()):
 			battle.damage_gate(1 - side, sword_damage * damage_multiplier)
 	else:
@@ -354,6 +354,8 @@ func _nearest(reach: float):
 	var mine := lane
 	for foe in battle.hostile_targets(side):
 		if foe.has_method("is_perched") and foe.is_perched():
+			continue
+		if reach <= 120.0 and foe.has_method("is_airborne") and foe.is_airborne():
 			continue
 		if int(foe.lane) != mine and not battle.is_boss(foe):
 			continue

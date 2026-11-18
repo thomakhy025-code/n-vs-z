@@ -1,6 +1,7 @@
 extends Node2D
 
 const Catalog = preload("res://scripts/unit_catalog.gd")
+const SmokeVeil = preload("res://scripts/smoke_veil.gd")
 const Painter = preload("res://scripts/painter.gd")
 const SceneryScript = preload("res://scripts/scenery.gd")
 const GateScript = preload("res://scripts/gate.gd")
@@ -48,6 +49,7 @@ var enemy_rear: float = 1232.0
 var units: Array = []
 var buff_links: Dictionary = {}
 var hazards: Array = []
+var smokes: Array = []
 var player_cd: Dictionary = {}
 var enemy_cd: Dictionary = {}
 var player_roster: Array = []
@@ -212,6 +214,10 @@ func _build_world() -> void:
 	add_child(enemy_gate)
 	world = Node2D.new()
 	add_child(world)
+	var veil = SmokeVeil.new()
+	veil.battle = self
+	veil.z_index = 900
+	add_child(veil)
 	fx = Node2D.new()
 	fx.z_index = 120
 	add_child(fx)
@@ -435,6 +441,7 @@ func _process(delta: float) -> void:
 			enemy_cd[id] = maxf(0.0, float(enemy_cd[id]) - delta)
 		player_value += PLAYER_INCOME * delta
 		_tick_hazards(delta)
+		_tick_smokes(delta)
 		if duel:
 			enemy_value += PLAYER_INCOME * delta
 			if hand_seen >= 0.0 and battle_time - hand_seen > 0.45 and foe != null:
@@ -483,14 +490,7 @@ func _enemy_ai(delta: float) -> void:
 	if enemy_lock > 0.0:
 		return
 	enemy_lock = _rule_f("spawn_gap", 0.42)
-	var human := str(rules.get("faction", "")) == "human"
-	var options: Array = ["knives", "knives", "firebow"] if human else ["walker", "walker", "runner"]
-	if battle_time >= _rule_f("oni_at", 50.0):
-		options = ["crow", "drum", "fan", "ward", "javelin", "firebow", "knives"] if human else ["oni", "howler", "storm", "herald", "reaver", "shell", "walker", "runner"]
-	elif battle_time >= _rule_f("brute_at", 24.0):
-		options = ["fan", "drum", "javelin", "ward", "knives"] if human else ["howler", "herald", "reaver", "shell", "viper", "walker", "runner"]
-	elif battle_time >= _rule_f("spitter_at", 12.0):
-		options = ["knives", "firebow", "javelin", "ward"] if human else ["viper", "shell", "walker", "runner"]
+	var options := _enemy_options()
 	options.shuffle()
 	var spawned := false
 	for id in options:
@@ -523,6 +523,45 @@ func _try_enemy(id: String, ignore_cd: bool = false) -> bool:
 	return true
 
 
+func _enemy_options() -> Array:
+	var human := str(rules.get("faction", "")) == "human"
+	var modern := human and level_no >= 61
+	var dire := (not human) and level_no >= 41
+	var options: Array = ["knives", "knives", "firebow"] if human else ["walker", "walker", "runner"]
+	if modern:
+		options = ["knives", "buck", "firebow"]
+	elif dire:
+		options = ["walker", "runner", "moth"]
+	if battle_time >= _rule_f("oni_at", 50.0):
+		if modern:
+			options = ["scope", "aria", "smog", "crow", "buck", "ward", "fan"]
+		elif human:
+			options = ["crow", "drum", "fan", "ward", "javelin", "firebow", "knives"]
+		elif dire:
+			options = ["glut", "oni", "brood", "elder", "moth", "howler", "storm"]
+		else:
+			options = ["oni", "howler", "storm", "herald", "reaver", "shell", "walker", "runner"]
+	elif battle_time >= _rule_f("brute_at", 24.0):
+		if modern:
+			options = ["smog", "aria", "buck", "javelin", "ward", "fan"]
+		elif human:
+			options = ["fan", "drum", "javelin", "ward", "knives"]
+		elif dire:
+			options = ["brood", "elder", "moth", "howler", "reaver", "viper", "walker"]
+		else:
+			options = ["howler", "herald", "reaver", "shell", "viper", "walker", "runner"]
+	elif battle_time >= _rule_f("spitter_at", 12.0):
+		if modern:
+			options = ["buck", "knives", "firebow", "javelin", "ward"]
+		elif human:
+			options = ["knives", "firebow", "javelin", "ward"]
+		elif dire:
+			options = ["moth", "viper", "shell", "walker", "runner"]
+		else:
+			options = ["viper", "shell", "walker", "runner"]
+	return options
+
+
 func _scaled_enemy(entry: Dictionary) -> Dictionary:
 	var copy: Dictionary = entry.duplicate()
 	var mult := _rule_f("dmg_mult", 1.0)
@@ -532,7 +571,7 @@ func _scaled_enemy(entry: Dictionary) -> Dictionary:
 		copy["damage"] = 5
 	elif kind == "fan":
 		copy["damage"] = 3
-	elif kind == "drum":
+	elif kind == "drum" or kind == "smog" or kind == "aria" or kind == "glut":
 		copy["damage"] = 0
 	else:
 		copy["damage"] = maxi(1, int(round(float(copy["damage"]) * mult)))
@@ -544,6 +583,8 @@ func _scaled_enemy(entry: Dictionary) -> Dictionary:
 		copy["sword"] = maxi(1, int(round(float(copy["sword"]) * mult)))
 	if copy.has("burn"):
 		copy["burn"] = maxi(1, int(round(float(copy["burn"]) * mult)))
+	if copy.has("chew"):
+		copy["chew"] = maxi(1, int(round(float(copy["chew"]) * mult)))
 	return copy
 
 
@@ -739,6 +780,8 @@ func _spawn(entry: Dictionary, side: int, forced_road: int = -1, back: float = 0
 	else:
 		born -= back
 	unit.position = Vector2(born, y)
+	if kind == "elder":
+		unit.position.x = randf_range(player_front + 36.0, enemy_front - 36.0)
 	unit.net_id = next_net
 	next_net += 1
 	if duel:
@@ -958,6 +1001,8 @@ func on_unit_down(unit) -> void:
 				stored.erase(unit)
 		elif stored == unit:
 			buff_links[source] = []
+	if str(unit.data.get("id", "")) == "brood" and not bool(unit.data.get("child", false)):
+		_hatch_lings(unit)
 	if boss_up and _unit_id(unit) == "boss":
 		_finish_battle(1)
 		return
@@ -974,9 +1019,11 @@ func set_buff_link(buffer, target) -> void:
 	set_buff_group(buffer, one)
 
 
-func set_buff_group(buffer, targets: Array) -> void:
+func set_buff_group(buffer, targets: Array, power_override: float = -1.0) -> void:
 	var power := 0.2
-	if buffer != null and "data" in buffer and buffer.data is Dictionary:
+	if power_override >= 0.0:
+		power = power_override
+	elif buffer != null and "data" in buffer and buffer.data is Dictionary:
 		power = 0.2 * float(buffer.data.get("rank_factor", 1.0))
 	var prev = buff_links.get(buffer, [])
 	var old: Array = []
@@ -1745,7 +1792,7 @@ func blow_road(road: int, attacker_side: int, amount: float, from_id: String) ->
 			passed = float(body.position.x) < mid
 		var dest := mid if passed else castle_x
 		if body.has_method("take_damage"):
-			body.take_damage(amount, true, from_id)
+			body.take_damage(amount, true, from_id, 1200.0)
 		if body.has_method("catch_blow"):
 			body.catch_blow(dest)
 	spread_road(road, castle_x)
@@ -1756,6 +1803,41 @@ func blow_road(road: int, attacker_side: int, amount: float, from_id: String) ->
 		poof(Vector2(px, puff_y), Color("d5e6f2"))
 	Sfx.play("wind", 0.92, -6.0)
 	float_text(Vector2(mid, puff_y - 28.0), "WIND", Color("d5e6f2"))
+
+
+func drop_smoke(at: Vector2, _lane: int) -> void:
+	smokes.append({"x": at.x, "y": at.y, "left": 10.0})
+
+
+func _tick_smokes(delta: float) -> void:
+	if smokes.is_empty():
+		return
+	var kept: Array = []
+	for puff in smokes:
+		var left := float(puff.get("left", 0.0)) - delta
+		if left <= 0.0:
+			continue
+		puff["left"] = left
+		kept.append(puff)
+	smokes = kept
+
+
+func _hatch_lings(parent) -> void:
+	var entry := Catalog.find_in(enemy_roster, "ling")
+	if entry.is_empty():
+		return
+	var road := int(parent.lane)
+	var at: Vector2 = parent.position
+	for hatch_i in 3:
+		if _count(1) >= MAX_SIDE:
+			return
+		var copy := _scaled_enemy(entry)
+		copy["child"] = true
+		copy["bounty"] = 1
+		_spawn(copy, 1)
+		var born = units[units.size() - 1]
+		born.lane = road
+		born.position = Vector2(at.x + float(hatch_i - 1) * 16.0, lane_y(road))
 
 
 func _tick_hazards(delta: float) -> void:
@@ -1788,7 +1870,7 @@ func _scorch(patch: Dictionary) -> void:
 	var bodies: Array = units.duplicate()
 	for body in bodies:
 		if _stands_in(body, road, x0, x1):
-			body.take_damage(amount, true, kind)
+			body.take_damage(amount, true, kind, 0.0)
 	if _stands_in(hero, road, x0, x1):
 		hero.take_damage(amount, true, kind)
 	if _stands_in(foe, road, x0, x1):
