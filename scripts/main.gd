@@ -8,6 +8,7 @@ const SceneryScript = preload("res://scripts/scenery.gd")
 const Levels = preload("res://scripts/levels.gd")
 const Story = preload("res://scripts/story.gd")
 const MangaScript = preload("res://scripts/manga.gd")
+const DuelGift = preload("res://scripts/duel_gift.gd")
 
 const SAVE_PATH := "user://progress.cfg"
 
@@ -35,7 +36,7 @@ The shop sells one new skin for the hero and one for each soldier. A skin costs 
 
 On the website you can keep playing as a guest. That progress stays on the device. Sign in with Google and the levels you have opened, your diamonds, your coins, your ranks, and your skins stay with that account, so a phone, a tablet, and a computer can share them. The first sign-in asks for a name. Ranking lists signed-in players: a higher level cleared ranks above a lower one, and the same level ranks the shorter clear time first. A profile shows that name, the best tag, the hero, and a favourite character.
 
-1 vs 1 is on the home screen. It opens after level 20, and until then the button wears a lock. It is two clans. Each side chooses 6 of the 11. Both have the same value, the same calls, the same roads, the same wind, and a hero. Before the search, choose Your ranks or Maximum. Your ranks uses the ranks saved on each account. Maximum locks both sides at rank 20. The host's choice is what the match uses, and the other ninja can leave. On this page, press Find opponent. The game looks for one other ninja and connects. The match runs until a gate falls. A 1 vs 1 pays no coins. You do not type an address or a code. On a computer build, Host opens port 3001 and the other ninja joins the address.
+1 vs 1 is on the home screen. It opens after level 20, and until then the button wears a lock. The first time it opens, a present arrives and a key turns in that lock. It is two clans. Each side chooses 6 of the 11. Both have the same value, the same calls, the same roads, the same wind, and a hero. Before the search, choose Your ranks or Maximum. Your ranks uses the ranks saved on each account. Maximum locks both sides at rank 20. The host's choice is what the match uses, and the other ninja can leave. On this page, press Find opponent. The game looks for one other ninja and connects. The match runs until a gate falls. A 1 vs 1 pays no coins. You do not type an address or a code. On a computer build, Host opens port 3001 and the other ninja joins the address.
 
 Escape or Back returns to the title."
 
@@ -48,6 +49,8 @@ var start_button: Button
 var last_id: String = ""
 var unlocked: int = 1
 var cleared: int = 0
+var duel_celebrated: bool = false
+var duel_celebrate: bool = false
 var story_version: int = Story.VERSION
 var story_seen: Dictionary = {}
 var story_layer: CanvasLayer = null
@@ -440,6 +443,7 @@ func _show_menu() -> void:
 	var quit := _menu_button("Quit", Color("6b3a32"), func() -> void: get_tree().quit(), 180, 18)
 	quit.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	box.add_child(quit)
+	_begin_duel_gift(root)
 
 
 func _home_pair(left_text: String, left_color: Color, left_call: Callable, right_text: String, right_color: Color, right_call: Callable) -> HBoxContainer:
@@ -1334,6 +1338,7 @@ func _next_index() -> int:
 
 
 func note_clear(level_index: int, elapsed: float = 0.0) -> void:
+	var was_open := Story.duel_open(cleared)
 	var opened := mini(Levels.count(), level_index + 1)
 	var changed := false
 	if level_index > cleared:
@@ -1347,6 +1352,9 @@ func note_clear(level_index: int, elapsed: float = 0.0) -> void:
 	if _take_road_pay():
 		changed = true
 	if _note_rank(level_index, elapsed):
+		changed = true
+	if not was_open and Story.duel_open(cleared) and not duel_celebrated:
+		duel_celebrate = true
 		changed = true
 	_grant_coins(level_index, elapsed)
 	changed = true
@@ -1598,6 +1606,8 @@ func _set_duel_choice(mode: String) -> void:
 func _load_progress() -> void:
 	unlocked = 1
 	cleared = 0
+	duel_celebrated = false
+	duel_celebrate = false
 	diamonds = 0
 	coins = 0
 	upgrades = {}
@@ -1608,6 +1618,7 @@ func _load_progress() -> void:
 	diamond_paid = 1
 	code_paid = false
 	var migrated := false
+	var duel_mark: bool = false
 	var cfg: ConfigFile = ConfigFile.new()
 	if cfg.load(SAVE_PATH) == OK:
 		unlocked = clampi(int(cfg.get_value("progress", "unlocked", 1)), 1, Levels.count())
@@ -1650,10 +1661,17 @@ func _load_progress() -> void:
 			story_seen = {}
 			story_version = Story.VERSION
 			migrated = true
+		if cfg.has_section_key("progress", "duel_celebrated"):
+			duel_celebrated = bool(cfg.get_value("progress", "duel_celebrated", false))
+		else:
+			duel_celebrated = Story.duel_open(cleared)
+			duel_mark = duel_celebrated
+		if Story.duel_open(cleared) and not duel_celebrated:
+			duel_celebrate = true
 	_normalize_progress()
 	var paid := _take_road_pay()
 	_apply_skins()
-	if paid or _navy_dirty or migrated:
+	if paid or _navy_dirty or migrated or duel_mark:
 		_save_progress()
 
 
@@ -1716,6 +1734,7 @@ func _save_progress() -> void:
 	cfg.set_value("progress", "best_rank", best_rank)
 	cfg.set_value("progress", "story_version", story_version)
 	cfg.set_value("progress", "story_seen", _pack_seen(story_seen))
+	cfg.set_value("progress", "duel_celebrated", duel_celebrated)
 	cfg.save(SAVE_PATH)
 	Cloud.push(_snapshot())
 	_push_profile()
@@ -1824,6 +1843,7 @@ func _merge_from_cloud(data: Dictionary) -> void:
 	if data.is_empty() or not data.has("diamonds"):
 		_save_progress()
 		return
+	var was_open := Story.duel_open(cleared)
 	var cloud_version := _whole(data.get("story_version", 0), 0)
 	if cloud_version >= Story.CAMPAIGN:
 		unlocked = maxi(unlocked, clampi(_whole(data.get("unlocked", 1), 1), 1, Levels.count()))
@@ -1862,6 +1882,8 @@ func _merge_from_cloud(data: Dictionary) -> void:
 	var cloud_worn := _unpack_keys(str(data.get("sheet_worn", "")))
 	if not cloud_worn.is_empty():
 		sheet_worn = cloud_worn
+	if not was_open and Story.duel_open(cleared) and not duel_celebrated:
+		duel_celebrate = true
 	_normalize_progress()
 	_take_road_pay()
 	_apply_skins()
@@ -2836,20 +2858,61 @@ func _collect_buttons(node: Node) -> Array:
 	return found
 
 
+func _duel_gift_pending() -> bool:
+	return duel_celebrate and not duel_celebrated and Story.duel_open(cleared)
+
+
+func _begin_duel_gift(root: Node) -> void:
+	if not _duel_gift_pending():
+		return
+	var button := _button_named(root, "1 vs 1")
+	if button == null:
+		return
+	var gift: DuelGift = DuelGift.new()
+	gift.host_button = button
+	gift.done.connect(_finish_duel_gift, CONNECT_ONE_SHOT)
+	gift.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	gift.mouse_filter = Control.MOUSE_FILTER_STOP
+	gift.z_index = 40
+	root.add_child(gift)
+	var host := root as Control
+	if gift.size.x < 20.0 and host.size.x > 20.0:
+		gift.position = Vector2.ZERO
+		gift.size = host.size
+
+
+func _finish_duel_gift() -> void:
+	duel_celebrate = false
+	duel_celebrated = true
+	_save_progress()
+
+
+func _reveal_duel_button(button: Button) -> void:
+	if button == null or not is_instance_valid(button):
+		return
+	button.set("locked", false)
+	button.modulate = Color.WHITE
+	if button.has_meta("duel_locked"):
+		button.remove_meta("duel_locked")
+	UiSkin.apply(button, Color("7d9a6a"), 22, Color("f3e6c8"))
+	button.queue_redraw()
+
+
 func _duel_button() -> Button:
 	var open := Story.duel_open(cleared)
+	var showing := open and not _duel_gift_pending()
 	var button := LockButton.new()
 	button.text = "1 vs 1"
-	button.locked = not open
+	button.locked = not showing
 	button.custom_minimum_size = Vector2(420, 52)
-	var color := Color("7d9a6a") if open else Color("d9d0c3")
+	var color := Color("7d9a6a") if showing else Color("d9d0c3")
 	var lum := color.r * 0.3 + color.g * 0.59 + color.b * 0.11
 	UiSkin.apply(button, color, 22, Color("1c140e") if lum > 0.62 else Color("f3e6c8"))
 	if not open:
 		button.set_meta("duel_locked", true)
 	button.pressed.connect(func() -> void:
 		Sfx.play("click", 1.0, -6.0)
-		if open:
+		if Story.duel_open(cleared) and not _duel_gift_pending():
 			_show_duel()
 	)
 	return button
