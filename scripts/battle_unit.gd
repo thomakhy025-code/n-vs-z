@@ -306,6 +306,10 @@ func _fight(delta: float) -> void:
 		_hunt(delta)
 		return
 	var foe = _nearest_foe()
+	if str(data.get("id", "")) == "bomber":
+		var marked = _marked_berserker()
+		if marked != null:
+			foe = marked
 	var gate = battle.gate_for_attacker(side)
 	var reach := float(data["reach"])
 	var engage := float(data["engage"])
@@ -941,6 +945,21 @@ func catch_gust(at_x: float) -> void:
 	hp = left
 	if lost >= 1.0:
 		battle.float_text(position + Vector2(0, -48), str(int(round(lost))), Color("9fd4ff"))
+
+
+func _marked_berserker():
+	var best = null
+	var best_along := 100000.0
+	for body in battle.hostile_targets(side):
+		if not battle.is_berserker(body):
+			continue
+		var span := _along(body)
+		if span < -8.0:
+			continue
+		if span < best_along:
+			best_along = span
+			best = body
+	return best
 
 
 func _nearest_foe():

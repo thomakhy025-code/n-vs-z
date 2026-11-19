@@ -105,7 +105,7 @@ static func _painted(kind: String) -> Dictionary:
 		"spitter":
 			return _look(Color("e0c2a0"), Color("46503a"), Color("6b7c4a"), "crossbow", false, "soldier")
 		"bomber":
-			return _look(Color("e0c2a0"), Color("4a4634"), Color("e24b3b"), "bomb", false, "soldier")
+			return _look(Color("e7c2a4"), Color("241418"), Color("e24b3b"), "bomb", false, "court")
 		"oni":
 			return _look(Color("e0c2a0"), Color("3d3428"), Color("e6c36a"), "polearm", false, "soldier")
 		"howler":
@@ -372,7 +372,7 @@ static func call_pitch(paint: String) -> float:
 
 
 static func is_human_body(paint: String) -> bool:
-	if paint == "knives" or paint == "firebow" or paint == "fan" or paint == "ward" or paint == "javelin" or paint == "drum" or paint == "crow" or paint == "cow" or paint == "smog" or paint == "buck" or paint == "scope" or paint == "aria":
+	if paint == "bomber" or paint == "knives" or paint == "firebow" or paint == "fan" or paint == "ward" or paint == "javelin" or paint == "drum" or paint == "crow" or paint == "cow" or paint == "smog" or paint == "buck" or paint == "scope" or paint == "aria":
 		return true
 	return paint == "spear" or paint == "scout" or paint == "guard" or paint == "crossbow" or paint == "satchel" or paint == "captain" or paint == "general"
 

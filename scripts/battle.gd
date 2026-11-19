@@ -593,9 +593,9 @@ static func enemy_ids(level_no: int, rules: Dictionary, _battle_time: float) -> 
 	var modern := human and level_no >= 61
 	var dire := (not human) and level_no >= 41
 	if modern:
-		return ["knives", "buck", "firebow", "javelin", "ward", "smog", "aria", "fan", "scope", "crow"]
+		return ["knives", "buck", "firebow", "javelin", "ward", "smog", "aria", "fan", "scope", "crow", "bomber"]
 	if human:
-		return ["knives", "firebow", "javelin", "ward", "fan", "drum", "cow"]
+		return ["knives", "firebow", "javelin", "ward", "fan", "drum", "cow", "bomber"]
 	if dire:
 		return ["walker", "runner", "moth", "viper", "shell", "brood", "elder", "howler", "reaver", "glut", "oni", "storm", "crow"]
 	return ["walker", "runner", "viper", "shell", "howler", "herald", "reaver", "oni", "storm"]
@@ -610,13 +610,23 @@ static func faced_enemy(entry: Dictionary, rules: Dictionary) -> Dictionary:
 	if rules.has("hp_mult"):
 		hp_mult = float(rules["hp_mult"])
 	var kind := str(copy.get("id", ""))
-	copy["hp"] = maxi(1, int(round(float(copy["hp"]) * hp_mult)))
+	var catalog_hp: int = int(copy["hp"])
+	var catalog_damage: int = int(copy["damage"])
+	copy["hp"] = maxi(1, int(round(float(catalog_hp) * hp_mult)))
 	if kind == "ward":
 		copy["damage"] = 5
 	elif kind == "fan":
 		copy["damage"] = 3
 	elif kind == "drum" or kind == "smog" or kind == "aria" or kind == "glut":
 		copy["damage"] = 0
+	elif kind == "bomber":
+		var scaled_hp: int = int(copy["hp"])
+		var scaled_damage: int = maxi(1, int(round(float(catalog_damage) * mult)))
+		if scaled_damage < catalog_damage or scaled_hp > catalog_hp:
+			copy["hp"] = catalog_hp
+			copy["damage"] = catalog_damage
+		else:
+			copy["damage"] = scaled_damage
 	else:
 		copy["damage"] = maxi(1, int(round(float(copy["damage"]) * mult)))
 	if copy.has("swing"):
