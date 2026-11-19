@@ -3530,10 +3530,6 @@ class Portrait:
 			head_y = -42.0
 			foot_y = 26.0
 			span_x = 104.0
-		elif kind == "sword":
-			head_y = -86.0
-			foot_y = 14.0
-			span_x = 132.0
 		elif kind == "moth" or kind == "glut" or kind == "brood" or kind == "oni" or kind == "crow" or kind == "cow" or kind == "elder" or kind == "shell" or kind == "general":
 			head_y = -56.0
 			foot_y = 32.0
@@ -3631,9 +3627,6 @@ class SkinPreview:
 	func _draw() -> void:
 		var origin := Vector2(size.x * 0.5, size.y * 0.74)
 		var zoom := 2.05
-		if kind == "sword":
-			origin = Vector2(size.x * 0.34, size.y * 0.84)
-			zoom = 1.45
 		if kind == "horse" and not navy:
 			zoom = 1.65
 			origin.y = size.y * 0.8
