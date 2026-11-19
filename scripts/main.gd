@@ -14,7 +14,7 @@ const SAVE_PATH := "user://progress.cfg"
 
 const HOW_TO := "This is a side-view gate battle. Your clan gate is on the left. The cursed gate is on the right. Both have 2000 blood.
 
-Fighters and the hero are born on the ground behind their own gate, so a new call is not standing in the fight. The other side cannot walk past a gate into the ground behind it. Someone standing there can still hit a fighter in front of that gate when the attack reaches. A blow that would have hit someone behind the gate hits the gate instead.
+Fighters and the hero are born on the ground behind their own gate, so a new call is not standing in the fight. The other side cannot walk past a gate into the ground behind it. Someone standing there can still hit a fighter in front of that gate when the attack reaches. A blow that would have hit someone behind the gate hits the gate instead. A fighter who stays behind their castle for 10 seconds is set down in front of it.
 
 You start with one call, the sword ninja. A lesson ends when their gate breaks and nine of that monster come out, three on each road. Kill all nine and that soldier is yours. Until you know six, bring who you have. After that, choose 6. Value builds by itself. Hold the phone or iPad sideways. A stick at the bottom left moves the hero. The call buttons sit to the right of that stick, and Sword and Shoot sit at the bottom right, so the left thumb can stay on the stick.
 

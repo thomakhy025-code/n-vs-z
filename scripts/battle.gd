@@ -65,6 +65,7 @@ var lane_ys: Array[float] = []
 const CASTLE_EDGE := 48.0
 const CASTLE_YARD := 100.0
 const CASTLE_HALF := 58.0
+const YARD_STAY := 10.0
 
 var player_front: float = 264.0
 var enemy_front: float = 1016.0
@@ -138,6 +139,7 @@ var buff_power: Dictionary = {}
 var sent_keys: Array = []
 var hand_seen: float = -1.0
 var fallen_side: int = -1
+var yard_stay: Dictionary = {}
 
 
 func start(chosen: Array, run_mode: String, level_index: int = 1) -> void:
@@ -504,6 +506,7 @@ func _process(delta: float) -> void:
 			for i in loadout.size():
 				if Input.is_action_pressed("slot%d" % (i + 1)):
 					summon_player(str(loadout[i]))
+		_tick_castle_yard(delta)
 	_send_state(delta)
 	_update_hud(delta)
 	_run_harness()
@@ -920,6 +923,43 @@ func sheltered(body) -> bool:
 	if int(body.side) == 0:
 		return x < player_front
 	return x > enemy_front
+
+
+func _tick_castle_yard(delta: float) -> void:
+	var living: Array = []
+	for unit in units:
+		if is_instance_valid(unit) and unit.alive:
+			living.append(unit)
+	if hero != null and is_instance_valid(hero) and hero.alive:
+		living.append(hero)
+	if foe != null and is_instance_valid(foe) and foe.alive:
+		living.append(foe)
+	var seen: Dictionary = {}
+	for body in living:
+		var stay_id: int = body.get_instance_id()
+		seen[stay_id] = true
+		if sheltered(body):
+			var spent: float = float(yard_stay.get(stay_id, 0.0)) + delta
+			if spent >= YARD_STAY:
+				_set_before_own_castle(body)
+				yard_stay.erase(stay_id)
+			else:
+				yard_stay[stay_id] = spent
+		elif yard_stay.has(stay_id):
+			yard_stay.erase(stay_id)
+	var gone: Array = []
+	for old_id in yard_stay.keys():
+		if not seen.has(old_id):
+			gone.append(old_id)
+	for drop_id in gone:
+		yard_stay.erase(drop_id)
+
+
+func _set_before_own_castle(body) -> void:
+	if int(body.side) == 0:
+		body.position.x = player_front
+	else:
+		body.position.x = enemy_front
 
 
 func hostile_targets(attacker_side: int) -> Array:
