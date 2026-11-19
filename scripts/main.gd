@@ -727,8 +727,14 @@ func _accept_tester(note: Label) -> bool:
 	tester = true
 	if not duel_celebrated:
 		duel_celebrate = true
+	var gift_line := ""
+	if not code_paid:
+		if _accept_vip(VIP_CODE, note):
+			gift_line = note.text
 	_save_progress()
 	note.text = "This save is a tester. 1 vs 1 is open."
+	if gift_line != "":
+		note.text += " " + gift_line
 	note.add_theme_color_override("font_color", Color("1c140e"))
 	if OS.has_feature("web"):
 		JavaScriptBridge.eval("var el=document.getElementById('nvsz-code');if(el){el.value='';}window.__nvCode='';", true)
