@@ -80,6 +80,7 @@ var sheet_owned: Dictionary = {}
 var sheet_worn: Dictionary = {}
 var diamond_paid: int = 1
 var code_paid: bool = false
+var tester: bool = false
 var code_lock: bool = false
 var code_note: Label = null
 var name_note: Label = null
@@ -102,6 +103,8 @@ const AUTO_WAIT := 1800.0
 const SKIN_COST := 200
 const VIP_CODE := "tomissogood0205"
 const VIP_DIAMONDS := 100000000
+const TESTER_CODE := "tomissogood0205"
+const TESTER_TOKEN := "tester:1"
 const WEB_CODE_OPEN := """
 (function(){
   document.body.style.touchAction = 'manipulation';
@@ -715,6 +718,24 @@ func _redeem_code(field: LineEdit, note: Label) -> void:
 
 func _apply_typed_code(raw: String, note: Label) -> bool:
 	var typed := raw.strip_edges().to_lower()
+	if typed == TESTER_CODE:
+		return _accept_tester(note)
+	return _accept_vip(typed, note)
+
+
+func _accept_tester(note: Label) -> bool:
+	tester = true
+	if not duel_celebrated:
+		duel_celebrate = true
+	_save_progress()
+	note.text = "This save is a tester. 1 vs 1 is open."
+	note.add_theme_color_override("font_color", Color("1c140e"))
+	if OS.has_feature("web"):
+		JavaScriptBridge.eval("var el=document.getElementById('nvsz-code');if(el){el.value='';}window.__nvCode='';", true)
+	return true
+
+
+func _accept_vip(typed: String, note: Label) -> bool:
 	if typed != VIP_CODE:
 		note.text = "That code does not pay."
 		note.add_theme_color_override("font_color", Color("8a2e28"))
@@ -1449,8 +1470,19 @@ func _squad_ok() -> bool:
 	return loadout.size() >= 1
 
 
+func _allowed_ids() -> Array:
+	if not picking_duel:
+		return Story.known_ids(cleared)
+	var ids: Array = []
+	for entry in roster:
+		var id := str(entry.get("id", ""))
+		if id != "":
+			ids.append(id)
+	return ids
+
+
 func _shown_roster() -> Array:
-	var allowed: Array = Story.known_ids(cleared)
+	var allowed: Array = _allowed_ids()
 	var out: Array = []
 	for entry in roster:
 		if allowed.has(str(entry.get("id", ""))):
@@ -1459,7 +1491,7 @@ func _shown_roster() -> Array:
 
 
 func _prepare_loadout() -> void:
-	var allowed: Array = Story.known_ids(cleared)
+	var allowed: Array = _allowed_ids()
 	var kept: Array = []
 	for id in loadout:
 		var key := str(id)
@@ -1636,7 +1668,7 @@ func _next_index() -> int:
 
 
 func note_clear(level_index: int, elapsed: float = 0.0) -> void:
-	var was_open := Story.duel_open(cleared)
+	var was_open := _duel_is_open()
 	var opened := mini(Levels.count(), level_index + 1)
 	var changed := false
 	if level_index > cleared:
@@ -1651,7 +1683,7 @@ func note_clear(level_index: int, elapsed: float = 0.0) -> void:
 		changed = true
 	if _note_rank(level_index, elapsed):
 		changed = true
-	if not was_open and Story.duel_open(cleared) and not duel_celebrated:
+	if not was_open and _duel_is_open() and not duel_celebrated:
 		duel_celebrate = true
 		changed = true
 	_grant_coins(level_index, elapsed)
@@ -1876,6 +1908,25 @@ func _pack_ranks() -> String:
 	return ",".join(parts)
 
 
+func _pack_upgrades() -> String:
+	var packed := _pack_ranks()
+	if not tester:
+		return packed
+	var marked := TESTER_TOKEN
+	if packed != "":
+		marked = packed + "," + TESTER_TOKEN
+	if marked.length() > 320:
+		return packed
+	return marked
+
+
+func _tester_marked(raw: String) -> bool:
+	for piece in raw.split(",", false):
+		if str(piece).strip_edges() == TESTER_TOKEN:
+			return true
+	return false
+
+
 func _unpack_ranks(raw: String) -> Dictionary:
 	var out: Dictionary = {}
 	var known: Array = ["hero", "sword", "archer", "shield", "saber", "lancer", "berserker", "horse", "suicide", "assassin", "heal", "level", "gate", "income"]
@@ -2093,6 +2144,7 @@ func _load_progress() -> void:
 	sheet_worn = {}
 	diamond_paid = 1
 	code_paid = false
+	tester = false
 	var migrated := false
 	var duel_mark: bool = false
 	var cfg: ConfigFile = ConfigFile.new()
@@ -2109,7 +2161,8 @@ func _load_progress() -> void:
 		if cfg.has_section_key("progress", "auto_left"):
 			auto_left = clampi(int(cfg.get_value("progress", "auto_left", AUTO_STOCK)), 0, AUTO_STOCK)
 			auto_at = float(cfg.get_value("progress", "auto_at", 0.0))
-		upgrades = _unpack_ranks(str(cfg.get_value("progress", "upgrades", "")))
+		var stored_ranks := str(cfg.get_value("progress", "upgrades", ""))
+		upgrades = _unpack_ranks(stored_ranks)
 		saber_skin = bool(cfg.get_value("progress", "saber_skin", false))
 		if cfg.has_section_key("progress", "saber_worn"):
 			saber_worn = str(cfg.get_value("progress", "saber_worn", "none"))
@@ -2120,6 +2173,7 @@ func _load_progress() -> void:
 		else:
 			diamond_paid = 1
 		code_paid = bool(cfg.get_value("progress", "code_paid", false))
+		tester = bool(cfg.get_value("progress", "tester", false)) or _tester_marked(stored_ranks)
 		navy_settled = bool(cfg.get_value("progress", "navy_settled", false))
 		sheet_owned = _unpack_keys(str(cfg.get_value("progress", "sheet_owned", "")))
 		sheet_worn = _unpack_keys(str(cfg.get_value("progress", "sheet_worn", "")))
@@ -2149,7 +2203,7 @@ func _load_progress() -> void:
 		else:
 			duel_celebrated = Story.duel_open(cleared)
 			duel_mark = duel_celebrated
-		if Story.duel_open(cleared) and not duel_celebrated:
+		if _duel_is_open() and not duel_celebrated:
 			duel_celebrate = true
 	_normalize_progress()
 	_refresh_auto()
@@ -2206,13 +2260,14 @@ func _save_progress() -> void:
 	cfg.set_value("progress", "level_pay", _pack_pay())
 	cfg.set_value("progress", "auto_left", auto_left)
 	cfg.set_value("progress", "auto_at", auto_at)
-	cfg.set_value("progress", "upgrades", _pack_ranks())
+	cfg.set_value("progress", "upgrades", _pack_upgrades())
 	cfg.set_value("progress", "saber_skin", saber_skin)
 	cfg.set_value("progress", "saber_worn", saber_worn)
 	cfg.set_value("progress", "sheet_owned", _pack_keys(sheet_owned))
 	cfg.set_value("progress", "sheet_worn", _pack_keys(sheet_worn))
 	cfg.set_value("progress", "diamond_paid", diamond_paid)
 	cfg.set_value("progress", "code_paid", code_paid)
+	cfg.set_value("progress", "tester", tester)
 	cfg.set_value("progress", "navy_settled", navy_settled)
 	cfg.set_value("progress", "rank_cleared", rank_cleared)
 	cfg.set_value("progress", "rank_time", rank_time)
@@ -2234,7 +2289,7 @@ func _snapshot() -> Dictionary:
 		"cleared": cleared,
 		"diamonds": diamonds,
 		"coins": coins,
-		"upgrades": _pack_ranks(),
+		"upgrades": _pack_upgrades(),
 		"saber_skin": saber_skin,
 		"saber_worn": saber_worn,
 		"sheet_owned": _pack_keys(sheet_owned),
@@ -2331,7 +2386,7 @@ func _merge_from_cloud(data: Dictionary) -> void:
 	if data.is_empty() or not data.has("diamonds"):
 		_save_progress()
 		return
-	var was_open := Story.duel_open(cleared)
+	var was_open := _duel_is_open()
 	var cloud_version := _whole(data.get("story_version", 0), 0)
 	if cloud_version >= Story.CAMPAIGN:
 		unlocked = maxi(unlocked, clampi(_whole(data.get("unlocked", 1), 1), 1, Levels.count()))
@@ -2347,10 +2402,13 @@ func _merge_from_cloud(data: Dictionary) -> void:
 		base_diamonds = 0
 	diamonds = maxi(base_diamonds, cloud_diamonds)
 	coins = maxi(coins, clampi(_whole(data.get("coins", 0), 0), 0, 20000000))
-	var cloud_ranks := _unpack_ranks(str(data.get("upgrades", "")))
+	var upgrade_text := str(data.get("upgrades", ""))
+	var cloud_ranks := _unpack_ranks(upgrade_text)
 	for key in cloud_ranks.keys():
 		var rank_id := str(key)
 		upgrades[rank_id] = maxi(_rank_of(rank_id), int(cloud_ranks[rank_id]))
+	if _tester_marked(upgrade_text):
+		tester = true
 	code_paid = code_paid or _flag(data.get("code_paid", false))
 	var cloud_owned := _unpack_keys(str(data.get("sheet_owned", "")))
 	for key in cloud_owned.keys():
@@ -2370,7 +2428,7 @@ func _merge_from_cloud(data: Dictionary) -> void:
 	var cloud_worn := _unpack_keys(str(data.get("sheet_worn", "")))
 	if not cloud_worn.is_empty():
 		sheet_worn = cloud_worn
-	if not was_open and Story.duel_open(cleared) and not duel_celebrated:
+	if not was_open and _duel_is_open() and not duel_celebrated:
 		duel_celebrate = true
 	_normalize_progress()
 	_take_road_pay()
@@ -2982,7 +3040,7 @@ func _duel_probe() -> void:
 
 
 func _show_duel() -> void:
-	if not Story.duel_open(cleared):
+	if not _duel_is_open():
 		_show_menu()
 		return
 	screen = "duel"
@@ -3180,7 +3238,7 @@ func _layout_check() -> void:
 		print("TITLE quit=", quit_rect, " ok=", quit_ok)
 	if duel_b != null:
 		var duel_rect := duel_b.get_global_rect()
-		var duel_locked := not Story.duel_open(cleared)
+		var duel_locked := not _duel_is_open()
 		duel_ok = duel_rect.position.y >= 0.0 and duel_rect.end.y <= vp.y + 1.0
 		if duel_locked:
 			duel_ok = duel_ok and bool(duel_b.get_meta("duel_locked", false))
@@ -3346,8 +3404,12 @@ func _collect_buttons(node: Node) -> Array:
 	return found
 
 
+func _duel_is_open() -> bool:
+	return tester or Story.duel_open(cleared)
+
+
 func _duel_gift_pending() -> bool:
-	return duel_celebrate and not duel_celebrated and Story.duel_open(cleared)
+	return duel_celebrate and not duel_celebrated and _duel_is_open()
 
 
 func _begin_duel_gift(root: Node) -> void:
@@ -3387,7 +3449,7 @@ func _reveal_duel_button(button: Button) -> void:
 
 
 func _duel_button() -> Button:
-	var open := Story.duel_open(cleared)
+	var open := _duel_is_open()
 	var showing := open and not _duel_gift_pending()
 	var button := LockButton.new()
 	button.text = "1 vs 1"
@@ -3400,7 +3462,7 @@ func _duel_button() -> Button:
 		button.set_meta("duel_locked", true)
 	button.pressed.connect(func() -> void:
 		Sfx.play("click", 1.0, -6.0)
-		if Story.duel_open(cleared) and not _duel_gift_pending():
+		if _duel_is_open() and not _duel_gift_pending():
 			_show_duel()
 	)
 	return button
