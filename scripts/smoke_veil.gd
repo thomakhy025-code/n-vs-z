@@ -1,10 +1,16 @@
 extends Node2D
 
 var battle = null
+var _was_drawing: bool = false
 
 
 func _process(_delta: float) -> void:
-	queue_redraw()
+	var active := false
+	if battle != null and battle.smokes.size() > 0:
+		active = true
+	if active or _was_drawing:
+		queue_redraw()
+	_was_drawing = active
 
 
 func _draw() -> void:

@@ -68,8 +68,22 @@ var sit_left: float = 0.0
 var rounds: int = 4
 var loading: float = 0.0
 var smoke_tick: float = 0.15
-var _picture_stamp: String = ""
 var _pose_nudge: float = 0.0
+var _phase_name: String = "idle"
+var _phase_t: float = 0.0
+var _phase_beat: int = 0
+var _shown_phase: String = ""
+var _shown_frame: int = -1
+var _shown_face: int = 0
+var _shown_flash: int = -1
+var _shown_hang: int = -1
+var _shown_scale: int = -1
+var _body_shell: Node2D = null
+var _bar_shell: Node2D = null
+var _bar_hp: int = -99999
+var _bar_max: int = -99999
+var _bar_stacks: int = -99999
+var _bar_bits: int = -1
 
 
 func setup(field, entry: Dictionary, which_side: int) -> void:
@@ -118,6 +132,16 @@ func setup(field, entry: Dictionary, which_side: int) -> void:
 		rounds = 4
 	bob_time = randf() * TAU
 	_pose_nudge = fposmod(bob_time, 0.1)
+	var body := BodyShell.new()
+	body.host = self
+	body.z_index = 0
+	add_child(body)
+	_body_shell = body
+	var bars := BarShell.new()
+	bars.host = self
+	bars.z_index = 1
+	add_child(bars)
+	_bar_shell = bars
 
 
 func damage_rating() -> float:
@@ -728,7 +752,7 @@ func _air_ahead():
 	var best = null
 	var best_d := 100000.0
 	for flyer in battle.hostile_targets(side):
-		if not flyer.has_method("is_airborne") or not flyer.is_airborne():
+		if not flyer.alive or not flyer.has_method("is_airborne") or not flyer.is_airborne():
 			continue
 		if not _spans_roads() and int(flyer.lane) != lane and not battle.is_boss(flyer):
 			continue
@@ -743,6 +767,8 @@ func _air_ahead():
 
 func _halted_by_air(delta: float) -> bool:
 	if not _arm_is_short():
+		return false
+	if battle == null or not battle.side_has_air(side):
 		return false
 	var wall = _air_ahead()
 	if wall == null:
@@ -996,7 +1022,12 @@ func _closest_prey():
 func _closest_ahead(same_road: bool):
 	var best = null
 	var best_d := 100000.0
-	for foe in battle.hostile_targets(side):
+	var pool: Array = battle.hostile_targets(side)
+	if same_road:
+		pool = battle.foes_on_lane(side, lane)
+	for foe in pool:
+		if not foe.alive:
+			continue
 		if same_road and int(foe.lane) != lane:
 			continue
 		var along := _along(foe)
@@ -1016,7 +1047,9 @@ func _berserker_in_reach():
 	var reach := float(data["reach"])
 	var best = null
 	var best_d := reach
-	for foe in battle.hostile_targets(side):
+	for foe in battle.wides_for(side):
+		if not foe.alive:
+			continue
 		if int(foe.lane) == lane or not (battle.is_berserker(foe) or battle.is_boss(foe)):
 			continue
 		var along := _along(foe)
@@ -1195,32 +1228,36 @@ func _clamp_x() -> void:
 		position.x = clampf(position.x, battle.player_front, battle.enemy_rear)
 
 
-func _pose() -> Dictionary:
-	var phase := "idle"
-	var t := 0.0
-	var beat := 0
+func _read_phase() -> void:
+	_phase_name = "idle"
+	_phase_t = 0.0
+	_phase_beat = 0
 	if not alive:
-		phase = "fall"
-		t = clampf(fall_t / 0.6, 0.0, 1.0)
+		_phase_name = "fall"
+		_phase_t = clampf(fall_t / 0.6, 0.0, 1.0)
 	elif debut > 0.0 and act <= 0.0:
-		phase = "debut"
-		t = 1.0 - clampf(debut / 0.46, 0.0, 1.0)
+		_phase_name = "debut"
+		_phase_t = 1.0 - clampf(debut / 0.46, 0.0, 1.0)
 	elif act > 0.0:
-		phase = "act"
-		var u := 1.0 - clampf(act, 0.0, 1.0)
-		beat = mini(3, int(u * 4.0))
-		t = clampf(u * 4.0 - float(beat), 0.0, 1.0)
+		_phase_name = "act"
+		var wind := 1.0 - clampf(act, 0.0, 1.0)
+		_phase_beat = mini(3, int(wind * 4.0))
+		_phase_t = clampf(wind * 4.0 - float(_phase_beat), 0.0, 1.0)
 	elif hurt > 0.0:
-		phase = "hurt"
-		t = 1.0 - clampf(hurt, 0.0, 1.0)
+		_phase_name = "hurt"
+		_phase_t = 1.0 - clampf(hurt, 0.0, 1.0)
 	elif moving:
-		phase = "march"
+		_phase_name = "march"
+
+
+func _pose() -> Dictionary:
+	_read_phase()
 	return {
-		"phase": phase,
-		"t": t,
+		"phase": _phase_name,
+		"t": _phase_t,
 		"clock": bob_time,
 		"flash": flash,
-		"beat": beat,
+		"beat": _phase_beat,
 		"hang": hang,
 		"calling": call_flash > 0.0,
 		"roost": roost,
@@ -1252,91 +1289,79 @@ func _body_shift(sc: float) -> float:
 	return -0.5 * (BERSERK_TOP + BERSERK_BOTTOM) * sc
 
 
-# A crowded fight used to rebuild every body from polygons on every frame.
-# Hold that picture until the walk or attack frame, facing, skin, or hurt flash changes.
+# The body is a child picture. Blood, support lines, and bolts redraw without rebuilding it.
 func _keep_picture() -> void:
-	var stamp := _picture_key()
-	if stamp == _picture_stamp:
+	_sync_body()
+	_sync_bars()
+
+
+func _sync_body() -> void:
+	if _body_shell == null:
 		return
-	_picture_stamp = stamp
-	queue_redraw()
-
-
-func _picture_key() -> String:
-	var pose := _pose()
-	var phase := str(pose["phase"])
-	var along := float(pose["t"])
-	var beat := int(pose["beat"])
-	var clock := float(pose["clock"])
-	var frame := _held_frame(phase, along, beat, clock)
-	var skin: Color = look["skin"]
-	var cloth: Color = look["cloth"]
-	var trim: Color = look["trim"]
-	var flash_on := 0
-	if float(pose["flash"]) > 0.04:
-		flash_on = 1
+	_read_phase()
+	var frame := _held_frame(_phase_name, _phase_t, _phase_beat, bob_time)
 	var face := 1
 	if facing < 0.0:
 		face = -1
-	var weapon := str(look.get("weapon", ""))
-	var paint := str(look.get("paint", ""))
-	var faction := str(look.get("faction", ""))
-	var horns := 0
-	if bool(look.get("horns", false)):
-		horns = 1
-	var sash := 0
-	if bool(look.get("sash", false)):
-		sash = 1
-	var sheet := 0
-	if bool(look.get("sheet", false)):
-		sheet = 1
-	var helm := str(look.get("helm", ""))
-	var mount := 0
-	if bool(look.get("mount", false)):
-		mount = 1
-	var sc := int(round(_body_scale() * 20.0))
+	var flash_on := 0
+	if flash > 0.04:
+		flash_on = 1
 	var hang_i := int(clampf(hang, 0.0, 1.0) * 4.0)
-	var roost_on := 0
-	if float(pose["roost"]) > 0.05:
-		roost_on = 1
-	var calling := 0
-	if bool(pose["calling"]):
-		calling = 1
-	var spears := int(pose["spears"])
-	var loading_on := 0
-	if float(pose["loading"]) > 0.05:
-		loading_on = 1
-	var sit_on := 0
-	if float(pose["sit"]) > 0.05:
-		sit_on = 1
+	var sc := int(round(_body_scale() * 20.0))
+	if _phase_name == _shown_phase and frame == _shown_frame and face == _shown_face and flash_on == _shown_flash and hang_i == _shown_hang and sc == _shown_scale:
+		return
+	_shown_phase = _phase_name
+	_shown_frame = frame
+	_shown_face = face
+	_shown_flash = flash_on
+	_shown_hang = hang_i
+	_shown_scale = sc
+	_body_shell.queue_redraw()
+
+
+func _sync_bars() -> void:
+	if _bar_shell == null:
+		return
 	var hp_i := int(round(hp))
 	var max_i := int(round(max_hp))
-	var stacks := level_stacks
-	var blink_on := 0
-	if role == "assassin" and blink_wait <= 0.0:
-		blink_on = 1
-	var bolt_on := 0
-	if bolt_t > 0.02:
-		bolt_on = 1
-	var bone_on := 0
-	if bone_t > 0.02:
-		bone_on = 1
-	var numb_on := 0
-	if numb > 0.02:
-		numb_on = 1
-	var strike_on := 0
+	var bits := 0
+	if debut > 0.0 and alive:
+		bits |= 1
 	if show_strike and lunge > 0.05:
-		strike_on = 1
-	var link := _link_stamp()
-	return "%s.%d.%d.%s.%s.%s.%s.%s.%s.%s.%d.%d.%d.%d.%d.%d.%d.%d.%d.%d.%d.%d.%d.%d.%d.%d.%d.%d.%d.%d.%s" % [
-		phase, frame, face,
-		skin.to_html(false), cloth.to_html(false), trim.to_html(false),
-		paint, weapon, faction, helm,
-		flash_on, horns, sash, sheet, mount, sc, hang_i, roost_on, calling,
-		spears, loading_on, sit_on, hp_i, max_i, stacks,
-		blink_on, bolt_on, bone_on, numb_on, strike_on,
-		link,
-	]
+		bits |= 2
+	if bolt_t > 0.02:
+		bits |= 4
+	if bone_t > 0.02 or numb > 0.02:
+		bits |= 8
+	if level_stacks > 0:
+		bits |= 16
+	if role == "assassin" and blink_wait <= 0.0 and alive:
+		bits |= 32
+	if (role == "drum" or role == "aria") and alive:
+		bits |= 64
+	if role == "fan" and lunge > 0.08 and alive:
+		bits |= 128
+	if _is_boss() and lunge > 0.12 and alive:
+		bits |= 256
+	if _is_berserker() and lunge > 0.12 and alive:
+		bits |= 512
+	var linked := false
+	if alive and support_target != null and is_instance_valid(support_target) and support_target.alive:
+		linked = true
+	if alive and not drum_targets.is_empty():
+		linked = true
+	if linked:
+		bits |= 1024
+	if not alive:
+		bits |= 2048
+	var motion := bits & (1 | 2 | 4 | 8 | 64 | 128 | 256 | 512 | 1024)
+	if hp_i == _bar_hp and max_i == _bar_max and level_stacks == _bar_stacks and bits == _bar_bits and motion == 0:
+		return
+	_bar_hp = hp_i
+	_bar_max = max_i
+	_bar_stacks = level_stacks
+	_bar_bits = bits
+	_bar_shell.queue_redraw()
 
 
 func _held_frame(phase: String, along: float, beat: int, clock: float) -> int:
@@ -1368,33 +1393,7 @@ func _prop_frame(paint: String) -> int:
 	return 0
 
 
-func _link_stamp() -> String:
-	var text := ""
-	var spot := Vector2.ZERO
-	if role == "drum":
-		for marked in drum_targets:
-			if marked != null and is_instance_valid(marked) and marked.alive:
-				spot = marked.position
-				text += _cell(spot)
-	elif support_target != null and is_instance_valid(support_target) and support_target.alive:
-		spot = support_target.position
-		text = _cell(spot)
-	if bolt_t > 0.02:
-		for bolt_at in bolt_marks:
-			spot = bolt_at
-			text += _cell(spot)
-	if _is_boss():
-		for mark in boss_marks:
-			spot = mark
-			text += _cell(spot)
-	return text
-
-
-func _cell(at: Vector2) -> String:
-	return "%d,%d;" % [int(at.x) >> 3, int(at.y) >> 3]
-
-
-func _draw() -> void:
+func draw_body(ci: Node2D) -> void:
 	var sc := _body_scale()
 	var shift := _body_shift(sc)
 	var bob := 0.0
@@ -1403,9 +1402,12 @@ func _draw() -> void:
 	var lift := -58.0 * hang
 	if role == "moth":
 		lift -= 46.0
-	draw_set_transform(Vector2(0, bob + shift + lift), 0, Vector2(facing * sc, sc))
-	Painter.paint_local(self, look, _pose())
-	draw_set_transform(Vector2.ZERO, 0, Vector2.ONE)
+	ci.draw_set_transform(Vector2(0, bob + shift + lift), 0.0, Vector2(facing * sc, sc))
+	Painter.paint_local(ci, look, _pose())
+	ci.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
+func draw_bars(ci: Node2D) -> void:
 	if debut > 0.0 and alive:
 		var ring := clampf(debut / 0.46, 0.0, 1.0)
 		var radius := 16.0 + (1.0 - ring) * 14.0
@@ -1413,59 +1415,61 @@ func _draw() -> void:
 		if _spans_roads():
 			radius = _road_span() * 0.48
 			at = Vector2.ZERO
-		draw_arc(at, radius, 0, TAU, 24, Color(1, 0.9, 0.62, ring), 2.2)
+		ci.draw_arc(at, radius, 0, TAU, 24, Color(1, 0.9, 0.62, ring), 2.2)
 	if not alive:
 		return
+	var sc := _body_scale()
+	var shift := _body_shift(sc)
 	var ratio := clampf(hp / maxf(1.0, max_hp), 0.0, 1.0)
 	var bar_y := -58.0 * sc
 	if _spans_roads():
 		bar_y = shift + BERSERK_TOP * sc - 14.0
 	var bar_w := 36.0 * sc
 	var bar_h := 8.0 if _spans_roads() else 5.0
-	draw_rect(Rect2(-bar_w * 0.5, bar_y, bar_w, bar_h), Color(0, 0, 0, 0.65))
+	ci.draw_rect(Rect2(-bar_w * 0.5, bar_y, bar_w, bar_h), Color(0, 0, 0, 0.65))
 	var fill := Color("7dce6a") if ratio > 0.35 else Color("e24b3b")
-	draw_rect(Rect2(-bar_w * 0.5, bar_y, bar_w * ratio, bar_h), fill)
+	ci.draw_rect(Rect2(-bar_w * 0.5, bar_y, bar_w * ratio, bar_h), fill)
 	if role == "assassin" and blink_wait <= 0.0:
-		draw_circle(Vector2(-bar_w * 0.5 - 6.0, bar_y + 2.0), 3.2, Color("c084fc"))
+		ci.draw_circle(Vector2(-bar_w * 0.5 - 6.0, bar_y + 2.0), 3.2, Color("c084fc"))
 	if level_stacks > 0:
-		draw_circle(Vector2(bar_w * 0.5 + 6.0, bar_y + 2.0), 3.4, Color("e6c36a"))
+		ci.draw_circle(Vector2(bar_w * 0.5 + 6.0, bar_y + 2.0), 3.4, Color("e6c36a"))
 	if _is_boss() and lunge > 0.12:
 		var boss_alpha := clampf(lunge, 0.0, 1.0)
 		for mark in boss_marks:
-			draw_line(Vector2(0, -20), to_local(mark), Color(0.86, 0.16, 0.12, boss_alpha), 7.0)
+			ci.draw_line(Vector2(0, -20), ci.to_local(mark), Color(0.86, 0.16, 0.12, boss_alpha), 7.0)
 	if _is_berserker() and lunge > 0.12:
 		var reach := float(data["reach"])
 		var alpha := clampf(lunge, 0.0, 1.0)
 		for road_y in battle.lane_ys:
 			var local_y := float(road_y) - position.y
-			draw_line(Vector2(0, -12), Vector2(facing * reach, local_y), Color(1, 0.72, 0.28, alpha * 0.9), 5.0)
+			ci.draw_line(Vector2(0, -12), Vector2(facing * reach, local_y), Color(1, 0.72, 0.28, alpha * 0.9), 5.0)
 	if show_strike and lunge > 0.05:
-		draw_line(Vector2(0, -16), to_local(strike_to), Color(1, 0.86, 0.45, clampf(lunge, 0.0, 1.0)), 4.0)
+		ci.draw_line(Vector2(0, -16), ci.to_local(strike_to), Color(1, 0.86, 0.45, clampf(lunge, 0.0, 1.0)), 4.0)
 	if bolt_t > 0.0:
 		var glow := clampf(bolt_t / 0.55, 0.0, 1.0)
 		var bolt_i := 0
 		for bolt_at in bolt_marks:
-			var tip := to_local(bolt_at)
-			var mid := tip * 0.5 + Vector2(sin(tip.y * 0.07 + float(bolt_i)) * 18.0, -22.0)
-			draw_line(Vector2(0, -30), mid, Color(0.75, 0.92, 1.0, glow), 4.0)
-			draw_line(mid, tip, Color(1.0, 0.98, 0.86, glow), 2.2)
+			var tip: Vector2 = ci.to_local(bolt_at)
+			var mid: Vector2 = tip * 0.5 + Vector2(sin(tip.y * 0.07 + float(bolt_i)) * 18.0, -22.0)
+			ci.draw_line(Vector2(0, -30), mid, Color(0.75, 0.92, 1.0, glow), 4.0)
+			ci.draw_line(mid, tip, Color(1.0, 0.98, 0.86, glow), 2.2)
 			bolt_i += 1
 	if bone_t > 0.0 or numb > 0.0:
-		Painter.paint_ailment(self, bone_t, numb, bob_time)
+		Painter.paint_ailment(ci, bone_t, numb, bob_time)
 	if role == "drum" or role == "aria":
 		for note_i in 3:
 			var nx := sin(bob_time * 3.0 + float(note_i)) * 8.0 + float(note_i) * 9.0
 			var ny := -52.0 - float(note_i) * 7.0 + sin(bob_time * 5.0 + float(note_i)) * 3.0
-			draw_circle(Vector2(nx, ny), 3.0, Color("f4efe4"))
-			draw_line(Vector2(nx + 2.6, ny), Vector2(nx + 2.6, ny - 11.0), Color("f4efe4"), 1.3)
+			ci.draw_circle(Vector2(nx, ny), 3.0, Color("f4efe4"))
+			ci.draw_line(Vector2(nx + 2.6, ny), Vector2(nx + 2.6, ny - 11.0), Color("f4efe4"), 1.3)
 	if role == "drum":
 		for marked in drum_targets:
 			if marked != null and is_instance_valid(marked) and marked.alive:
-				draw_line(Vector2(0, -20), to_local(marked.global_position), Color(0.9, 0.76, 0.42, 0.85), 2.0)
+				ci.draw_line(Vector2(0, -20), ci.to_local(marked.global_position), Color(0.9, 0.76, 0.42, 0.85), 2.0)
 	elif support_target != null and is_instance_valid(support_target) and support_target.alive:
-		var to: Vector2 = to_local(support_target.global_position)
+		var to: Vector2 = ci.to_local(support_target.global_position)
 		var line := Color("8ee0a2") if role == "heal" else Color("e6c36a")
-		draw_line(Vector2(0, -20), to, Color(line.r, line.g, line.b, 0.85), 2.0)
+		ci.draw_line(Vector2(0, -20), to, Color(line.r, line.g, line.b, 0.85), 2.0)
 	if role == "fan" and lunge > 0.08:
 		var gust := clampf(lunge, 0.0, 1.0)
 		var gust_len := 180.0
@@ -1473,4 +1477,22 @@ func _draw() -> void:
 			gust_len = absf(float(battle.enemy_front) - float(battle.player_front)) * 0.25
 		for gust_i in 4:
 			var gy := -30.0 + float(gust_i) * 12.0
-			draw_line(Vector2(0, gy), Vector2(facing * gust_len, gy - 4.0), Color(0.75, 0.9, 0.86, gust * 0.75), 2.0)
+			ci.draw_line(Vector2(0, gy), Vector2(facing * gust_len, gy - 4.0), Color(0.75, 0.9, 0.86, gust * 0.75), 2.0)
+
+
+class BodyShell extends Node2D:
+	var host = null
+
+	func _draw() -> void:
+		if host == null:
+			return
+		host.draw_body(self)
+
+
+class BarShell extends Node2D:
+	var host = null
+
+	func _draw() -> void:
+		if host == null:
+			return
+		host.draw_bars(self)

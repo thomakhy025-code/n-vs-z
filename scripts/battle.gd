@@ -140,6 +140,21 @@ var sent_keys: Array = []
 var hand_seen: float = -1.0
 var fallen_side: int = -1
 var yard_stay: Dictionary = {}
+var full_note: float = 0.0
+var _yard_seen: Dictionary = {}
+var _yard_drop: Array = []
+var _list_frame: int = -1
+var _ally_lists: Array = [[], []]
+var _foe_lists: Array = [[], []]
+var _lane_foes: Array = [[], []]
+var _wide_foes: Array = [[], []]
+var _air_on: Array = [false, false]
+var _no_foes: Array = []
+var _hud_level_size: int = 0
+var _hud_hp_hot: bool = false
+var _hud_pfill: float = -1.0
+var _hud_efill: float = -1.0
+var _hud_p_hot: bool = false
 
 
 func start(chosen: Array, run_mode: String, level_index: int = 1) -> void:
@@ -268,10 +283,12 @@ func _build_hud() -> void:
 	field.battle = self
 	field.set_anchors_preset(Control.PRESET_FULL_RECT)
 	field.mouse_filter = Control.MOUSE_FILTER_STOP
+	field.z_index = 0
 	layer.add_child(field)
 	hud = Control.new()
 	hud.set_anchors_preset(Control.PRESET_FULL_RECT)
 	hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hud.z_index = 2
 	layer.add_child(hud)
 	hurt_flash = ColorRect.new()
 	hurt_flash.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -340,9 +357,13 @@ func _build_hud() -> void:
 		btn.text = "%s\n%d" % [entry["short"], int(entry["cost"])]
 		var cloth: Color = Painter.look(str(entry["paint"]))["cloth"]
 		UiSkin.apply(btn, cloth, 16, _ink(cloth))
+		btn.set_meta("slot_short", str(entry["short"]))
+		btn.set_meta("slot_cost", int(entry["cost"]))
+		btn.mouse_filter = Control.MOUSE_FILTER_STOP
+		btn.z_index = 4
 		var slot_index := slot_buttons.size()
 		slot_hold.append(false)
-		btn.button_down.connect(_set_hold.bind(slot_index, true))
+		btn.button_down.connect(_press_slot.bind(slot_index))
 		btn.button_up.connect(_set_hold.bind(slot_index, false))
 		btn.clip_text = true
 		hud.add_child(btn)
@@ -368,6 +389,21 @@ func _release_stick() -> void:
 func _set_hold(index: int, held: bool) -> void:
 	if index >= 0 and index < slot_hold.size():
 		slot_hold[index] = held
+
+
+# The click itself calls the fighter. A crowded frame can deliver the press and
+# the release together, before _process, and the hold flag would already be down.
+func _press_slot(index: int) -> void:
+	_set_hold(index, true)
+	if finished or paused:
+		return
+	if index < 0 or index >= loadout.size():
+		return
+	if duel and local_side != 0:
+		if _count(local_side) >= MAX_SIDE:
+			_note_side_full()
+		return
+	summon_player(str(loadout[index]))
 
 
 func _plain(text: String, size: int, color: Color) -> Label:
@@ -747,11 +783,59 @@ func summon_player(id: String) -> void:
 	var entry := Catalog.find_in(player_roster, id)
 	if entry.is_empty():
 		return
-	if float(player_cd[id]) > 0.0 or player_value < float(entry["cost"]) or _count(0) >= MAX_SIDE:
+	if float(player_cd[id]) > 0.0:
+		return
+	if player_value < float(entry["cost"]):
+		return
+	if _count(0) >= MAX_SIDE:
+		_note_side_full()
 		return
 	player_value -= float(entry["cost"])
 	player_cd[id] = float(entry["cooldown"])
 	_spawn(entry, 0)
+
+
+func _note_side_full() -> void:
+	full_note = 1.6
+	if down_label != null:
+		var watched = controlled if controlled != null else hero
+		if watched == null or watched.alive:
+			if down_label.text != "Field is full":
+				down_label.text = "Field is full"
+	_paint_slots()
+
+
+func _paint_slots() -> void:
+	if slot_buttons.is_empty():
+		return
+	var cap_side := 0
+	if duel and local_side == 1:
+		cap_side = 1
+	var at_cap := _count(cap_side) >= MAX_SIDE
+	for i in slot_buttons.size():
+		var id := str(loadout[i])
+		var btn: Button = slot_buttons[i]
+		var short_name := str(btn.get_meta("slot_short", id))
+		var cost := int(btn.get_meta("slot_cost", 0))
+		var cd := 0.0
+		if player_cd.has(id):
+			cd = float(player_cd[id])
+		var shown := ""
+		var tint := Color.WHITE
+		if cd > 0.0:
+			shown = "%s\n%.1fs" % [short_name, cd]
+			tint = Color(0.62, 0.62, 0.68)
+		elif at_cap:
+			shown = "%s\nFULL" % short_name
+			tint = Color(0.85, 0.55, 0.45)
+		else:
+			shown = "%s\n%d" % [short_name, cost]
+			if player_value < float(cost):
+				tint = Color(0.75, 0.62, 0.58)
+		if btn.text != shown:
+			btn.text = shown
+		if btn.modulate != tint:
+			btn.modulate = tint
 
 
 func summon_foe(id: String) -> void:
@@ -926,33 +1010,34 @@ func sheltered(body) -> bool:
 
 
 func _tick_castle_yard(delta: float) -> void:
-	var living: Array = []
+	_yard_seen.clear()
 	for unit in units:
 		if is_instance_valid(unit) and unit.alive:
-			living.append(unit)
+			_note_yard(unit, delta)
 	if hero != null and is_instance_valid(hero) and hero.alive:
-		living.append(hero)
+		_note_yard(hero, delta)
 	if foe != null and is_instance_valid(foe) and foe.alive:
-		living.append(foe)
-	var seen: Dictionary = {}
-	for body in living:
-		var stay_id: int = body.get_instance_id()
-		seen[stay_id] = true
-		if sheltered(body):
-			var spent: float = float(yard_stay.get(stay_id, 0.0)) + delta
-			if spent >= YARD_STAY:
-				_set_before_own_castle(body)
-				yard_stay.erase(stay_id)
-			else:
-				yard_stay[stay_id] = spent
-		elif yard_stay.has(stay_id):
-			yard_stay.erase(stay_id)
-	var gone: Array = []
+		_note_yard(foe, delta)
+	_yard_drop.clear()
 	for old_id in yard_stay.keys():
-		if not seen.has(old_id):
-			gone.append(old_id)
-	for drop_id in gone:
+		if not _yard_seen.has(old_id):
+			_yard_drop.append(old_id)
+	for drop_id in _yard_drop:
 		yard_stay.erase(drop_id)
+
+
+func _note_yard(body, delta: float) -> void:
+	var stay_id: int = body.get_instance_id()
+	_yard_seen[stay_id] = true
+	if sheltered(body):
+		var spent: float = float(yard_stay.get(stay_id, 0.0)) + delta
+		if spent >= YARD_STAY:
+			_set_before_own_castle(body)
+			yard_stay.erase(stay_id)
+		else:
+			yard_stay[stay_id] = spent
+	elif yard_stay.has(stay_id):
+		yard_stay.erase(stay_id)
 
 
 func _set_before_own_castle(body) -> void:
@@ -963,26 +1048,103 @@ func _set_before_own_castle(body) -> void:
 
 
 func hostile_targets(attacker_side: int) -> Array:
-	var defend := 1 - attacker_side
-	var out: Array = []
-	for unit in units:
-		if is_instance_valid(unit) and unit.alive and unit.side == defend and not sheltered(unit):
-			out.append(unit)
-	var defender = _hero_for(defend)
-	if defender != null and not sheltered(defender):
-		out.append(defender)
-	return out
+	_ensure_lists()
+	if attacker_side != 0 and attacker_side != 1:
+		return _no_foes
+	var foes: Array = _foe_lists[attacker_side]
+	return foes
 
 
 func support_candidates(side: int) -> Array:
-	var out: Array = []
+	_ensure_lists()
+	if side != 0 and side != 1:
+		return _no_foes
+	var allies: Array = _ally_lists[side]
+	return allies
+
+
+func foes_on_lane(attacker_side: int, road: int) -> Array:
+	_ensure_lists()
+	if attacker_side != 0 and attacker_side != 1:
+		return _no_foes
+	var lanes: Array = _lane_foes[attacker_side]
+	if road < 0 or road >= lanes.size():
+		return _no_foes
+	var found: Array = lanes[road]
+	return found
+
+
+func wides_for(attacker_side: int) -> Array:
+	_ensure_lists()
+	if attacker_side != 0 and attacker_side != 1:
+		return _no_foes
+	var wides: Array = _wide_foes[attacker_side]
+	return wides
+
+
+func side_has_air(attacker_side: int) -> bool:
+	_ensure_lists()
+	if attacker_side != 0 and attacker_side != 1:
+		return false
+	return bool(_air_on[attacker_side])
+
+
+func _ensure_lists() -> void:
+	var frame := Engine.get_process_frames()
+	if frame == _list_frame:
+		return
+	_list_frame = frame
+	var roads := maxi(lane_ys.size(), 1)
+	for which in 2:
+		var allies: Array = _ally_lists[which]
+		allies.clear()
+		var foes: Array = _foe_lists[which]
+		foes.clear()
+		var wides: Array = _wide_foes[which]
+		wides.clear()
+		_air_on[which] = false
+		var lanes: Array = _lane_foes[which]
+		while lanes.size() < roads:
+			var fresh: Array = []
+			lanes.append(fresh)
+		while lanes.size() > roads:
+			lanes.remove_at(lanes.size() - 1)
+		for lane_list in lanes:
+			lane_list.clear()
 	for unit in units:
-		if is_instance_valid(unit) and unit.alive and unit.side == side:
-			out.append(unit)
-	var ally = _hero_for(side)
-	if ally != null:
-		out.append(ally)
-	return out
+		if is_instance_valid(unit) and unit.alive:
+			var which_side := int(unit.side)
+			if which_side == 0 or which_side == 1:
+				_push_combatant(unit, which_side)
+	for defend_side in 2:
+		var defender = _hero_for(defend_side)
+		if defender != null:
+			_push_combatant(defender, defend_side)
+
+
+func _push_combatant(body, which_side: int) -> void:
+	var allies: Array = _ally_lists[which_side]
+	allies.append(body)
+	if sheltered(body):
+		return
+	var attacker := 1 - which_side
+	var foes: Array = _foe_lists[attacker]
+	foes.append(body)
+	if body.has_method("is_airborne") and body.is_airborne():
+		_air_on[attacker] = true
+	var road := 0
+	if "lane" in body:
+		road = int(body.lane)
+	var lanes: Array = _lane_foes[attacker]
+	if lanes.is_empty():
+		return
+	if road < 0 or road >= lanes.size():
+		road = clampi(road, 0, lanes.size() - 1)
+	var lane_list: Array = lanes[road]
+	lane_list.append(body)
+	if is_berserker(body) or is_boss(body):
+		var wides: Array = _wide_foes[attacker]
+		wides.append(body)
 
 
 func gate_for_attacker(attacker_side: int):
@@ -1443,53 +1605,71 @@ func _update_hud(delta: float) -> void:
 		return
 	var player_ratio: float = float(player_gate.hp) / float(player_gate.max_hp)
 	var enemy_ratio: float = float(enemy_gate.hp) / float(enemy_gate.max_hp)
+	var player_hp_text := "Clan gate  %d" % int(round(player_gate.hp))
+	var enemy_hp_text := "Cursed gate  %d" % int(round(enemy_gate.hp))
 	if duel:
-		player_hp_label.text = "Left clan  %d" % int(round(player_gate.hp))
-		enemy_hp_label.text = "Right clan  %d" % int(round(enemy_gate.hp))
-		if level_label != null:
+		player_hp_text = "Left clan  %d" % int(round(player_gate.hp))
+		enemy_hp_text = "Right clan  %d" % int(round(enemy_gate.hp))
+		if level_label != null and level_label.text != "1 vs 1":
 			level_label.text = "1 vs 1"
-	else:
-		player_hp_label.text = "Clan gate  %d" % int(round(player_gate.hp))
-		enemy_hp_label.text = "Cursed gate  %d" % int(round(enemy_gate.hp))
-	player_hp_label.add_theme_color_override("font_color", Color("ffb4a8") if player_ratio < 0.3 else Color("f3e6c8"))
-	value_label.text = "Value  %d" % int(floor(player_value))
-	income_label.text = income_line(_shown_income())
+	if player_hp_label.text != player_hp_text:
+		player_hp_label.text = player_hp_text
+	if enemy_hp_label.text != enemy_hp_text:
+		enemy_hp_label.text = enemy_hp_text
+	var hp_hot := player_ratio < 0.3
+	if hp_hot != _hud_hp_hot:
+		_hud_hp_hot = hp_hot
+		player_hp_label.add_theme_color_override("font_color", Color("ffb4a8") if hp_hot else Color("f3e6c8"))
+	var value_text := "Value  %d" % int(floor(player_value))
+	if value_label.text != value_text:
+		value_label.text = value_text
+	var income_text := income_line(_shown_income())
+	if income_label.text != income_text:
+		income_label.text = income_text
 	if level_label != null and not duel:
 		var hold := ""
 		if mode == "":
 			var host := get_parent()
 			if host != null and host.has_method("hold_hud"):
 				hold = str(host.hold_hud(level_no))
-		if hold == "":
-			level_label.text = "Level %d  ·  %s" % [level_no, str(rules["name"])]
-			level_label.add_theme_font_size_override("font_size", 18)
-		else:
-			level_label.text = "Level %d  ·  %s  ·  %s" % [level_no, str(rules["name"]), hold]
-			level_label.add_theme_font_size_override("font_size", 15)
-	player_bar_fill.size.x = 220.0 * clampf(player_ratio, 0.0, 1.0)
-	enemy_bar_fill.size.x = 220.0 * clampf(enemy_ratio, 0.0, 1.0)
-	player_bar_fill.color = Color("7dce6a") if player_ratio > 0.3 else Color("e24b3b")
+		var level_text := "Level %d  ·  %s" % [level_no, str(rules["name"])]
+		var level_size := 18
+		if hold != "":
+			level_text = "Level %d  ·  %s  ·  %s" % [level_no, str(rules["name"]), hold]
+			level_size = 15
+		if level_label.text != level_text:
+			level_label.text = level_text
+		if level_size != _hud_level_size:
+			_hud_level_size = level_size
+			level_label.add_theme_font_size_override("font_size", level_size)
+	var pfill := 220.0 * clampf(player_ratio, 0.0, 1.0)
+	if absf(pfill - _hud_pfill) >= 0.5:
+		_hud_pfill = pfill
+		player_bar_fill.size.x = pfill
+	var efill := 220.0 * clampf(enemy_ratio, 0.0, 1.0)
+	if absf(efill - _hud_efill) >= 0.5:
+		_hud_efill = efill
+		enemy_bar_fill.size.x = efill
+	var p_hot := player_ratio <= 0.3
+	if p_hot != _hud_p_hot:
+		_hud_p_hot = p_hot
+		player_bar_fill.color = Color("e24b3b") if p_hot else Color("7dce6a")
 	var watched = controlled if controlled != null else hero
+	var down_text := ""
 	if duel and paused and not finished:
-		down_label.text = "Paused"
+		down_text = "Paused"
 	elif watched != null and not watched.alive:
-		down_label.text = "Hero returns in %.1f" % maxf(watched.down_timer, 0.0)
-	else:
-		down_label.text = ""
-	if hint != null and battle_time > 11.0:
+		down_text = "Hero returns in %.1f" % maxf(watched.down_timer, 0.0)
+	elif full_note > 0.0:
+		down_text = "Field is full"
+	if down_label.text != down_text:
+		down_label.text = down_text
+	if full_note > 0.0:
+		full_note = maxf(0.0, full_note - delta)
+	if hint != null and battle_time > 11.0 and hint.modulate.a > 0.0:
 		hint.modulate.a = maxf(0.0, hint.modulate.a - delta * 0.45)
-	for i in slot_buttons.size():
-		var id := str(loadout[i])
-		var entry := Catalog.find_in(player_roster, id)
-		var cd := float(player_cd[id])
-		var btn: Button = slot_buttons[i]
-		if cd > 0.0:
-			btn.text = "%s\n%.1fs" % [entry["short"], cd]
-			btn.modulate = Color(0.62, 0.62, 0.68)
-		else:
-			btn.text = "%s\n%d" % [entry["short"], int(entry["cost"])]
-			btn.modulate = Color(0.75, 0.62, 0.58) if player_value < float(entry["cost"]) else Color.WHITE
-	if hurt_flash != null:
+	_paint_slots()
+	if hurt_flash != null and hurt_flash.color.a > 0.0:
 		var fade: Color = hurt_flash.color
 		fade.a = move_toward(fade.a, 0.0, delta * 0.9)
 		hurt_flash.color = fade
@@ -1559,6 +1739,16 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 		_toggle_pause()
 		get_viewport().set_input_as_handled()
+		return
+	if finished or paused or event.is_echo():
+		return
+	if duel and local_side != 0:
+		return
+	for i in loadout.size():
+		if event.is_action_pressed("slot%d" % (i + 1)):
+			summon_player(str(loadout[i]))
+			get_viewport().set_input_as_handled()
+			return
 
 
 func _hero_for(which: int):
@@ -2077,14 +2267,16 @@ func drop_smoke(at: Vector2, _lane: int) -> void:
 func _tick_smokes(delta: float) -> void:
 	if smokes.is_empty():
 		return
-	var kept: Array = []
+	var write := 0
 	for puff in smokes:
 		var left := float(puff.get("left", 0.0)) - delta
 		if left <= 0.0:
 			continue
 		puff["left"] = left
-		kept.append(puff)
-	smokes = kept
+		smokes[write] = puff
+		write += 1
+	if write < smokes.size():
+		smokes.resize(write)
 
 
 func _hatch_lings(parent) -> void:
@@ -2108,7 +2300,7 @@ func _hatch_lings(parent) -> void:
 func _tick_hazards(delta: float) -> void:
 	if hazards.is_empty():
 		return
-	var kept: Array = []
+	var write := 0
 	for patch in hazards:
 		var left := float(patch.get("left", 0.0)) - delta
 		if left <= 0.0:
@@ -2119,8 +2311,10 @@ func _tick_hazards(delta: float) -> void:
 			_scorch(patch)
 			tick = 1.0
 		patch["tick"] = tick
-		kept.append(patch)
-	hazards = kept
+		hazards[write] = patch
+		write += 1
+	if write < hazards.size():
+		hazards.resize(write)
 	queue_redraw()
 
 

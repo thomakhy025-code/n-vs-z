@@ -41,6 +41,11 @@ func setup(from: Vector2, aim: Vector2, amount: float, side: int, color: Color, 
 		delta = Vector2(1.0 if aim.x >= from.x else -1.0, 0.0)
 	velocity = delta.normalized() * (760.0 if heavy else 640.0)
 	z_index = 560 if heavy else 520
+	queue_redraw()
+
+
+func _ready() -> void:
+	queue_redraw()
 
 
 func _process(delta: float) -> void:
@@ -49,7 +54,6 @@ func _process(delta: float) -> void:
 	var step := velocity * delta
 	position += step
 	traveled += step.length()
-	queue_redraw()
 	if traveled >= max_dist:
 		queue_free()
 		return

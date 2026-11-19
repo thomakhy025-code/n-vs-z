@@ -2,6 +2,7 @@ extends RefCounted
 
 static var saber_navy: bool = false
 static var sheet_on: Dictionary = {}
+static var _quad: PackedVector2Array = PackedVector2Array([Vector2.ZERO, Vector2.ZERO, Vector2.ZERO, Vector2.ZERO])
 
 const GROUND_Y := 20.0
 const HEAD_R := 16.0
@@ -564,12 +565,11 @@ static func _bone(ci: CanvasItem, origin: Vector2, angle: float, length: float, 
 	var dir := Vector2(cos(angle), sin(angle))
 	var side := Vector2(-dir.y, dir.x) * (thick * 0.5)
 	var end := origin + dir * length
-	var pts := PackedVector2Array()
-	pts.append(origin - side)
-	pts.append(origin + side)
-	pts.append(end + side)
-	pts.append(end - side)
-	ci.draw_colored_polygon(pts, color)
+	_quad[0] = origin - side
+	_quad[1] = origin + side
+	_quad[2] = end + side
+	_quad[3] = end - side
+	ci.draw_colored_polygon(_quad, color)
 	return end
 
 
