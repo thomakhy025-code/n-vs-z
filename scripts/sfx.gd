@@ -72,6 +72,29 @@ func narration_length() -> float:
 	return _voice_len
 
 
+func speak(id: String) -> float:
+	_voice_len = 0.0
+	if _voice != null and _voice.playing:
+		_voice.stop()
+	if id == "" or _voice == null:
+		return 0.0
+	var stream := _stream(id)
+	if stream == null:
+		return 0.0
+	_voice.stream = stream
+	_voice.pitch_scale = 1.0
+	_voice.volume_db = -2.0
+	_voice.play()
+	_voice_len = stream.get_length()
+	return _voice_len
+
+
+func hush() -> void:
+	_voice_len = 0.0
+	if _voice != null:
+		_voice.stop()
+
+
 func stop_mood() -> void:
 	_mood = ""
 	_voice_len = 0.0

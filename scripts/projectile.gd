@@ -132,3 +132,7 @@ func _draw() -> void:
 		dir * (tip + (12.0 if bold else 8.0)),
 		dir * tip - side * (6.0 if bold else 4.0),
 	]), tint)
+	if hazard == "fire":
+		var flick := sin(Time.get_ticks_msec() * 0.02) * 3.0
+		draw_circle(-dir * tail * 0.45 + Vector2(flick, -3.0), 3.2, Color("ffb15a"))
+		draw_circle(-dir * tail * 0.75, 2.2, Color("ff7a2a"))

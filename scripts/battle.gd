@@ -15,6 +15,7 @@ const TouchLayout = preload("res://scripts/touch_layout.gd")
 const JoyScript = preload("res://scripts/joystick.gd")
 const UiSkin = preload("res://scripts/ui_skin.gd")
 const Levels = preload("res://scripts/levels.gd")
+const Early = preload("res://scripts/early_roster.gd")
 
 const PLAYER_START := 16.0
 const PLAYER_INCOME := 3.6
@@ -637,6 +638,8 @@ static func enemy_ids(level_no: int, rules: Dictionary, _battle_time: float) -> 
 		return ["knives", "firebow", "javelin", "ward", "fan", "drum", "cow", "bomber"]
 	if dire:
 		return ["walker", "runner", "moth", "viper", "shell", "brood", "elder", "howler", "reaver", "glut", "oni", "storm", "crow"]
+	if level_no <= 19:
+		return Early.pool(level_no)
 	return ["walker", "runner", "viper", "shell", "howler", "herald", "reaver", "oni", "storm"]
 
 
@@ -979,7 +982,14 @@ func _spawn(entry: Dictionary, side: int, forced_road: int = -1, back: float = 0
 
 
 func summon_for_herald() -> void:
-	var pool: Array = ["walker", "runner", "howler", "viper", "shell", "reaver"]
+	var allowed: Array = enemy_ids(level_no, rules, battle_time)
+	var base: Array = ["walker", "runner", "howler", "viper", "shell", "reaver"]
+	var pool: Array = []
+	for ident in base:
+		if allowed.has(ident):
+			pool.append(ident)
+	if pool.is_empty():
+		pool.append("walker")
 	for call_n in 2:
 		if _count(1) >= MAX_SIDE:
 			return
@@ -1029,6 +1039,9 @@ func _tick_castle_yard(delta: float) -> void:
 func _note_yard(body, delta: float) -> void:
 	var stay_id: int = body.get_instance_id()
 	_yard_seen[stay_id] = true
+	if _howler_leaving(body):
+		yard_stay.erase(stay_id)
+		return
 	if sheltered(body):
 		var spent: float = float(yard_stay.get(stay_id, 0.0)) + delta
 		if spent >= YARD_STAY:
@@ -1038,6 +1051,16 @@ func _note_yard(body, delta: float) -> void:
 			yard_stay[stay_id] = spent
 	elif yard_stay.has(stay_id):
 		yard_stay.erase(stay_id)
+
+
+func _howler_leaving(body) -> bool:
+	if body == null or not is_instance_valid(body):
+		return false
+	if body.get_script() != UnitScript:
+		return false
+	if str(body.role) != "howler":
+		return false
+	return bool(body.perched) or bool(body.diving)
 
 
 func _set_before_own_castle(body) -> void:
@@ -2363,14 +2386,31 @@ func _draw() -> void:
 			var fx := x0 + span * (float(flame_i) + 0.5) / float(flames)
 			var hop := sin(battle_time * 9.0 + fx * 0.07) * 4.0
 			var height := 16.0 + hop
-			draw_colored_polygon(PackedVector2Array([
-				Vector2(fx - 7.0, y + 6.0),
-				Vector2(fx + 7.0, y + 6.0),
-				Vector2(fx, y - height),
-			]), hot)
-			draw_colored_polygon(PackedVector2Array([
-				Vector2(fx - 3.0, y + 4.0),
-				Vector2(fx + 3.0, y + 4.0),
-				Vector2(fx, y - height * 0.45),
-			]), core)
+			if kind == "ice":
+				var top := Vector2(fx, y - height)
+				draw_colored_polygon(PackedVector2Array([
+					Vector2(fx, y + 5.0),
+					Vector2(fx + 6.0, y - height * 0.42),
+					top,
+					Vector2(fx - 6.0, y - height * 0.42),
+				]), hot)
+				draw_colored_polygon(PackedVector2Array([
+					Vector2(fx, y - 2.0),
+					Vector2(fx + 2.4, y - height * 0.48),
+					Vector2(fx, y - height * 0.72),
+					Vector2(fx - 2.4, y - height * 0.48),
+				]), core)
+			else:
+				draw_colored_polygon(PackedVector2Array([
+					Vector2(fx - 7.0, y + 6.0),
+					Vector2(fx + 7.0, y + 6.0),
+					Vector2(fx, y - height),
+				]), hot)
+				draw_colored_polygon(PackedVector2Array([
+					Vector2(fx - 3.0, y + 4.0),
+					Vector2(fx + 3.0, y + 4.0),
+					Vector2(fx, y - height * 0.45),
+				]), core)
+				var ember := Vector2(fx + sin(battle_time * 7.0 + fx) * 3.0, y - height - 4.0)
+				draw_circle(ember, 2.4, core)
 

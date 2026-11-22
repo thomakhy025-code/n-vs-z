@@ -396,6 +396,9 @@ func _pose() -> Dictionary:
 	if not alive:
 		phase = "fall"
 		t = clampf(1.0 - down_timer / RESPAWN, 0.0, 1.0)
+	elif numb > 0.0:
+		phase = "hurt"
+		t = 0.0
 	elif act > 0.0:
 		phase = "act"
 		var u := 1.0 - clampf(act, 0.0, 1.0)

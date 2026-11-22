@@ -9,6 +9,8 @@ const Levels = preload("res://scripts/levels.gd")
 const Story = preload("res://scripts/story.gd")
 const MangaScript = preload("res://scripts/manga.gd")
 const DuelGift = preload("res://scripts/duel_gift.gd")
+const Early = preload("res://scripts/early_roster.gd")
+const DemoScript = preload("res://scripts/unlock_demo.gd")
 
 const SAVE_PATH := "user://progress.cfg"
 
@@ -24,7 +26,7 @@ If a runner slips past the line, you are the one who runs back. If your gate bre
 
 When their gate is down to a quarter of its blood, they immediately gain their starting gold again. At half blood, on every level, they gain 100 value at once. From level 20 on they also gain 100 value when the gate is still at 70% blood.
 
-The other gate calls its own fighters. On monster levels they are walkers, runners, a howler, a viper, a storm, a herald, a shell, a reaver, and an oni. From level 41 those monsters are faster and harder, and Moth, Elder, Glut, and Brood join them. The howler hangs from the curse. Only an archer can hit it there. It swings once onto an archer, a leveling caster, or a healing caster, then stays on the road. The viper's bite holds one fighter still for 2 seconds, so they cannot move or strike, until a healing caster clears it. If two fighters are in front, it bites the one who hits harder and does not hold them. Most blows miss the viper. The storm waits 4 seconds, then lightning hits the fighter in front and four others on any road, and holds each for 1 second. The herald calls two other monsters every 3 seconds. The shell is slow, hits softly, and carries a great deal of blood. The reaver is a harder hitter for a moderate call. Moth flies on one road. A short weapon cannot hit it, and those fighters stop beneath it, though they still fight a closer fighter on the ground. Elder appears somewhere on the road, strikes whoever is nearest, friend or foe, and fades after 15 seconds. Many blows miss Elder. Glut is very slow. It eats the fighter in front, except a berserker or a flyer, then sits for 5 seconds and heals. Brood bites, and when it dies three quick Lings crawl out. On soldier levels they wear modern kit, and they hit harder than before. Knives match the sword soldier. The firebow is thin-blooded and hits hard, then leaves fire on that spot for 3 seconds. The fan is thin-blooded, barely hurts, and once every 10 seconds it blows its road, pushing fighters in front of it back by a quarter of the road. A berserker ignores that gust and covers the fighters behind him. That gust also stretches any fire or ice and keeps it burning 2 seconds longer. Each road holds at most two. The ward carries a great shield, a great deal of blood, and hits for 5. The javelin throws five long heavy shots, then fights up close with a short sword. The drum lifts three allies at once, the way a leveling caster lifts one. On levels 21 to 40 a cow waits 4 seconds, then the first charge hits harder than the blows after it, and it fights up close, slower and softer than a rider. From level 41 a crow does the same and hits harder: it waits 3 seconds, strikes the first enemy hard, then fights like the horse rider. From level 61, Smog, Buck, Scope, and Aria join them. Smog deals no damage and lays smoke where it walks. The smoke hides that stretch for 10 seconds. Buck fires a shotgun once a second, four times, then reloads for 2 seconds. Scope fires a long heavy shot every 3 seconds and has little blood. Aria sings, and the lift is half of a leveling caster, on every ally on every road at once. The bomber is fragile, its hit is heavy, and it strikes the berserker when one is alive. Level 40's general is an officer.
+The other gate calls its own fighters. On levels 1 to 19 the fight starts with walkers, and each other monster of that band joins on a later level, one at a time. From level 20 they are walkers, runners, a howler, a viper, a storm, a herald, a shell, a reaver, and an oni. From level 41 those monsters are faster and harder, and Moth, Elder, Glut, and Brood join them. The howler hangs behind its castle. Only an archer can hit it there. It swings from behind the castle onto the road, and onto an archer, a leveling caster, or a healing caster when one is alive, then stays on the road. The viper's bite holds one fighter still for 2 seconds. For a short time they cannot move or attack, and they hold the hurt pose until it ends. A healing caster can clear it. If two fighters are in front, it bites the one who hits harder and does not hold them. Most blows miss the viper. The storm waits 4 seconds, then lightning hits the fighter in front and jumps to four others, one by one, and holds each for 1 second. The herald calls two other monsters every 3 seconds. The shell is slow, hits softly, and carries a great deal of blood. The reaver is a harder hitter for a moderate call. Moth flies on one road. A short weapon cannot hit it, and those fighters stop beneath it, though they still fight a closer fighter on the ground. Elder appears somewhere on the road, strikes whoever is nearest, friend or foe, and fades after 15 seconds. Many blows miss Elder. Glut is very slow. It eats the fighter in front, except a berserker or a flyer, then sits for 5 seconds and heals. Brood bites, and when it dies three quick Lings crawl out. On soldier levels they wear modern kit, and they hit harder than before. Knives match the sword soldier. The firebow is thin-blooded and hits hard, then leaves fire on that spot for 3 seconds. The fan is thin-blooded, barely hurts, and once every 10 seconds it blows its road, pushing fighters in front of it back by a quarter of the road. A berserker ignores that gust and covers the fighters behind him. That gust also stretches any fire or ice and keeps it burning 2 seconds longer. Each road holds at most two. The ward carries a great shield, a great deal of blood, and hits for 5. The javelin throws five long heavy shots, then fights up close with a short sword. The drum lifts three allies at once, the way a leveling caster lifts one. On levels 21 to 40 a cow waits 4 seconds, then the first charge hits harder than the blows after it, and it fights up close, slower and softer than a rider. From level 41 a crow does the same and hits harder: it waits 3 seconds, strikes the first enemy hard, then fights like the horse rider. From level 61, Smog, Buck, Scope, and Aria join them. Smog deals no damage and lays smoke where it walks. The smoke hides that stretch for 10 seconds. Buck fires a shotgun once a second, four times, then reloads for 2 seconds. Scope fires a long heavy shot every 3 seconds and has little blood. Aria sings, and the lift is half of a leveling caster, on every ally on every road at once. The bomber is fragile, its hit is heavy, and it strikes the berserker when one is alive. Level 40's general is an officer.
 
 Play lists seventy levels. The first is open. Winning a level opens the next. Levels 1 to 20 are monsters, and that is where each soldier is learned. Levels 21 to 40 are human soldiers. Levels 41 to 60 are monsters again, and the new monsters begin. Levels 61 to 70 alternate, monster then soldier, starting with monsters. The new soldiers begin on the soldier turns. Your purse stays the same. Theirs gets heavier as the levels climb, and it eases a little when the soldiers first arrive. Before you choose who to bring, the level shows the other side, each fighter with a skin and a name. Press a name to read blood, damage, attacking distance, attacking range, speed, and the special skill.
 
@@ -53,6 +55,7 @@ var duel_celebrated: bool = false
 var duel_celebrate: bool = false
 var story_version: int = Story.VERSION
 var story_seen: Dictionary = {}
+var early_fresh: bool = false
 var story_layer: CanvasLayer = null
 var diamonds: int = 0
 var coins: int = 0
@@ -295,6 +298,39 @@ func _has_arg(flag: String) -> bool:
 	return flag in OS.get_cmdline_user_args() or flag in OS.get_cmdline_args()
 
 
+func _harness() -> bool:
+	return _has_arg("--smoke") or _has_arg("--layout") or _has_arg("--sim") or _has_arg("--sim-cheap") or _has_arg("--shot") or _has_arg("--win-check") or _has_arg("--unlock-check") or _has_arg("--duel-smoke") or _has_arg("--roster-probe") or _has_arg("--look-shot")
+
+
+func _maybe_demo() -> bool:
+	if picking_duel or _harness():
+		return false
+	if chosen_level < 1 or chosen_level > 19:
+		return false
+	var kind := Early.debut_on(chosen_level)
+	if kind == "":
+		return false
+	_play_demo(kind)
+	return true
+
+
+func _play_demo(kind: String) -> void:
+	screen = "demo"
+	_clear_screens()
+	var demo = DemoScript.new()
+	demo.kind = kind
+	demo.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(demo)
+	demo.finished.connect(_on_demo_done.bind(kind), CONNECT_ONE_SHOT)
+
+
+func _on_demo_done(kind: String) -> void:
+	Early.mark_demo(kind)
+	Sfx.hush()
+	_save_progress()
+	_show_foes()
+
+
 func _shot_flow() -> void:
 	_show_menu()
 	for _i in 3:
@@ -358,7 +394,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif screen == "foe_detail":
 		_show_foes()
 		get_viewport().set_input_as_handled()
-	elif screen == "foe":
+	elif screen == "foe" or screen == "demo":
+		if screen == "demo":
+			Sfx.hush()
 		_show_levels()
 		get_viewport().set_input_as_handled()
 	elif screen == "select":
@@ -961,6 +999,8 @@ func _pick_level(index: int) -> void:
 
 
 func _show_foes() -> void:
+	if _maybe_demo():
+		return
 	screen = "foe"
 	if not picking_duel:
 		_prepare_loadout()
@@ -1186,11 +1226,11 @@ func _foe_skill(entry: Dictionary, kind: String) -> String:
 		"runner":
 			return "Faster than a walker, and the next blow comes sooner."
 		"howler":
-			return "Hangs from the curse. Only an archer can hit it there. It swings once for %d onto an archer, a leveling caster, or a healing caster, then stays on the road." % int(entry.get("swing", 0))
+			return "Hangs behind its castle. Only an archer can hit it there. It swings once for %d from behind the castle onto an archer, a leveling caster, or a healing caster, then stays on the road." % int(entry.get("swing", 0))
 		"viper":
-			return "The bite holds one fighter still for 2 seconds, so they cannot move or strike, until a healing caster clears it. If two fighters are in front, it bites the one who hits harder and does not hold them. Most blows miss the viper."
+			return "The bite holds one fighter still for 2 seconds. For a short time they cannot move or attack, and they hold the hurt pose until it ends. A healing caster can clear it. If two fighters are in front, it bites the one who hits harder and does not hold them. Most blows miss the viper."
 		"storm":
-			return "Waits, then lightning hits the fighter in front and four others on any road, and holds each for 1 second."
+			return "Waits, then lightning hits the fighter in front and jumps to four others, one by one. For a short time they cannot move or attack, and they hold the hurt pose until it ends."
 		"herald":
 			return "Calls two other monsters every few seconds. Those calls pay no value when they fall."
 		"shell":
@@ -2212,10 +2252,11 @@ func _load_progress() -> void:
 		if _duel_is_open() and not duel_celebrated:
 			duel_celebrate = true
 	_normalize_progress()
+	_bind_early()
 	_refresh_auto()
 	var paid := _take_road_pay()
 	_apply_skins()
-	if paid or _navy_dirty or migrated or duel_mark:
+	if paid or _navy_dirty or migrated or duel_mark or (early_fresh and not _harness()):
 		_save_progress()
 
 
@@ -2258,6 +2299,7 @@ func _normalize_progress() -> void:
 
 
 func _save_progress() -> void:
+	_remember_early()
 	var cfg: ConfigFile = ConfigFile.new()
 	cfg.set_value("progress", "unlocked", unlocked)
 	cfg.set_value("progress", "cleared", cleared)
@@ -2303,7 +2345,7 @@ func _snapshot() -> Dictionary:
 		"diamond_paid": diamond_paid,
 		"code_paid": code_paid,
 		"story_version": story_version,
-		"story_seen": _pack_seen(story_seen),
+		"story_seen": _cloud_seen(),
 	}
 
 
@@ -2398,8 +2440,17 @@ func _merge_from_cloud(data: Dictionary) -> void:
 		unlocked = maxi(unlocked, clampi(_whole(data.get("unlocked", 1), 1), 1, Levels.count()))
 		cleared = maxi(cleared, clampi(_whole(data.get("cleared", 0), 0), 0, Levels.count()))
 	if cloud_version >= Story.VERSION:
-		for key in _unpack_seen(str(data.get("story_seen", ""))).keys():
-			story_seen[str(key)] = true
+		var cloud_seen: Dictionary = _unpack_seen(str(data.get("story_seen", "")))
+		var cloud_token := ""
+		for key in cloud_seen.keys():
+			var seen_id := str(key)
+			if seen_id.begins_with("nv:"):
+				cloud_token = seen_id
+			else:
+				story_seen[seen_id] = true
+		if cloud_token != "" and Early.apply_token(cloud_token):
+			_drop_nv()
+			story_seen[cloud_token] = true
 	diamond_paid = maxi(diamond_paid, clampi(_whole(data.get("diamond_paid", 1), 1), 1, Levels.count()))
 	story_version = Story.VERSION
 	var cloud_diamonds := clampi(_whole(data.get("diamonds", 0), 0), 0, 200000000)
@@ -2987,6 +3038,52 @@ func _pack_seen(bag: Dictionary) -> String:
 		if id != "":
 			parts.append(id)
 	return ",".join(parts)
+
+
+func _cloud_seen() -> String:
+	var full := _pack_seen(story_seen)
+	if full.length() <= 2000:
+		return full
+	var stripped: Dictionary = {}
+	for key in story_seen.keys():
+		var id := str(key)
+		if not id.begins_with("nv:"):
+			stripped[id] = true
+	return _pack_seen(stripped)
+
+
+func _drop_nv() -> void:
+	var drop: Array = []
+	for key in story_seen.keys():
+		var id := str(key)
+		if id.begins_with("nv:"):
+			drop.append(id)
+	for id in drop:
+		story_seen.erase(id)
+
+
+func _bind_early() -> void:
+	early_fresh = false
+	var found := ""
+	for key in story_seen.keys():
+		var id := str(key)
+		if id.begins_with("nv:"):
+			found = id
+			break
+	if found != "" and Early.apply_token(found):
+		return
+	Early.roll()
+	early_fresh = true
+
+
+func _remember_early() -> void:
+	if _harness():
+		return
+	Early.ensure()
+	_drop_nv()
+	var token := Early.token()
+	if token != "":
+		story_seen[token] = true
 
 
 func _unpack_seen(text: String) -> Dictionary:

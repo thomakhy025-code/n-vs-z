@@ -55,6 +55,20 @@ var dive_aim: Vector2 = Vector2.ZERO
 var dive_lane: int = 1
 var dive_prey = null
 var hang: float = 0.0
+var swing_wait: float = 0.0
+var swing_leg: int = 0
+var swing_u: float = 0.0
+var swing_a: Vector2 = Vector2.ZERO
+var swing_b: Vector2 = Vector2.ZERO
+var swing_c: Vector2 = Vector2.ZERO
+var storm_chain: Array = []
+var storm_pending = null
+var storm_from: Vector2 = Vector2.ZERO
+var storm_to: Vector2 = Vector2.ZERO
+var storm_hop: float = 1.0
+var storm_amount: float = 0.0
+var storm_reach: float = 330.0
+var cast_t: float = 0.0
 var call_left: float = 3.0
 var call_flash: float = 0.0
 var bolt_t: float = 0.0
@@ -114,6 +128,7 @@ func setup(field, entry: Dictionary, which_side: int) -> void:
 		perched = true
 		hang = 1.0
 		attack_timer = 0.35
+		swing_wait = 0.48
 	if role == "storm" or role == "fan":
 		attack_timer = float(entry["interval"])
 	if role == "herald":
@@ -230,6 +245,8 @@ func _report_down() -> void:
 
 func _process(delta: float) -> void:
 	flash = maxf(0.0, flash - delta)
+	heal_flash = maxf(0.0, heal_flash - delta)
+	cast_t = maxf(0.0, cast_t - delta)
 	lunge = maxf(0.0, lunge - delta * 3.2)
 	var cycle := Painter.cycle_time(str(data.get("paint", "")))
 	act = maxf(0.0, act - delta / cycle)
@@ -250,7 +267,7 @@ func _process(delta: float) -> void:
 		winding = false
 		act = 0.0
 		hurt = maxf(hurt, 0.45)
-	elif winding and not strike_sent:
+	elif winding and not strike_sent and numb <= 0.0:
 		var weapon := str(look.get("weapon", "katana"))
 		var clock := _act_clock()
 		if Painter.strike_due(weapon, int(clock.x), clock.y):
@@ -260,6 +277,9 @@ func _process(delta: float) -> void:
 		winding = false
 	if lunge <= 0.0:
 		show_strike = false
+	if battle != null and not battle.puppet and not battle.finished and not battle.paused:
+		if role == "storm" or storm_pending != null or not storm_chain.is_empty():
+			_tick_storm(delta)
 	if not alive:
 		fall_t += delta
 		modulate.a = maxf(0.0, 1.0 - fall_t * 1.65)
@@ -310,7 +330,9 @@ func _process(delta: float) -> void:
 		_fight(delta)
 	if role == "herald" and numb <= 0.0 and gust_lock <= 0.0:
 		_herald(delta)
-	if _spans_roads() and battle.lane_ys.size() > 0:
+	if diving:
+		z_index = 480
+	elif _spans_roads() and battle.lane_ys.size() > 0:
 		z_index = int(battle.lane_ys[battle.lane_ys.size() - 1]) + 24
 	else:
 		z_index = int(position.y)
@@ -365,6 +387,7 @@ func _support(delta: float) -> void:
 		if not drum_targets.is_empty() and attack_timer <= 0.0 and not winding:
 			attack_timer = float(data["interval"])
 			act = 1.0
+			cast_t = 0.55
 			winding = true
 			strike_sent = false
 			support_pulse = false
@@ -373,6 +396,7 @@ func _support(delta: float) -> void:
 		if role == "heal" and target != null and attack_timer <= 0.0 and not winding:
 			attack_timer = float(data["interval"])
 			act = 1.0
+			cast_t = 0.55
 			winding = true
 			strike_sent = false
 			support_pulse = true
@@ -382,6 +406,7 @@ func _support(delta: float) -> void:
 			if target != null and attack_timer <= 0.0 and not winding:
 				attack_timer = float(data["interval"])
 				act = 1.0
+				cast_t = 0.55
 				winding = true
 				strike_sent = false
 				support_pulse = false
@@ -487,54 +512,80 @@ func _herald(delta: float) -> void:
 
 
 func _howler(delta: float) -> void:
+	moving = false
 	if diving:
-		act = 0.55
-		dive_t += delta / 0.38
-		var glide := clampf(dive_t, 0.0, 1.0)
-		position = dive_from.lerp(dive_aim, glide)
-		hang = 1.0 - glide
-		lane = dive_lane
-		moving = false
-		if glide < 1.0:
-			return
-		diving = false
-		perched = false
-		hang = 0.0
+		_swing_step(delta)
+		return
+	if swing_wait > 0.0:
+		swing_wait -= delta
+		hang = 1.0
 		act = 0.0
-		var landed = dive_prey
-		dive_prey = null
-		if landed != null and is_instance_valid(landed) and landed.alive:
-			var swing := float(data.get("swing", data["damage"])) * damage_multiplier
-			landed.take_damage(swing, true, "howler", 70.0)
-			lunge = 1.0
-			Sfx.play("hit_blunt", randf_range(0.9, 1.02), -5.0)
-		attack_timer = float(data["interval"])
 		return
+	_start_swing()
+
+
+func _start_swing() -> void:
 	var prey = _closest_prey()
-	if prey != null:
-		var gap := _along(prey)
-		if gap > -8.0 and gap <= 900.0:
-			diving = true
-			dive_t = 0.0
-			dive_from = position
-			dive_lane = int(prey.lane)
-			dive_prey = prey
-			var land_x: float = float(prey.position.x) - facing * 28.0
-			land_x = clampf(land_x, battle.player_front + 10.0, battle.enemy_front - 10.0)
-			dive_aim = Vector2(land_x, battle.lane_y(dive_lane))
-			act = 1.0
-			return
-	var foe = _closest_ahead(true)
-	var gate = battle.gate_for_attacker(side)
-	var siege := minf(float(data["reach"]), 150.0)
-	var at_line: bool = foe != null and _along(foe) <= 90.0
-	var at_gate: bool = gate != null and abs(position.x - float(gate.front_x)) <= siege + 6.0
-	if at_line or at_gate:
-		perched = false
+	diving = true
+	swing_leg = 0
+	swing_u = 0.0
+	dive_t = 0.0
+	dive_from = position
+	dive_prey = prey
+	var land_x: float = float(battle.enemy_front) - 48.0
+	var land_lane := lane
+	if prey != null and is_instance_valid(prey) and prey.alive:
+		land_lane = int(prey.lane)
+		land_x = float(prey.position.x) - facing * 28.0
+		land_x = clampf(land_x, battle.player_front + 10.0, battle.enemy_front - 10.0)
+	dive_lane = land_lane
+	dive_aim = Vector2(land_x, battle.lane_y(land_lane))
+	swing_a = dive_from
+	swing_c = dive_aim
+	swing_b = Vector2((swing_a.x + swing_c.x) * 0.5, minf(swing_a.y, swing_c.y) - 150.0)
+	act = 0.7
+	hang = 1.0
+
+
+func _swing_step(delta: float) -> void:
+	swing_u += delta / 0.42
+	if swing_u >= 1.0 and swing_leg == 0:
+		swing_leg = 1
+		swing_u = 0.0
+		swing_a = swing_c
+		var land := dive_aim
+		if dive_prey != null and is_instance_valid(dive_prey) and dive_prey.alive and _is_prey(dive_prey):
+			var fresh_x: float = float(dive_prey.position.x) - facing * 28.0
+			fresh_x = clampf(fresh_x, battle.player_front + 10.0, battle.enemy_front - 10.0)
+			land = Vector2(fresh_x, battle.lane_y(int(dive_prey.lane)))
+			dive_aim = land
+			dive_lane = int(dive_prey.lane)
+		swing_c = land
+		swing_b = Vector2((swing_a.x + swing_c.x) * 0.5, minf(swing_a.y, swing_c.y) - 86.0)
+	var glide := clampf(swing_u, 0.0, 1.0)
+	var remain := 1.0 - glide
+	position = swing_a * remain * remain + swing_b * 2.0 * remain * glide + swing_c * glide * glide
+	if swing_leg == 0:
+		hang = 1.0
+	else:
+		hang = 1.0 - glide
+	lane = dive_lane
+	act = 0.55
+	moving = false
+	if swing_leg == 0 or glide < 1.0:
 		return
-	moving = true
-	position.x += facing * float(data["speed"]) * delta
-	_clamp_x()
+	diving = false
+	perched = false
+	hang = 0.0
+	act = 0.0
+	var landed = dive_prey
+	dive_prey = null
+	if landed != null and is_instance_valid(landed) and landed.alive and _is_prey(landed):
+		var swing := float(data.get("swing", data["damage"])) * damage_multiplier
+		landed.take_damage(swing, true, "howler", 70.0)
+		lunge = 1.0
+		Sfx.play("hit_blunt", randf_range(0.9, 1.02), -5.0)
+	attack_timer = float(data["interval"])
 
 
 func _try_strike(foe, gate) -> void:
@@ -566,10 +617,14 @@ func _resolve_strike() -> void:
 			if ally.has_method("clear_numb"):
 				ally.clear_numb()
 			heal_flash = 0.55
+			cast_t = 0.55
+			if "heal_flash" in ally:
+				ally.heal_flash = 0.55
 			battle.float_text(ally.position + Vector2(0, -46), "+%d" % int(round(healed)), Color("8ee0a2"))
 			Sfx.play("heal", randf_range(0.96, 1.05), -8.0)
 		return
 	if role == "buff" or role == "drum" or role == "aria":
+		cast_t = 0.55
 		return
 	var amount := float(data["damage"]) * damage_multiplier
 	if role == "fan":
@@ -1162,27 +1217,72 @@ func _strike_storm(amount: float, reach: float, foe, gate) -> void:
 			continue
 		pool.append(body)
 	pool.shuffle()
-	var hits: Array = []
+	storm_chain = []
 	if front != null:
-		hits.append(front)
+		storm_chain.append(front)
 	var extra := 4
 	if front == null:
 		extra = 5
 	var room := mini(extra, pool.size())
 	for pick_i in room:
-		hits.append(pool[pick_i])
+		storm_chain.append(pool[pick_i])
+	storm_amount = amount
+	storm_reach = reach
+	storm_pending = null
+	storm_hop = 1.0
+	storm_from = global_position
+	storm_to = storm_from
 	bolt_marks.clear()
-	for struck in hits:
-		var zapped = struck.take_damage(amount, true, "storm", reach)
+	bolt_t = 0.0
+	if front == null and gate != null and abs(position.x - gate.front_x) <= minf(reach, 150.0) + 6.0:
+		gate.take_damage(amount)
+
+
+func _tick_storm(delta: float) -> void:
+	if storm_pending != null:
+		storm_hop = minf(1.0, storm_hop + delta / 0.16)
+		if storm_hop < 1.0:
+			return
+		var landed = storm_pending
+		storm_pending = null
+		_land_storm(landed)
+	if storm_chain.is_empty():
+		return
+	_open_storm_hop()
+
+
+func _open_storm_hop() -> void:
+	while not storm_chain.is_empty():
+		var raw: Variant = storm_chain[0]
+		storm_chain.remove_at(0)
+		if not (raw is Node2D):
+			continue
+		var body = raw
+		if not is_instance_valid(body) or not body.alive:
+			continue
+		storm_pending = body
+		storm_to = body.global_position
+		storm_hop = 0.0
+		bolt_t = 0.55
+		return
+	storm_pending = null
+
+
+func _land_storm(target) -> void:
+	if target == null or not is_instance_valid(target):
+		return
+	var struck = target
+	if struck.alive:
+		var zapped = struck.take_damage(storm_amount, true, "storm", storm_reach)
 		if zapped == true and is_instance_valid(struck) and struck.alive:
 			if struck.has_method("apply_numb"):
 				struck.apply_numb(1.0)
 			if struck.has_method("show_bones"):
 				struck.show_bones()
-		bolt_marks.append(struck.global_position)
-	bolt_t = 0.55
-	if front == null and gate != null and abs(position.x - gate.front_x) <= minf(reach, 150.0) + 6.0:
-		gate.take_damage(amount)
+	bolt_marks.append(struck.global_position)
+	storm_from = struck.global_position
+	bolt_t = 0.48
+	Sfx.play("hit_magic", randf_range(1.02, 1.12), -12.0)
 
 
 func _support_target():
@@ -1235,6 +1335,9 @@ func _read_phase() -> void:
 	if not alive:
 		_phase_name = "fall"
 		_phase_t = clampf(fall_t / 0.6, 0.0, 1.0)
+	elif numb > 0.0:
+		_phase_name = "hurt"
+		_phase_t = 0.0
 	elif debut > 0.0 and act <= 0.0:
 		_phase_name = "debut"
 		_phase_t = 1.0 - clampf(debut / 0.46, 0.0, 1.0)
@@ -1354,7 +1457,9 @@ func _sync_bars() -> void:
 		bits |= 1024
 	if not alive:
 		bits |= 2048
-	var motion := bits & (1 | 2 | 4 | 8 | 64 | 128 | 256 | 512 | 1024)
+	if heal_flash > 0.02 or cast_t > 0.02:
+		bits |= 4096
+	var motion := bits & (1 | 2 | 4 | 8 | 64 | 128 | 256 | 512 | 1024 | 4096)
 	if hp_i == _bar_hp and max_i == _bar_max and level_stacks == _bar_stacks and bits == _bar_bits and motion == 0:
 		return
 	_bar_hp = hp_i
@@ -1445,31 +1550,31 @@ func draw_bars(ci: Node2D) -> void:
 			ci.draw_line(Vector2(0, -12), Vector2(facing * reach, local_y), Color(1, 0.72, 0.28, alpha * 0.9), 5.0)
 	if show_strike and lunge > 0.05:
 		ci.draw_line(Vector2(0, -16), ci.to_local(strike_to), Color(1, 0.86, 0.45, clampf(lunge, 0.0, 1.0)), 4.0)
-	if bolt_t > 0.0:
-		var glow := clampf(bolt_t / 0.55, 0.0, 1.0)
-		var bolt_i := 0
-		for bolt_at in bolt_marks:
-			var tip: Vector2 = ci.to_local(bolt_at)
-			var mid: Vector2 = tip * 0.5 + Vector2(sin(tip.y * 0.07 + float(bolt_i)) * 18.0, -22.0)
-			ci.draw_line(Vector2(0, -30), mid, Color(0.75, 0.92, 1.0, glow), 4.0)
-			ci.draw_line(mid, tip, Color(1.0, 0.98, 0.86, glow), 2.2)
-			bolt_i += 1
+	_draw_bolt(ci)
+	_draw_heal_glow(ci)
+	_draw_cast_fx(ci)
 	if bone_t > 0.0 or numb > 0.0:
 		Painter.paint_ailment(ci, bone_t, numb, bob_time)
 	if role == "drum" or role == "aria":
+		var note_ink := Color("f4efe4")
+		if role == "aria":
+			note_ink = Color("d7c4ff")
 		for note_i in 3:
 			var nx := sin(bob_time * 3.0 + float(note_i)) * 8.0 + float(note_i) * 9.0
 			var ny := -52.0 - float(note_i) * 7.0 + sin(bob_time * 5.0 + float(note_i)) * 3.0
-			ci.draw_circle(Vector2(nx, ny), 3.0, Color("f4efe4"))
-			ci.draw_line(Vector2(nx + 2.6, ny), Vector2(nx + 2.6, ny - 11.0), Color("f4efe4"), 1.3)
-	if role == "drum":
+			ci.draw_circle(Vector2(nx, ny), 3.0, note_ink)
+			ci.draw_line(Vector2(nx + 2.6, ny), Vector2(nx + 2.6, ny - 11.0), note_ink, 1.3)
+	if role == "drum" or role == "aria":
+		var link_ink := Color("e6c36a")
+		if role == "aria":
+			link_ink = Color("d7c4ff")
 		for marked in drum_targets:
 			if marked != null and is_instance_valid(marked) and marked.alive:
-				ci.draw_line(Vector2(0, -20), ci.to_local(marked.global_position), Color(0.9, 0.76, 0.42, 0.85), 2.0)
+				_draw_link(ci, ci.to_local(marked.global_position), link_ink)
 	elif support_target != null and is_instance_valid(support_target) and support_target.alive:
 		var to: Vector2 = ci.to_local(support_target.global_position)
 		var line := Color("8ee0a2") if role == "heal" else Color("e6c36a")
-		ci.draw_line(Vector2(0, -20), to, Color(line.r, line.g, line.b, 0.85), 2.0)
+		_draw_link(ci, to, line)
 	if role == "fan" and lunge > 0.08:
 		var gust := clampf(lunge, 0.0, 1.0)
 		var gust_len := 180.0
@@ -1478,6 +1583,66 @@ func draw_bars(ci: Node2D) -> void:
 		for gust_i in 4:
 			var gy := -30.0 + float(gust_i) * 12.0
 			ci.draw_line(Vector2(0, gy), Vector2(facing * gust_len, gy - 4.0), Color(0.75, 0.9, 0.86, gust * 0.75), 2.0)
+
+
+func _draw_bolt(ci: Node2D) -> void:
+	if bolt_t <= 0.0 and storm_pending == null:
+		return
+	var glow := clampf(bolt_t / 0.48, 0.2, 1.0)
+	var trail := Vector2.ZERO
+	var started := false
+	for mark in bolt_marks:
+		var at: Vector2 = ci.to_local(mark)
+		if started:
+			ci.draw_line(trail, at, Color(0.55, 0.78, 1.0, glow * 0.4), 2.0)
+		trail = at
+		started = true
+		ci.draw_circle(at, 3.6, Color(0.9, 0.97, 1.0, glow * 0.65))
+	if storm_pending == null:
+		return
+	var tip_g := storm_from.lerp(storm_to, clampf(storm_hop, 0.0, 1.0))
+	var origin: Vector2 = ci.to_local(storm_from)
+	var tip: Vector2 = ci.to_local(tip_g)
+	var mid1 := origin.lerp(tip, 0.34) + Vector2(sin(tip.y * 0.08 + bob_time * 18.0) * 14.0, -16.0)
+	var mid2 := origin.lerp(tip, 0.67) + Vector2(cos(tip.x * 0.05 + bob_time * 14.0) * 12.0, 10.0)
+	ci.draw_line(origin, mid1, Color(0.62, 0.86, 1.0, glow), 4.0)
+	ci.draw_line(mid1, mid2, Color(0.86, 0.95, 1.0, glow), 3.2)
+	ci.draw_line(mid2, tip, Color(1.0, 0.96, 0.72, glow), 2.4)
+	ci.draw_circle(tip, 5.5, Color(1.0, 0.98, 0.86, glow))
+
+
+func _draw_heal_glow(ci: Node2D) -> void:
+	if heal_flash <= 0.02:
+		return
+	var glow := clampf(heal_flash / 0.55, 0.0, 1.0)
+	var lift := (1.0 - glow) * 16.0
+	var at := Vector2(0.0, -42.0 - lift)
+	ci.draw_arc(at, 12.0, 0.0, TAU, 16, Color(0.56, 0.92, 0.68, glow), 2.2)
+	ci.draw_line(at + Vector2(-7, 0), at + Vector2(7, 0), Color(0.85, 1.0, 0.9, glow), 2.4)
+	ci.draw_line(at + Vector2(0, -7), at + Vector2(0, 7), Color(0.85, 1.0, 0.9, glow), 2.4)
+
+
+func _draw_cast_fx(ci: Node2D) -> void:
+	if cast_t <= 0.02 or role == "storm":
+		return
+	var fade := clampf(cast_t / 0.55, 0.0, 1.0)
+	var tint := Color("e6c36a")
+	if role == "heal":
+		tint = Color("8ee0a2")
+	elif role == "aria":
+		tint = Color("d7c4ff")
+	elif role == "drum":
+		tint = Color("f0d78a")
+	var spin := bob_time * 4.0
+	ci.draw_arc(Vector2(0, -28), 16.0 + (1.0 - fade) * 10.0, spin, spin + 4.2, 12, Color(tint.r, tint.g, tint.b, fade), 2.4)
+
+
+func _draw_link(ci: Node2D, to: Vector2, ink: Color) -> void:
+	var from := Vector2(0, -20)
+	ci.draw_line(from, to, Color(ink.r, ink.g, ink.b, 0.72), 2.0)
+	for mote_i in 3:
+		var u := fposmod(bob_time * 0.55 + float(mote_i) * 0.33, 1.0)
+		ci.draw_circle(from.lerp(to, u), 2.6, Color(ink.r, ink.g, ink.b, 0.9))
 
 
 class BodyShell extends Node2D:

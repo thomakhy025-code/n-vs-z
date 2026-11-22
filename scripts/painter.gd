@@ -567,7 +567,7 @@ static func _part_mark(ci: CanvasItem, at: Vector2, paint: String, trim: Color, 
 			pass
 
 
-static func _part_cloth(ci: CanvasItem, chest: Vector2, cloth: Color, trim: Color, bare: bool, paint: String) -> void:
+static func _part_cloth(ci: CanvasItem, chest: Vector2, cloth: Color, trim: Color, bare: bool, _paint: String) -> void:
 	var wide := 9.4 if bare else 7.6
 	_poly(ci, PackedVector2Array([
 		chest + Vector2(-wide - 1.4, -5.0),
@@ -588,50 +588,12 @@ static func _part_cloth(ci: CanvasItem, chest: Vector2, cloth: Color, trim: Colo
 		chest + Vector2(wide + 0.2, 7.4),
 		chest + Vector2(2.6, 11.0),
 	]), cloth.lightened(0.12))
-	_line(ci, chest + Vector2(-wide + 2.0, -4.0), chest + Vector2(wide - 1.0, 6.0), trim, 1.7)
-	_line(ci, chest + Vector2(-wide + 1.0, -6.2), chest + Vector2(wide - 1.4, -4.8), trim, 1.8)
-	_line(ci, chest + Vector2(-wide + 1.6, 11.2), chest + Vector2(2.2, 13.2), trim, 2.1)
-	_box(ci, Rect2(chest.x - wide + 1.2, chest.y + 4.8, wide + 3.4, 3.8), trim.darkened(0.18))
-	_line(ci, chest + Vector2(-wide + 2.4, 5.4), chest + Vector2(2.8, 5.4), trim.lightened(0.22), 1.1)
-	_poly(ci, PackedVector2Array([
-		chest + Vector2(1.0, 4.6),
-		chest + Vector2(3.2, 6.6),
-		chest + Vector2(1.0, 8.6),
-		chest + Vector2(-1.2, 6.6),
-	]), trim.lightened(0.2))
-	_poly(ci, PackedVector2Array([
-		chest + Vector2(wide - 2.4, -6.4),
-		chest + Vector2(wide + 1.6, -3.2),
-		chest + Vector2(wide - 0.6, 1.2),
-		chest + Vector2(wide - 4.2, -1.0),
-	]), trim)
-	if bare:
-		_ellipse(ci, chest + Vector2(6.4, -5.2), 4.2, 2.6, trim)
-		_ellipse(ci, chest + Vector2(6.2, -5.4), 2.4, 1.3, trim.lightened(0.22))
-	if paint == "heal":
-		_poly(ci, PackedVector2Array([
-			chest + Vector2(2.0, 1.0),
-			chest + Vector2(3.2, 2.4),
-			chest + Vector2(2.0, 3.8),
-			chest + Vector2(0.8, 2.4),
-		]), trim)
+	_ellipse(ci, chest + Vector2(1.0, 1.4), 4.6, 6.0, trim.darkened(0.06))
+	_ellipse(ci, chest + Vector2(0.0, -0.2), 2.0, 2.2, trim.lightened(0.26))
 
 
-static func _part_leg(ci: CanvasItem, hip: Vector2, foot: Vector2, pants: Color, trim: Color, wraps: int) -> void:
-	var knee := (hip + foot) * 0.5 + Vector2(-2.2, -1.4)
-	var bend := clampf(hip.distance_to(foot), 8.0, 24.0)
-	knee.y -= maxf(0.0, 16.0 - bend)
-	var ankle := foot + Vector2(0.4, -3.2)
-	_line(ci, hip, knee, pants.darkened(0.12), 4.4)
-	_ellipse(ci, knee, 2.3, 2.0, pants.lightened(0.06))
-	_line(ci, knee, ankle, pants, 3.6)
-	_line(ci, hip + Vector2(0.8, 0.4), knee + Vector2(0.6, 0.0), pants.lightened(0.16), 1.2)
-	_ellipse(ci, foot + Vector2(1.6, -1.4), 4.8, 2.8, Color("2a241c"))
-	_ellipse(ci, foot + Vector2(2.4, 0.6), 5.4, 1.7, Color("12100e"))
-	_ellipse(ci, foot + Vector2(3.2, -1.6), 1.6, 1.0, Color("3a342c"))
-	for i in wraps:
-		var band := ankle + Vector2(0.0, -1.2 - float(i) * 2.4)
-		_line(ci, band + Vector2(-2.2, 0.2), band + Vector2(2.6, -0.2), trim, 1.8)
+static func _part_leg(ci: CanvasItem, hip: Vector2, foot: Vector2, pants: Color, _trim: Color, _wraps: int) -> void:
+	_oval_leg(ci, hip, foot, pants)
 
 
 static func _part_arm(ci: CanvasItem, shoulder: Vector2, hand: Vector2, sleeve: Color, glove: Color, trim: Color, bare: bool) -> void:
@@ -1244,10 +1206,16 @@ static func paint_local(ci: CanvasItem, look: Dictionary, pose: Dictionary) -> v
 		return
 	_back(ci, chest, faction, weapon, cloth, trim, bool(look.get("pack", true)), snap)
 	if not mount:
-		_leg(ci, chest + Vector2(-3.5, 12.0), Vector2(-5.0 - step * 11.0, ground), cloth.darkened(0.34), 3.2)
+		if faction == "ninja":
+			_oval_leg(ci, chest + Vector2(-3.5, 11.0), Vector2(-5.0 - step * 11.0, ground), cloth.darkened(0.28))
+		else:
+			_leg(ci, chest + Vector2(-3.5, 12.0), Vector2(-5.0 - step * 11.0, ground), cloth.darkened(0.34), 3.2)
 	_torso(ci, chest, cloth, trim, faction)
 	if not mount:
-		_leg(ci, chest + Vector2(3.0, 12.0), Vector2(6.0 + step * 12.0, ground), cloth.darkened(0.08), 3.5)
+		if faction == "ninja":
+			_oval_leg(ci, chest + Vector2(3.0, 11.0), Vector2(6.0 + step * 12.0, ground), cloth.darkened(0.08))
+		else:
+			_leg(ci, chest + Vector2(3.0, 12.0), Vector2(6.0 + step * 12.0, ground), cloth.darkened(0.08), 3.5)
 	_head(ci, chest + Vector2(1.6, -16.0), skin, cloth, trim, faction, weapon, phase, str(look.get("helm", "")))
 	if bool(look.get("horns", false)):
 		_horns(ci, chest + Vector2(1.6, -24.0), trim)
@@ -2040,6 +2008,19 @@ static func _back(ci: CanvasItem, chest: Vector2, faction: String, weapon: Strin
 			_box(ci, Rect2(chest.x - 16.0, chest.y - 2.0, 10.0, 14.0), cloth.darkened(0.35))
 			_line(ci, chest + Vector2(-14.0, -2.0), chest + Vector2(-6.0, -8.0), cloth.darkened(0.2), 2.0)
 		return
+	if faction == "ninja":
+		var hem_n := chest + Vector2(-8.0, 10.0)
+		if snap > 10.0:
+			hem_n = chest + Vector2(6.0, 6.0)
+		_poly(ci, PackedVector2Array([
+			chest + Vector2(-2.0, -4.0),
+			chest + Vector2(2.0, -2.0),
+			hem_n,
+		]), trim.darkened(0.2))
+		if weapon == "bow":
+			_box(ci, Rect2(chest.x - 13.0, chest.y - 4.0, 7.0, 13.0), cloth.lightened(0.08))
+			_line(ci, chest + Vector2(-11.0, -6.0), chest + Vector2(-9.0, -1.0), trim, 1.3)
+		return
 	var hem := chest + Vector2(-18.0, 24.0)
 	if snap > 10.0:
 		hem = chest + Vector2(8.0 + snap * 0.42, 8.0)
@@ -2070,6 +2051,10 @@ static func _torso(ci: CanvasItem, chest: Vector2, cloth: Color, trim: Color, fa
 	if faction == "soldier":
 		front = trim.darkened(0.05)
 	_ellipse(ci, chest + Vector2(6.4, -1.4), 5.0, 8.4, front)
+	if faction == "ninja":
+		_ellipse(ci, chest + Vector2(1.2, 2.2), 4.8, 6.4, trim.darkened(0.08))
+		_ellipse(ci, chest + Vector2(0.2, 0.6), 2.2, 2.4, trim.lightened(0.28))
+		return
 	_line(ci, chest + Vector2(-2.0, -7.0), chest + Vector2(7.0, 9.0), trim, 1.6)
 
 
@@ -2273,6 +2258,9 @@ static func _staff(ci: CanvasItem, beat: int, t: float, front: Vector2, tip: Vec
 		_dot(ci, fly, 2.2, Color(1, 1, 1, 0.85))
 	elif beat >= 3:
 		_arc(ci, tip + Vector2(10.0, 2.0), 3.2, 0.0, TAU, 12, Color(trim.r, trim.g, trim.b, 0.45), 1.4)
+	var spin := t * TAU + float(beat)
+	_dot(ci, tip + Vector2(cos(spin) * 8.0, sin(spin) * 5.0), 1.6, trim.lightened(0.35))
+	_dot(ci, tip + Vector2(cos(spin + 2.1) * 6.0, sin(spin + 2.1) * 4.0), 1.3, Color(1, 1, 1, 0.7))
 
 
 static func _scroll(ci: CanvasItem, beat: int, rear: Vector2, front: Vector2, trim: Color, cloth: Color) -> void:
@@ -2286,6 +2274,9 @@ static func _scroll(ci: CanvasItem, beat: int, rear: Vector2, front: Vector2, tr
 	_line(ci, Vector2(left + 3.0, mid.y - 2.0), Vector2(left + span - 3.0, mid.y - 2.0), cloth.darkened(0.35), 1.2)
 	if beat == 2:
 		_dot(ci, mid + Vector2(0.0, -12.0), 2.6, Color("f2d38a"))
+	if beat >= 1:
+		_arc(ci, mid + Vector2(0.0, -10.0), 5.0 + float(beat), 0.4, 2.4, 8, Color(trim.r, trim.g, trim.b, 0.55), 1.4)
+		_dot(ci, mid + Vector2(6.0, -14.0), 1.5, Color("fff6d0"))
 
 
 static func _blade_to(ci: CanvasItem, hand: Vector2, tip: Vector2, color: Color, phase: String, beat: int, width: float) -> void:
@@ -2349,6 +2340,21 @@ static func _horse(ci: CanvasItem, cloth: Color, trim: Color, step: float, drop:
 		_leg(ci, base + Vector2(hx, 12), Vector2(hx + gait * 7.0, 22), body.darkened(0.15), 2.6)
 	_ellipse(ci, base + Vector2(2, 4), 6.5, 3.2, cloth)
 	_line(ci, base + Vector2(18, -2), base + Vector2(28, -8), trim, 2.2)
+
+
+static func _oval_leg(ci: CanvasItem, hip: Vector2, foot: Vector2, color: Color) -> void:
+	var delta := foot - hip
+	var length := maxf(delta.length(), 8.0)
+	var angle := delta.angle()
+	var mid := (hip + foot) * 0.5
+	var pts := PackedVector2Array()
+	var segs := 12
+	for i in segs:
+		var a := TAU * float(i) / float(segs)
+		var local := Vector2(cos(a) * length * 0.5, sin(a) * 3.4).rotated(angle)
+		pts.append(mid + local)
+	_poly(ci, pts, color)
+	_ellipse(ci, foot + Vector2(1.4, 0.4), 4.2, 1.8, Color(0.08, 0.06, 0.05))
 
 
 static func _leg(ci: CanvasItem, hip: Vector2, foot: Vector2, color: Color, width: float) -> void:
@@ -2572,8 +2578,9 @@ static func _beast_storm(ci: CanvasItem, phase: String, chop: float, clock: floa
 	_ellipse(ci, Vector2(0, -16), 6.5, 6.2, Color("d5e6f4"))
 	_dot(ci, Vector2(-2.2, -16), 1.35, Color("e6c36a"))
 	_dot(ci, Vector2(2.4, -16), 1.35, Color("e6c36a"))
-	_ellipse(ci, Vector2(-9, -12), 7, 4.2, cloud)
-	_ellipse(ci, Vector2(8, -13), 8, 4.6, cloud)
+	var puff := Vector2(sin(clock * 3.0) * 4.0, cos(clock * 2.4) * 2.0)
+	_ellipse(ci, Vector2(-9, -12) + puff, 7, 4.2, cloud)
+	_ellipse(ci, Vector2(8, -13) - puff * 0.6, 8, 4.6, cloud)
 	var tip := Vector2(4, -32)
 	if phase == "act":
 		var lift := clampf(chop + 0.45, 0.0, 1.0)
@@ -2582,7 +2589,9 @@ static func _beast_storm(ci: CanvasItem, phase: String, chop: float, clock: floa
 	_dot(ci, tip, 2.6, bolt)
 	var flick := sin(clock * 24.0) * 3.0
 	_line(ci, tip, tip + Vector2(6.0 + flick, 7.0), bolt, 2.2)
+	_line(ci, tip + Vector2(-2.0, 2.0), tip + Vector2(-8.0 + flick * 0.3, 9.0), Color(0.75, 0.9, 1.0, 0.85), 1.6)
 	_line(ci, tip + Vector2(5.0, 5.0), tip + Vector2(12.0, 13.0), Color("fff6c8"), 1.7)
+	_dot(ci, tip + Vector2(sin(clock * 8.0) * 7.0, 6.0), 1.5, Color(1, 1, 1, 0.75))
 	if phase == "act" and chop > 0.3:
 		_line(ci, tip + Vector2(8, 8), tip + Vector2(4, 16), bolt, 1.8)
 
