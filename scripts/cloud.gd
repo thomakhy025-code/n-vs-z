@@ -33,7 +33,7 @@ var _wait: float = 0.0
 const BOOT := """
 (function(){
   if (window.__acct) return;
-  window.__acct = {status:'boot', uid:'', name:'', email:'', error:'', saveJson:'', profileJson:'', boardJson:'', gen:0, started:false, want:false, cfg:null, auth:null, db:null, pendingToken:''};
+  window.__acct = {status:'boot', uid:'', name:'', email:'', error:'', saveJson:'', profileJson:'', boardJson:'', gen:0, started:false, want:false, cfg:null, auth:null, db:null, pendingToken:'', wantBoard:false, wantSignIn:false, boardTimer:0, boardBusy:false};
   function keepLetters(raw) {
     var out = '';
     var text = String(raw || '');
@@ -166,6 +166,12 @@ const BOOT := """
           a.uid = '';
           a.name = '';
           a.email = '';
+          if (a.error === 'Still connecting. Try again in a moment.') a.error = '';
+        }
+        if (a.wantBoard) fetchBoard(a);
+        if (a.wantSignIn) {
+          if (user) a.wantSignIn = false;
+          else window.nvAcctSignIn();
         }
       });
     } catch (e) {
@@ -195,9 +201,10 @@ const BOOT := """
   window.nvAcctSignIn = function() {
     var a = window.__acct;
     if (!a.auth) {
-      a.error = 'Still connecting. Try again in a moment.';
+      a.wantSignIn = true;
       return;
     }
+    a.wantSignIn = false;
     var provider = new firebase.auth.GoogleAuthProvider();
     provider.setCustomParameters({prompt: 'select_account'});
     a.auth.signInWithPopup(provider).catch(function(err) {
@@ -276,13 +283,30 @@ const BOOT := """
     });
     return '1';
   };
-  window.nvAcctLoadBoard = function() {
-    var a = window.__acct;
-    if (!a.db) {
-      a.error = 'Still connecting. Try again in a moment.';
-      return;
+  function clearBoardNote(a) {
+    if (a.error === 'Could not load the ranking.' || a.error === 'Sign in with Google to see the ranking.' || a.error === 'Could not reach Google.' || a.error === 'Still connecting. Try again in a moment.') {
+      a.error = '';
     }
+  }
+  function fetchBoard(a) {
+    if (!a.db || a.boardBusy) return;
+    a.wantBoard = false;
+    a.boardBusy = true;
+    if (a.boardTimer) {
+      clearTimeout(a.boardTimer);
+      a.boardTimer = 0;
+    }
+    a.boardGen = (a.boardGen || 0) + 1;
+    var gen = a.boardGen;
+    var timer = setTimeout(function() {
+      if (a.boardGen !== gen || !a.boardBusy) return;
+      a.boardBusy = false;
+      a.error = 'Could not load the ranking.';
+    }, 20000);
     a.db.collection('profiles').get().then(function(snap) {
+      if (a.boardGen !== gen) return;
+      clearTimeout(timer);
+      a.boardBusy = false;
       var rows = [];
       snap.forEach(function(doc) {
         var d = doc.data() || {};
@@ -298,11 +322,38 @@ const BOOT := """
           best_rank: Math.min(100000, whole(d.best_rank))
         });
       });
+      clearBoardNote(a);
       a.boardJson = JSON.stringify(rows);
       a.gen += 1;
-    }).catch(function() {
-      a.error = 'Could not load the ranking.';
+    }).catch(function(err) {
+      if (a.boardGen !== gen) return;
+      clearTimeout(timer);
+      a.boardBusy = false;
+      var code = err && err.code ? String(err.code) : '';
+      if (code === 'permission-denied' && (!a.auth || !a.auth.currentUser)) {
+        a.wantBoard = true;
+        a.error = 'Sign in with Google to see the ranking.';
+      } else {
+        a.error = 'Could not load the ranking.';
+      }
     });
+  }
+  window.nvAcctLoadBoard = function() {
+    var a = window.__acct;
+    a.wantBoard = true;
+    if (!a.db || (a.status !== 'guest' && a.status !== 'signed')) {
+      if (a.status === 'error' && !a.db) return;
+      if (!a.boardTimer) {
+        a.boardTimer = setTimeout(function() {
+          a.boardTimer = 0;
+          if (!a.wantBoard || a.boardBusy || a.error) return;
+          if (!a.db) a.error = 'Could not reach Google.';
+          else a.error = 'Google sign-in is not ready.';
+        }, 20000);
+      }
+      return;
+    }
+    fetchBoard(a);
   };
 })();
 """

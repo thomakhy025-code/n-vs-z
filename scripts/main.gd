@@ -2548,8 +2548,11 @@ func _on_account() -> void:
 			_show_menu()
 			return
 	if screen == "rank":
-		rank_wait = false
-		_paint_rank(false)
+		if _board_problem() != "":
+			rank_wait = false
+			_paint_rank(false)
+		elif not rank_wait:
+			_paint_rank(false)
 		return
 	if screen == "menu" or screen == "name" or screen == "opening":
 		_show_menu()
@@ -2760,9 +2763,24 @@ func _clean_name(raw: String) -> String:
 	return clean
 
 
+func _board_problem() -> String:
+	var err: String = Cloud.last_error
+	if err == "Could not load the ranking.":
+		return err
+	if err == "Could not reach Google.":
+		return err
+	if err == "Google sign-in is not ready.":
+		return err
+	if err == "Could not read the ranking.":
+		return err
+	if err == "Sign in with Google to see the ranking.":
+		return err
+	return ""
+
+
 func _show_rank() -> void:
-	rank_wait = true
 	profile_own = false
+	rank_wait = _board_problem() == ""
 	_paint_rank(true)
 
 
@@ -2777,10 +2795,11 @@ func _paint_rank(fetch: bool) -> void:
 	var list := _page_list(box)
 	if rank_rows.is_empty():
 		var message := "No names yet."
-		if rank_wait or fetch:
+		var problem: String = _board_problem()
+		if problem != "":
+			message = problem
+		elif rank_wait or fetch:
 			message = "Loading the ranking."
-		elif Cloud.last_error != "":
-			message = Cloud.last_error
 		var empty := UiSkin.label(message, 18, Color("1c140e"))
 		empty.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		empty.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
