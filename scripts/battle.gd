@@ -3,6 +3,7 @@ extends Node2D
 const Catalog = preload("res://scripts/unit_catalog.gd")
 const SmokeVeil = preload("res://scripts/smoke_veil.gd")
 const Painter = preload("res://scripts/painter.gd")
+const FrameBake = preload("res://scripts/frame_bake.gd")
 const SceneryScript = preload("res://scripts/scenery.gd")
 const GateScript = preload("res://scripts/gate.gd")
 const UnitScript = preload("res://scripts/battle_unit.gd")
@@ -2048,6 +2049,7 @@ func _bind_duel_signals() -> void:
 
 
 func _exit_tree() -> void:
+	FrameBake.clear()
 	if Net.input_got.is_connected(_on_hand):
 		Net.input_got.disconnect(_on_hand)
 	if Net.buy_got.is_connected(_on_net_buy):

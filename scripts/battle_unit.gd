@@ -2,6 +2,7 @@ extends Node2D
 
 const Buff = preload("res://scripts/level_buff.gd")
 const Painter = preload("res://scripts/painter.gd")
+const FrameBake = preload("res://scripts/frame_bake.gd")
 
 const BERSERK_TOP := -22.0
 const BERSERK_BOTTOM := 20.0
@@ -82,17 +83,26 @@ var sit_left: float = 0.0
 var rounds: int = 4
 var loading: float = 0.0
 var smoke_tick: float = 0.15
-var _pose_nudge: float = 0.0
 var _phase_name: String = "idle"
 var _phase_t: float = 0.0
 var _phase_beat: int = 0
-var _shown_phase: String = ""
-var _shown_frame: int = -1
-var _shown_face: int = 0
-var _shown_flash: int = -1
-var _shown_hang: int = -1
-var _shown_scale: int = -1
-var _body_shell: Node2D = null
+var _body_sprite: Sprite2D = null
+var _flash_mat: ShaderMaterial = null
+var _sheet_tex: Texture2D = null
+var _bound_key: String = ""
+var _shown_slot: int = -1
+var _shown_wash: float = -1.0
+var _bake_key: String = ""
+var _key_skin: int = -1
+var _key_cloth: int = -1
+var _key_trim: int = -1
+var _key_eye: int = -1
+var _key_bits: int = -99999
+var _key_flags: int = -1
+var _key_weapon: String = ""
+var _key_paint: String = ""
+var _key_faction: String = ""
+var _key_helm: String = ""
 var _bar_shell: Node2D = null
 var _bar_hp: int = -99999
 var _bar_max: int = -99999
@@ -146,12 +156,18 @@ func setup(field, entry: Dictionary, which_side: int) -> void:
 	if role == "buck":
 		rounds = 4
 	bob_time = randf() * TAU
-	_pose_nudge = fposmod(bob_time, 0.1)
-	var body := BodyShell.new()
-	body.host = self
+	var body := Sprite2D.new()
+	body.centered = false
+	body.offset = FrameBake.offset()
+	body.region_enabled = true
+	body.region_filter_clip_enabled = true
+	body.region_rect = FrameBake.region(0)
+	body.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	body.z_index = 0
+	_flash_mat = FrameBake.flash_material()
+	body.material = _flash_mat
 	add_child(body)
-	_body_shell = body
+	_body_sprite = body
 	var bars := BarShell.new()
 	bars.host = self
 	bars.z_index = 1
@@ -1353,23 +1369,6 @@ func _read_phase() -> void:
 		_phase_name = "march"
 
 
-func _pose() -> Dictionary:
-	_read_phase()
-	return {
-		"phase": _phase_name,
-		"t": _phase_t,
-		"clock": bob_time,
-		"flash": flash,
-		"beat": _phase_beat,
-		"hang": hang,
-		"calling": call_flash > 0.0,
-		"roost": roost,
-		"spears": throws_left,
-		"loading": loading,
-		"sit": sit_left,
-	}
-
-
 func _road_span() -> float:
 	if battle == null or battle.lane_ys.size() < 2:
 		return 0.0
@@ -1392,34 +1391,148 @@ func _body_shift(sc: float) -> float:
 	return -0.5 * (BERSERK_TOP + BERSERK_BOTTOM) * sc
 
 
-# The body is a child picture. Blood, support lines, and bolts redraw without rebuilding it.
+# The body is a shared baked frame. Blood, support lines, and bolts redraw without it.
 func _keep_picture() -> void:
 	_sync_body()
 	_sync_bars()
 
 
 func _sync_body() -> void:
-	if _body_shell == null:
+	if _body_sprite == null:
 		return
-	_read_phase()
-	var frame := _held_frame(_phase_name, _phase_t, _phase_beat, bob_time)
-	var face := 1
+	FrameBake.warm_ring(self)
+	var slot := _baked_slot()
+	var key := _current_key()
+	if key != _bound_key:
+		_sheet_tex = null
+		_body_sprite.texture = null
+		_bound_key = ""
+		_shown_slot = -1
+	if _sheet_tex == null:
+		var bits := _extra_bits()
+		var tex := FrameBake.request(self, key, look, bits)
+		if tex != null:
+			_sheet_tex = tex
+			_bound_key = key
+			_body_sprite.texture = tex
+			_shown_slot = -1
+	if _sheet_tex != null and slot != _shown_slot:
+		_shown_slot = slot
+		_body_sprite.region_rect = FrameBake.region(slot)
+	_place_sprite()
+	_tint_sprite()
+
+
+func _place_sprite() -> void:
+	var sc := _body_scale()
+	var bob := 0.0
+	if moving and alive and debut <= 0.0:
+		bob = sin(bob_time * 8.0) * 1.5
+	var lift := -58.0 * hang
+	if role == "moth":
+		lift -= 46.0
+	var shift := _body_shift(sc)
+	var pos := Vector2(0.0, bob + shift + lift)
+	if _body_sprite.position != pos:
+		_body_sprite.position = pos
+	var face := sc
 	if facing < 0.0:
-		face = -1
-	var flash_on := 0
+		face = -sc
+	var scl := Vector2(face, sc)
+	if _body_sprite.scale != scl:
+		_body_sprite.scale = scl
+
+
+func _tint_sprite() -> void:
+	var tint := Color(1.0, 1.0, 1.0, 1.0)
+	if hurt > 0.0 or numb > 0.0:
+		tint = Color(1.0, 0.58, 0.54, 1.0)
+	if _body_sprite.modulate != tint:
+		_body_sprite.modulate = tint
+	var wash := 0.0
 	if flash > 0.04:
-		flash_on = 1
-	var hang_i := int(clampf(hang, 0.0, 1.0) * 4.0)
-	var sc := int(round(_body_scale() * 20.0))
-	if _phase_name == _shown_phase and frame == _shown_frame and face == _shown_face and flash_on == _shown_flash and hang_i == _shown_hang and sc == _shown_scale:
-		return
-	_shown_phase = _phase_name
-	_shown_frame = frame
-	_shown_face = face
-	_shown_flash = flash_on
-	_shown_hang = hang_i
-	_shown_scale = sc
-	_body_shell.queue_redraw()
+		wash = clampf(flash * 4.0, 0.0, 0.72)
+	if _flash_mat != null and absf(wash - _shown_wash) > 0.03:
+		_shown_wash = wash
+		_flash_mat.set_shader_parameter("wash", wash)
+
+
+func _baked_slot() -> int:
+	_read_phase()
+	if _phase_name == "act":
+		return 4 + clampi(_phase_beat, 0, 3)
+	if _phase_name == "march":
+		var rate := 8.0
+		var paint := str(data.get("paint", ""))
+		if paint == "runner" or paint == "scout":
+			rate = 11.0
+		var stride := fposmod(bob_time * rate, TAU) / TAU
+		return clampi(int(stride * 4.0), 0, 3)
+	return 0
+
+
+func _extra_bits() -> int:
+	var bits := 0
+	if hang > 0.45:
+		bits |= 1
+	if roost > 0.05:
+		bits |= 2
+	bits |= mini(maxi(throws_left, 0), 3) << 3
+	if sit_left > 0.05:
+		bits |= 32
+	if loading > 0.05:
+		bits |= 64
+	if call_flash > 0.05:
+		bits |= 128
+	return bits
+
+
+func _look_flags() -> int:
+	var flags := 0
+	if bool(look.get("mount", false)):
+		flags |= 1
+	if bool(look.get("sheet", false)):
+		flags |= 2
+	if bool(look.get("horns", false)):
+		flags |= 4
+	if bool(look.get("sash", false)):
+		flags |= 8
+	if bool(look.get("pack", true)):
+		flags |= 16
+	if bool(look.get("bare", false)):
+		flags |= 32
+	return flags
+
+
+func _current_key() -> String:
+	var skin: Color = look.get("skin", Color.BLACK)
+	var cloth: Color = look.get("cloth", Color.BLACK)
+	var trim: Color = look.get("trim", Color.BLACK)
+	var eye: Color = look.get("eye", Color.BLACK)
+	var skin_i := skin.to_rgba32()
+	var cloth_i := cloth.to_rgba32()
+	var trim_i := trim.to_rgba32()
+	var eye_i := eye.to_rgba32()
+	var weapon := str(look.get("weapon", ""))
+	var paint := str(look.get("paint", ""))
+	var faction := str(look.get("faction", ""))
+	var helm := str(look.get("helm", ""))
+	var bits := _extra_bits()
+	var flags := _look_flags()
+	if _bake_key != "" and skin_i == _key_skin and cloth_i == _key_cloth and trim_i == _key_trim and eye_i == _key_eye and bits == _key_bits and flags == _key_flags and weapon == _key_weapon and paint == _key_paint and faction == _key_faction and helm == _key_helm:
+		return _bake_key
+	_key_skin = skin_i
+	_key_cloth = cloth_i
+	_key_trim = trim_i
+	_key_eye = eye_i
+	_key_bits = bits
+	_key_flags = flags
+	_key_weapon = weapon
+	_key_paint = paint
+	_key_faction = faction
+	_key_helm = helm
+	_bake_key = FrameBake.make_key(look, bits)
+	return _bake_key
 
 
 func _sync_bars() -> void:
@@ -1467,49 +1580,6 @@ func _sync_bars() -> void:
 	_bar_stacks = level_stacks
 	_bar_bits = bits
 	_bar_shell.queue_redraw()
-
-
-func _held_frame(phase: String, along: float, beat: int, clock: float) -> int:
-	var paint := str(data.get("paint", ""))
-	var rate := 8.0
-	if paint == "runner" or paint == "scout":
-		rate = 11.0
-	if phase == "march":
-		return mini(7, int(fposmod(clock * rate, TAU) / TAU * 8.0))
-	if phase == "act":
-		var u := (float(beat) + clampf(along, 0.0, 0.999)) * 0.25
-		var wobble := _pose_nudge
-		var shown := clampf(u - wobble, 0.0, 0.999)
-		var shown_beat := mini(3, int(shown * 4.0))
-		var shown_t := shown * 4.0 - float(shown_beat)
-		var swing := shown_beat * 2 + mini(1, int(shown_t * 2.0))
-		if paint == "runner" or paint == "scout" or paint == "horse":
-			swing += mini(3, int(fposmod(clock * rate, TAU) / TAU * 4.0)) * 8
-		return swing
-	if phase == "idle":
-		var breath := mini(3, int(fposmod(clock * 2.1, TAU) / TAU * 4.0))
-		return breath + _prop_frame(paint) * 4
-	return mini(3, int(clampf(along, 0.0, 0.999) * 4.0)) + _prop_frame(paint) * 4
-
-
-func _prop_frame(paint: String) -> int:
-	if paint == "crow" or paint == "cow" or paint == "storm" or paint == "viper":
-		return mini(5, int(fposmod(bob_time * 6.0, TAU) / TAU * 6.0))
-	return 0
-
-
-func draw_body(ci: Node2D) -> void:
-	var sc := _body_scale()
-	var shift := _body_shift(sc)
-	var bob := 0.0
-	if moving and alive and debut <= 0.0:
-		bob = sin(bob_time * 8.0) * 1.5
-	var lift := -58.0 * hang
-	if role == "moth":
-		lift -= 46.0
-	ci.draw_set_transform(Vector2(0, bob + shift + lift), 0.0, Vector2(facing * sc, sc))
-	Painter.paint_local(ci, look, _pose())
-	ci.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
 func draw_bars(ci: Node2D) -> void:
@@ -1634,7 +1704,15 @@ func _draw_cast_fx(ci: Node2D) -> void:
 	elif role == "drum":
 		tint = Color("f0d78a")
 	var spin := bob_time * 4.0
-	ci.draw_arc(Vector2(0, -28), 16.0 + (1.0 - fade) * 10.0, spin, spin + 4.2, 12, Color(tint.r, tint.g, tint.b, fade), 2.4)
+	var ring: Texture2D = FrameBake.ring_tex
+	if ring == null:
+		ci.draw_arc(Vector2(0, -28), 16.0 + (1.0 - fade) * 10.0, spin, spin + 4.2, 12, Color(tint.r, tint.g, tint.b, fade), 2.4)
+		return
+	var radius := 16.0 + (1.0 - fade) * 10.0
+	var sc := radius / 16.0
+	ci.draw_set_transform(Vector2(0.0, -28.0), spin, Vector2(sc, sc))
+	ci.draw_texture(ring, Vector2(-32.0, -32.0), Color(tint.r, tint.g, tint.b, fade))
+	ci.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
 func _draw_link(ci: Node2D, to: Vector2, ink: Color) -> void:
@@ -1643,15 +1721,6 @@ func _draw_link(ci: Node2D, to: Vector2, ink: Color) -> void:
 	for mote_i in 3:
 		var u := fposmod(bob_time * 0.55 + float(mote_i) * 0.33, 1.0)
 		ci.draw_circle(from.lerp(to, u), 2.6, Color(ink.r, ink.g, ink.b, 0.9))
-
-
-class BodyShell extends Node2D:
-	var host = null
-
-	func _draw() -> void:
-		if host == null:
-			return
-		host.draw_body(self)
 
 
 class BarShell extends Node2D:
