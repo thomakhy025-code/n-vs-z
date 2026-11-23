@@ -108,6 +108,7 @@ var hint: Label
 var down_label: Label
 var pause_layer: Control
 var end_layer: Control
+var front: CanvasLayer
 var hurt_flash: ColorRect
 var lane_tick: int = 0
 var enemy_lock: float = 0.2
@@ -119,6 +120,8 @@ var harness_done: bool = false
 var sword_hold: bool = false
 var stick_axis: Vector2 = Vector2.ZERO
 var stick: Control = null
+var stick_finger: int = -1
+var stick_mouse: bool = false
 var shoot_hold: bool = false
 var purse_paid: Dictionary = {}
 var boss_up: bool = false
@@ -322,7 +325,7 @@ func _build_hud() -> void:
 	level_label = _plain("Level %d  ·  %s" % [level_no, str(rules["name"])], 18, Color("f3e6c8"))
 	level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	level_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	hint = _plain("The stick moves the hero. Calls sit beside it. Sword and Shoot are on the right.", 16, Color("f3e6c8"))
+	hint = _plain("Press the field. The stick appears under that hand. Calls sit along the bottom. Sword and Shoot are on the right.", 16, Color("f3e6c8"))
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	down_label = _plain("", 18, Color("ffb4a8"))
@@ -401,8 +404,94 @@ func _on_stick(axis: Vector2) -> void:
 
 func _release_stick() -> void:
 	stick_axis = Vector2.ZERO
+	stick_finger = -1
+	stick_mouse = false
 	if stick != null and is_instance_valid(stick) and stick.has_method("release_stick"):
 		stick.release_stick()
+
+
+func _input(event: InputEvent) -> void:
+	if finished or paused or puppet:
+		return
+	if event is InputEventScreenTouch:
+		_stick_touch(event as InputEventScreenTouch)
+	elif event is InputEventScreenDrag:
+		_stick_screen_drag(event as InputEventScreenDrag)
+	elif stick_finger >= 0 and (event is InputEventMouseButton or event is InputEventMouseMotion):
+		get_viewport().set_input_as_handled()
+	elif event is InputEventMouseButton and (event as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT:
+		_stick_mouse_button(event as InputEventMouseButton)
+	elif event is InputEventMouseMotion and stick_mouse:
+		_stick_mouse_move(event as InputEventMouseMotion)
+
+
+func _stick_touch(touch: InputEventScreenTouch) -> void:
+	if touch.pressed:
+		if stick_finger >= 0:
+			get_viewport().set_input_as_handled()
+			return
+		if _stick_blocked(touch.position):
+			return
+		stick_finger = touch.index
+		stick_mouse = false
+		_move_stick(touch.position, true)
+		get_viewport().set_input_as_handled()
+		return
+	if touch.index != stick_finger:
+		return
+	_release_stick()
+	get_viewport().set_input_as_handled()
+
+
+func _stick_screen_drag(drag: InputEventScreenDrag) -> void:
+	if drag.index != stick_finger:
+		return
+	_move_stick(drag.position, false)
+	get_viewport().set_input_as_handled()
+
+
+func _stick_mouse_button(press: InputEventMouseButton) -> void:
+	if press.pressed:
+		if _stick_blocked(press.position):
+			return
+		stick_mouse = true
+		stick_finger = -1
+		_move_stick(press.position, true)
+		get_viewport().set_input_as_handled()
+		return
+	if not stick_mouse:
+		return
+	_release_stick()
+	get_viewport().set_input_as_handled()
+
+
+func _stick_mouse_move(motion: InputEventMouseMotion) -> void:
+	_move_stick(motion.position, false)
+	get_viewport().set_input_as_handled()
+
+
+func _move_stick(point: Vector2, fresh: bool) -> void:
+	if stick == null or not is_instance_valid(stick) or hud == null:
+		return
+	var local: Vector2 = hud.get_global_transform().affine_inverse() * point
+	if fresh and stick.has_method("show_under"):
+		stick.show_under(local)
+	elif stick.has_method("follow_finger"):
+		stick.follow_finger(local)
+
+
+func _stick_blocked(point: Vector2) -> bool:
+	if note_board != null and is_instance_valid(note_board) and note_board.get_global_rect().has_point(point):
+		return true
+	if sword_btn != null and is_instance_valid(sword_btn) and sword_btn.get_global_rect().has_point(point):
+		return true
+	if shoot_btn != null and is_instance_valid(shoot_btn) and shoot_btn.get_global_rect().has_point(point):
+		return true
+	for raw_slot in slot_buttons:
+		var slot_btn: Button = raw_slot
+		if slot_btn.get_global_rect().has_point(point):
+			return true
+	return false
 
 
 func _set_hold(index: int, held: bool) -> void:
@@ -477,9 +566,12 @@ func _layout_hud() -> void:
 		btn.add_theme_font_size_override("font_size", slot_font)
 	if stick != null:
 		var stick_size := float(box["stick"])
+		var hold_center := stick.position + stick.size * 0.5
+		var was_shown := stick.visible
 		stick.size = Vector2(stick_size, stick_size)
 		stick.custom_minimum_size = stick.size
-		stick.position = box["stick_pos"]
+		if was_shown:
+			stick.position = hold_center - stick.size * 0.5
 		stick.queue_redraw()
 	var sky_bottom := size.y * 0.34 - 22.0
 	var board_top := top + 6.0
@@ -1508,6 +1600,7 @@ func _finish_battle(defender_side: int, from_gate: bool = false) -> void:
 		return
 	finished = true
 	paused = false
+	_release_stick()
 	fallen_side = defender_side
 	var won := defender_side == 1
 	if duel:
@@ -1648,8 +1741,15 @@ func _present_end(defender_side: int) -> void:
 	actions.append({"text": "Rematch", "color": Color("e6c36a"), "call": Callable(get_parent(), "rematch")})
 	actions.append({"text": "Change the call", "color": Color("d7c4a3"), "call": Callable(get_parent(), "change_squad")})
 	actions.append({"text": "Home", "color": Color("f7f1df"), "call": Callable(get_parent(), "show_title")})
-	end_layer = _overlay(title, body, actions)
-	layer.add_child(end_layer)
+	var lines := PackedStringArray()
+	var purse_line := _coin_board_text()
+	if purse_line != "":
+		lines.append(purse_line)
+	lines.append("Value  %d    ·    %s" % [int(floor(player_value)), income_line(_shown_income())])
+	_release_stick()
+	end_layer = _overlay(title, body, actions, lines)
+	end_layer.set_meta("result_front", true)
+	_front_layer().add_child(end_layer)
 
 
 func _toggle_pause() -> void:
@@ -1666,7 +1766,7 @@ func _toggle_pause() -> void:
 		{"text": "Rematch", "color": Color("c44536"), "call": Callable(get_parent(), "rematch")},
 		{"text": "Change the six", "color": Color("d7c4a3"), "call": Callable(get_parent(), "change_squad")},
 	])
-	layer.add_child(pause_layer)
+	_front_layer().add_child(pause_layer)
 
 
 func _notification(what: int) -> void:
@@ -1695,27 +1795,37 @@ func _close_pause() -> void:
 	pause_layer = null
 
 
-func _overlay(title: String, body: String, buttons: Array) -> Control:
+func _front_layer() -> CanvasLayer:
+	if front != null and is_instance_valid(front):
+		return front
+	front = CanvasLayer.new()
+	front.layer = 30
+	front.set_meta("result_front", true)
+	add_child(front)
+	return front
+
+
+func _overlay(title: String, body: String, buttons: Array, lines: PackedStringArray = PackedStringArray()) -> Control:
 	var root := Control.new()
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
 	root.mouse_filter = Control.MOUSE_FILTER_STOP
 	var dim := ColorRect.new()
-	dim.color = Color(0.04, 0.03, 0.07, 0.62)
+	dim.color = Color(0.04, 0.03, 0.07, 0.78)
 	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
 	dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(dim)
 	var margin := MarginContainer.new()
 	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
 	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	margin.add_theme_constant_override("margin_left", 340)
-	margin.add_theme_constant_override("margin_right", 340)
-	margin.add_theme_constant_override("margin_top", 64)
-	margin.add_theme_constant_override("margin_bottom", 40)
+	margin.add_theme_constant_override("margin_left", 18)
+	margin.add_theme_constant_override("margin_right", 18)
+	margin.add_theme_constant_override("margin_top", 16)
+	margin.add_theme_constant_override("margin_bottom", 16)
 	root.add_child(margin)
 	var panel := PanelContainer.new()
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	panel.clip_contents = true
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	panel.add_theme_stylebox_override("panel", UiSkin.panel(Color("f3e6c8"), Color("e6c36a"), 18, 4))
 	margin.add_child(panel)
 	var box := VBoxContainer.new()
@@ -1723,11 +1833,17 @@ func _overlay(title: String, body: String, buttons: Array) -> Control:
 	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	box.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	panel.add_child(box)
-	var heading := UiSkin.label(title, 32, Color("1c140e"))
+	var heading := UiSkin.label(title, 36, Color("1c140e"))
 	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	heading.autowrap_mode = TextServer.AUTOWRAP_WORD
 	heading.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	heading.custom_minimum_size = Vector2(0, 48)
 	box.add_child(heading)
+	for line in lines:
+		var row := UiSkin.label(str(line), 20, Color("6b3a32"))
+		row.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		box.add_child(row)
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL

@@ -11,6 +11,7 @@ const MangaScript = preload("res://scripts/manga.gd")
 const DuelGift = preload("res://scripts/duel_gift.gd")
 const Early = preload("res://scripts/early_roster.gd")
 const DemoScript = preload("res://scripts/unlock_demo.gd")
+const DragScroll = preload("res://scripts/drag_scroll.gd")
 
 const SAVE_PATH := "user://progress.cfg"
 
@@ -18,9 +19,9 @@ const HOW_TO := "This is a side-view gate battle. Your clan gate is on the left.
 
 Fighters and the hero are born on the ground behind their own gate, so a new call is not standing in the fight. The other side cannot walk past a gate into the ground behind it. Someone standing there can still hit a fighter in front of that gate when the attack reaches. A blow that would have hit someone behind the gate hits the gate instead. A fighter who stays behind their castle for 10 seconds is set down in front of it.
 
-You start with one call, the sword ninja. A lesson ends when their gate breaks and nine of that monster come out, three on each road. Kill all nine and that soldier is yours. Until you know six, bring who you have. After that, choose 6. Value builds by itself. Hold the phone or iPad sideways. A stick at the bottom left moves the hero. The call buttons sit to the right of that stick, and Sword and Shoot sit at the bottom right, so the left thumb can stay on the stick.
+You start with one call, the sword ninja. A lesson ends when their gate breaks and nine of that monster come out, three on each road. Kill all nine and that soldier is yours. Until you know six, bring who you have. After that, choose 6. Value builds by itself. Hold the phone or iPad sideways. Press the field and the stick appears under that hand, then follows the drag. The call buttons sit along the bottom, and Sword and Shoot sit at the bottom right.
 
-There are three roads. Soldiers only march forward on the road where you called them, and they fight only that road. The Berserker stands across all three roads, hits every road at once, and enemies on every road can hit the Berserker. The assassin blinks past every other fighter and crosses roads to kill an archer, a leveling caster, or a healing caster. She cuts no one else. The first time a house falls to half blood, a wind helps that side: fighters of the other team who have crossed the middle are blown back to the center and lose half of the blood they still have. You move the hero onto any road with the stick, by dragging on the field, or with WASD. J and K match Sword and Shoot. Number keys call the soldiers you brought, in order, onto the hero's road.
+There are three roads. Soldiers only march forward on the road where you called them, and they fight only that road. The Berserker stands across all three roads, hits every road at once, and enemies on every road can hit the Berserker. The assassin blinks past every other fighter and crosses roads to kill an archer, a leveling caster, or a healing caster. She cuts no one else. The first time a house falls to half blood, a wind helps that side: fighters of the other team who have crossed the middle are blown back to the center and lose half of the blood they still have. You move the hero onto any road with the stick under your hand, or with WASD. J and K match Sword and Shoot. Number keys call the soldiers you brought, in order, onto the hero's road.
 
 If a runner slips past the line, you are the one who runs back. If your gate breaks, you lose. On a lesson, breaking their gate is not the end: nine of that monster walk out, and you win when those nine are dead. On level 40, a general walks out after their gate falls, and you win when the general dies. Every other level ends when their gate breaks.
 
@@ -240,6 +241,19 @@ const WEB_NAME_CLOSE := """
   document.body.style.touchAction = 'none';
   window.__nvName = '';
   window.__nvNameDone = 0;
+})();
+"""
+const WEB_FULLSCREEN := """
+(function () {
+  var el = document.fullscreenElement || document.webkitFullscreenElement;
+  if (el) {
+    if (document.exitFullscreen) document.exitFullscreen();
+    else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+    return;
+  }
+  var root = document.documentElement;
+  var ask = root.requestFullscreen || root.webkitRequestFullscreen;
+  if (ask) ask.call(root);
 })();
 """
 var chosen_level: int = 1
@@ -496,9 +510,10 @@ func _show_menu() -> void:
 		))
 	else:
 		box.add_child(_menu_button("Code", Color("c4a574"), _show_code, 420, 18))
-	var quit := _menu_button("Quit", Color("6b3a32"), func() -> void: get_tree().quit(), 180, 18)
-	quit.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	box.add_child(quit)
+	box.add_child(_home_pair(
+		"Full screen", Color("f3e6c8"), _toggle_fullscreen,
+		"Quit", Color("6b3a32"), func() -> void: get_tree().quit()
+	))
 	_begin_duel_gift(root)
 
 
@@ -515,13 +530,18 @@ func _home_pair(left_text: String, left_color: Color, left_call: Callable, right
 	return row
 
 
-func _show_how() -> void:
-	screen = "how"
-	var box := _open_page("How to play")
-	var scroll := ScrollContainer.new()
+func _vscroll() -> ScrollContainer:
+	var scroll := DragScroll.new()
 	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	return scroll
+
+
+func _show_how() -> void:
+	screen = "how"
+	var box := _open_page("How to play")
+	var scroll := _vscroll()
 	box.add_child(scroll)
 	var body := UiSkin.label(HOW_TO, 16, Color("2c2118"))
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -603,10 +623,7 @@ func _skin_line(id: String) -> String:
 
 
 func _page_list(box: VBoxContainer) -> VBoxContainer:
-	var scroll := ScrollContainer.new()
-	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	var scroll := _vscroll()
 	box.add_child(scroll)
 	var list := VBoxContainer.new()
 	list.add_theme_constant_override("separation", 16)
@@ -959,10 +976,7 @@ func _apply_skins() -> void:
 func _show_levels() -> void:
 	screen = "levels"
 	var box := _open_page("Choose a level")
-	var scroll := ScrollContainer.new()
-	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	var scroll := _vscroll()
 	box.add_child(scroll)
 	var list := VBoxContainer.new()
 	list.add_theme_constant_override("separation", 8)
@@ -1010,10 +1024,7 @@ func _show_foes() -> void:
 	intro.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(intro)
-	var scroll := ScrollContainer.new()
-	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	var scroll := _vscroll()
 	box.add_child(scroll)
 	var list := VBoxContainer.new()
 	list.add_theme_constant_override("separation", 8)
@@ -1099,10 +1110,7 @@ func _show_foe_detail(id: String, kind: String) -> void:
 	frame.custom_minimum_size = Vector2(0, 150)
 	frame.add_child(_foe_portrait(str(entry.get("paint", id)), 220, 140))
 	box.add_child(frame)
-	var scroll := ScrollContainer.new()
-	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	var scroll := _vscroll()
 	box.add_child(scroll)
 	var column := VBoxContainer.new()
 	column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -1341,9 +1349,8 @@ func _show_select() -> void:
 	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
 	dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(dim)
-	var scroll := ScrollContainer.new()
+	var scroll := _vscroll()
 	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	root.add_child(scroll)
 	var margin := MarginContainer.new()
 	margin.add_theme_constant_override("margin_left", 28)
@@ -1644,7 +1651,9 @@ func _drop_story() -> void:
 
 
 func _story_seen(id: String) -> bool:
-	return id != "" and bool(story_seen.get(id, false))
+	if id == "" or id.begins_with("nv:"):
+		return false
+	return bool(story_seen.get(id, false))
 
 
 func _mark_story(id: String) -> void:
@@ -2029,10 +2038,7 @@ func _show_upgrade() -> void:
 		price.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		prices.add_child(price)
 	box.add_child(prices)
-	var scroll := ScrollContainer.new()
-	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	var scroll := _vscroll()
 	box.add_child(scroll)
 	var list := VBoxContainer.new()
 	list.name = "UpgradeList"
@@ -2193,6 +2199,7 @@ func _load_progress() -> void:
 	tester = false
 	var migrated := false
 	var duel_mark: bool = false
+	var packed_token := ""
 	var cfg: ConfigFile = ConfigFile.new()
 	if cfg.load(SAVE_PATH) == OK:
 		unlocked = clampi(int(cfg.get_value("progress", "unlocked", 1)), 1, Levels.count())
@@ -2232,6 +2239,11 @@ func _load_progress() -> void:
 		var stored_story: int = int(cfg.get_value("progress", "story_version", 0))
 		story_version = stored_story
 		story_seen = _unpack_seen(str(cfg.get_value("progress", "story_seen", "")))
+		for key in story_seen.keys():
+			var seen_id := str(key)
+			if seen_id.begins_with("nv:"):
+				packed_token = seen_id
+				break
 		if stored_story < Story.CAMPAIGN:
 			unlocked = 1
 			cleared = 0
@@ -2252,7 +2264,7 @@ func _load_progress() -> void:
 		if _duel_is_open() and not duel_celebrated:
 			duel_celebrate = true
 	_normalize_progress()
-	_bind_early()
+	_adopt_early(cfg, packed_token)
 	_refresh_auto()
 	var paid := _take_road_pay()
 	_apply_skins()
@@ -2299,7 +2311,7 @@ func _normalize_progress() -> void:
 
 
 func _save_progress() -> void:
-	_remember_early()
+	_drop_nv()
 	var cfg: ConfigFile = ConfigFile.new()
 	cfg.set_value("progress", "unlocked", unlocked)
 	cfg.set_value("progress", "cleared", cleared)
@@ -2325,6 +2337,12 @@ func _save_progress() -> void:
 	cfg.set_value("progress", "best_rank", best_rank)
 	cfg.set_value("progress", "story_version", story_version)
 	cfg.set_value("progress", "story_seen", _pack_seen(story_seen))
+	if not _harness():
+		Early.ensure()
+	if Early.unlocks.has("walker"):
+		var early_token := Early.token()
+		if early_token != "":
+			cfg.set_value("progress", "early", early_token)
 	cfg.set_value("progress", "duel_celebrated", duel_celebrated)
 	cfg.save(SAVE_PATH)
 	Cloud.push(_snapshot())
@@ -2448,9 +2466,8 @@ func _merge_from_cloud(data: Dictionary) -> void:
 				cloud_token = seen_id
 			else:
 				story_seen[seen_id] = true
-		if cloud_token != "" and Early.apply_token(cloud_token):
-			_drop_nv()
-			story_seen[cloud_token] = true
+		if cloud_token != "":
+			Early.apply_token(cloud_token)
 	diamond_paid = maxi(diamond_paid, clampi(_whole(data.get("diamond_paid", 1), 1), 1, Levels.count()))
 	story_version = Story.VERSION
 	var cloud_diamonds := clampi(_whole(data.get("diamonds", 0), 0), 0, 200000000)
@@ -3041,15 +3058,18 @@ func _pack_seen(bag: Dictionary) -> String:
 
 
 func _cloud_seen() -> String:
-	var full := _pack_seen(story_seen)
-	if full.length() <= 2000:
-		return full
 	var stripped: Dictionary = {}
 	for key in story_seen.keys():
 		var id := str(key)
-		if not id.begins_with("nv:"):
+		if id != "" and not id.begins_with("nv:"):
 			stripped[id] = true
-	return _pack_seen(stripped)
+	var packed := _pack_seen(stripped)
+	while packed.length() > 2000:
+		var cut := packed.rfind(",")
+		if cut < 0:
+			return ""
+		packed = packed.substr(0, cut)
+	return packed
 
 
 func _drop_nv() -> void:
@@ -3062,28 +3082,38 @@ func _drop_nv() -> void:
 		story_seen.erase(id)
 
 
-func _bind_early() -> void:
+func _adopt_early(cfg: ConfigFile, packed_token: String) -> void:
 	early_fresh = false
-	var found := ""
+	var stored_early := ""
+	if cfg != null and cfg.has_section_key("progress", "early"):
+		stored_early = str(cfg.get_value("progress", "early", ""))
+	var story_token := packed_token
+	var drop: Array = []
 	for key in story_seen.keys():
-		var id := str(key)
-		if id.begins_with("nv:"):
-			found = id
-			break
-	if found != "" and Early.apply_token(found):
+		var seen_key := str(key)
+		if seen_key.begins_with("nv:"):
+			drop.append(seen_key)
+			if story_token == "":
+				story_token = seen_key
+	for gone in drop:
+		story_seen.erase(gone)
+	if story_token != "" and Early.apply_token(story_token):
+		return
+	if stored_early != "" and Early.apply_token(stored_early):
 		return
 	Early.roll()
 	early_fresh = true
 
 
-func _remember_early() -> void:
-	if _harness():
+func _toggle_fullscreen() -> void:
+	if OS.has_feature("web"):
+		JavaScriptBridge.eval(WEB_FULLSCREEN, true)
 		return
-	Early.ensure()
-	_drop_nv()
-	var token := Early.token()
-	if token != "":
-		story_seen[token] = true
+	var mode := DisplayServer.window_get_mode()
+	if mode == DisplayServer.WINDOW_MODE_FULLSCREEN or mode == DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN:
+		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+	else:
+		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
 
 
 func _unpack_seen(text: String) -> Dictionary:
