@@ -1,5 +1,7 @@
 extends Node2D
 
+const SkillFx = preload("res://scripts/skill_fx.gd")
+
 var velocity: Vector2 = Vector2.RIGHT
 var damage: float = 0.0
 var shooter_side: int = 0
@@ -18,6 +20,7 @@ var from_id: String = ""
 var hazard: String = ""
 var hazard_dmg: float = 0.0
 var splash: float = 0.0
+var trail: Array[Vector2] = []
 
 
 func setup(from: Vector2, aim: Vector2, amount: float, side: int, color: Color, reach: float, road: int, field, heavy: bool = false, may_hit_gate: bool = true, seek_cross: bool = false, shot_from: String = "", hazard_kind: String = "", hazard_amount: float = 0.0, splash_reach: float = 0.0) -> void:
@@ -56,6 +59,11 @@ func _process(delta: float) -> void:
 	var step := velocity * delta
 	position += step
 	traveled += step.length()
+	if hazard == "fire":
+		trail.append(position)
+		while trail.size() > 8:
+			trail.pop_front()
+		queue_redraw()
 	if traveled >= max_dist:
 		queue_free()
 		return
@@ -142,6 +150,16 @@ func _draw() -> void:
 		dir * tip - side * (6.0 if bold else 4.0),
 	]), tint)
 	if hazard == "fire":
-		var flick := sin(Time.get_ticks_msec() * 0.02) * 3.0
-		draw_circle(-dir * tail * 0.45 + Vector2(flick, -3.0), 3.2, Color("ffb15a"))
-		draw_circle(-dir * tail * 0.75, 2.2, Color("ff7a2a"))
+		_draw_fire_trail()
+
+
+func _draw_fire_trail() -> void:
+	var count: int = trail.size()
+	var i: int = 0
+	while i < count:
+		var spot: Vector2 = trail[i] - position
+		var fade: float = float(i + 1) / float(count)
+		var frame: int = 4 + (i % 4)
+		var wide: float = 20.0 + fade * 22.0
+		SkillFx.blit(self, "ex", frame, Rect2(spot.x - wide * 0.5, spot.y - wide * 0.85, wide, wide * 0.9), false, Color(1, 1, 1, 0.4 + fade * 0.6))
+		i += 1

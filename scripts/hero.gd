@@ -2,6 +2,7 @@ extends Node2D
 
 const Buff = preload("res://scripts/level_buff.gd")
 const Painter = preload("res://scripts/painter.gd")
+const SkillFx = preload("res://scripts/skill_fx.gd")
 
 var battle = null
 var side: int = 0
@@ -62,6 +63,7 @@ var frost_time: float = 0.0
 var blaze: float = 0.0
 var blaze_clock: float = 0.0
 var blaze_factor: float = 1.0
+var _aura: Sprite2D = null
 const RESPAWN: float = 6.0
 
 
@@ -191,6 +193,7 @@ func _process(delta: float) -> void:
 			_move(delta)
 		if act <= 0.0:
 			winding = false
+		_sync_aura()
 		queue_redraw()
 		return
 	if not alive:
@@ -200,11 +203,14 @@ func _process(delta: float) -> void:
 		down_timer -= delta
 		if down_timer <= 0.0:
 			_revive()
+		_sync_aura()
 		return
 	if battle.finished or battle.paused:
+		_sync_aura()
 		queue_redraw()
 		return
 	_tick_blaze(delta)
+	_sync_aura()
 	if numb > 0.0 or gust_lock > 0.0:
 		dragging = false
 		winding = false
@@ -526,30 +532,33 @@ func _draw() -> void:
 		draw_circle(Vector2(32, -85), 3.5, Color("e6c36a"))
 	if bone_t > 0.0 or numb > 0.0:
 		Painter.paint_ailment(self, bone_t, numb, bob_time)
-	_draw_blaze()
 
 
-func _draw_blaze() -> void:
+func _sync_aura() -> void:
 	if blaze <= 0.0:
+		if _aura != null:
+			_aura.visible = false
 		return
-	var hot := Color("ff7a2a")
-	var core := Color("ffe08a")
-	var stamp := Time.get_ticks_msec() * 0.001
-	for flame_i in 3:
-		var fx := -12.0 + float(flame_i) * 12.0
-		var hop := sin(stamp * 9.0 + fx) * 3.0
-		var base_y := 8.0
-		var height := 16.0 + hop
-		draw_colored_polygon(PackedVector2Array([
-			Vector2(fx - 6.0, base_y),
-			Vector2(fx + 6.0, base_y),
-			Vector2(fx, base_y - height),
-		]), hot)
-		draw_colored_polygon(PackedVector2Array([
-			Vector2(fx - 2.4, base_y - 2.0),
-			Vector2(fx + 2.4, base_y - 2.0),
-			Vector2(fx, base_y - height * 0.48),
-		]), core)
+	var tex: Texture2D = SkillFx.texture("en")
+	if tex == null:
+		return
+	if _aura == null:
+		_aura = Sprite2D.new()
+		_aura.centered = true
+		_aura.z_index = -1
+		_aura.show_behind_parent = true
+		_aura.region_enabled = true
+		var mat := CanvasItemMaterial.new()
+		mat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+		_aura.material = mat
+		add_child(_aura)
+	_aura.visible = true
+	if _aura.texture != tex:
+		_aura.texture = tex
+	var frame: int = posmod(int(Time.get_ticks_msec() / 70), SkillFx.FRAMES)
+	_aura.region_rect = SkillFx.region("en", frame)
+	_aura.position = Vector2(0.0, -24.0)
+	_aura.scale = Vector2(1.25, 1.25)
 
 
 func _draw_slash() -> void:
@@ -562,6 +571,21 @@ func _draw_slash() -> void:
 		finish = PI + 1.2
 	draw_arc(center, 58.0, start, finish, 18, Color(1, 0.94, 0.72, alpha), 10.0)
 	draw_arc(center, 42.0, start, finish, 14, Color(0.86, 0.22, 0.16, alpha), 5.0)
+	if blaze <= 0.0:
+		return
+	var along: float = 1.0 - clampf(slash / 0.28, 0.0, 1.0)
+	var puff: int = 0
+	while puff < 6:
+		var t: float = float(puff) / 5.0
+		if t > along + 0.02:
+			puff += 1
+			continue
+		var px: float = facing * (18.0 + t * 84.0)
+		var py: float = -10.0 - sin(t * PI) * 36.0
+		var frame: int = 4 + (puff % 4)
+		var fade: float = 0.55 + 0.4 * t
+		SkillFx.blit(self, "ex", frame, Rect2(px - 18.0, py - 26.0, 36.0, 42.0), false, Color(1, 1, 1, fade))
+		puff += 1
 
 
 func _draw_muzzle() -> void:

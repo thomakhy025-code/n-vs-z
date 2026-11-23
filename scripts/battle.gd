@@ -4,6 +4,7 @@ const Catalog = preload("res://scripts/unit_catalog.gd")
 const SmokeVeil = preload("res://scripts/smoke_veil.gd")
 const Painter = preload("res://scripts/painter.gd")
 const FrameBake = preload("res://scripts/frame_bake.gd")
+const SkillFx = preload("res://scripts/skill_fx.gd")
 const SceneryScript = preload("res://scripts/scenery.gd")
 const GateScript = preload("res://scripts/gate.gd")
 const UnitScript = preload("res://scripts/battle_unit.gd")
@@ -193,6 +194,10 @@ var _hud_p_hot: bool = false
 var skill_buttons: Array = []
 var cold_roads: Array = []
 var slash_fx: Array = []
+var bursts: Array = []
+var fx_glow = null
+var fx_marks = null
+var fx_rooted: bool = false
 
 
 func start(chosen: Array, run_mode: String, level_index: int = 1) -> void:
@@ -306,6 +311,20 @@ func _build_world() -> void:
 	fx = Node2D.new()
 	fx.z_index = 120
 	add_child(fx)
+	SkillFx.warm(self)
+	var glow = SkillFx.GlowLayer.new()
+	glow.field = self
+	glow.z_index = 500
+	var glow_mat := CanvasItemMaterial.new()
+	glow_mat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	glow.material = glow_mat
+	add_child(glow)
+	fx_glow = glow
+	var marks = SkillFx.MarkLayer.new()
+	marks.field = self
+	marks.z_index = 640
+	add_child(marks)
+	fx_marks = marks
 	hero = HeroScript.new()
 	hero.setup(self)
 	add_child(hero)
@@ -684,7 +703,9 @@ func _process(delta: float) -> void:
 		_tick_hazards(delta)
 		_tick_chill(delta)
 		_tick_slashes(delta)
+		_tick_bursts(delta)
 		_tick_smokes(delta)
+		_redraw_fx()
 		if duel:
 			enemy_value += enemy_income * delta
 			if hand_seen >= 0.0 and battle_time - hand_seen > 0.45 and foe != null:
@@ -2601,6 +2622,7 @@ func _root_allies(caster, road: int, seconds: float) -> void:
 		if not ("root_left" in body):
 			continue
 		body.root_left = maxf(float(body.root_left), seconds)
+		fx_rooted = true
 
 
 func _cast_explosion(who, amount: float) -> void:
@@ -2611,6 +2633,7 @@ func _cast_explosion(who, amount: float) -> void:
 		var y := lane_y(road)
 		lay_zone("fire", road, span.x, span.y, y, 3.0, burn, who)
 		poof(Vector2((span.x + span.y) * 0.5, y), Color("ff7a2a"))
+	_note_burst(span.x, span.y)
 	Sfx.play("hit", 0.86, -4.0)
 
 
@@ -2618,7 +2641,12 @@ func _cast_smash(who, amount: float) -> void:
 	var span := _ahead_box(who, 2.0 / 3.0)
 	var road := int(who.lane)
 	_hurt_band(who, span.x, span.y, road, amount, true, true)
-	_note_slash(span.x, span.y, lane_y(road))
+	var near_x := span.x
+	var far_x := span.y
+	if _toward_enemy(int(who.side)) < 0.0:
+		near_x = span.y
+		far_x = span.x
+	_note_slash(span.x, span.y, lane_y(road), near_x, far_x)
 	Sfx.play(Painter.hit_id("katana"), 0.92, -4.0)
 
 
@@ -2627,7 +2655,7 @@ func _cast_freeze(who, amount: float) -> void:
 	_hurt_band(who, 0.0, vp.x, road, amount, true, false)
 	_root_allies(who, road, 3.0)
 	_hold_cold(road)
-	lay_zone("ice", road, 0.0, vp.x, lane_y(road), 6.0, 0.0, null)
+	lay_zone("ice", road, 0.0, vp.x, lane_y(road), 6.0, 0.0, null, float(who.position.x))
 	Sfx.play("wind", 1.15, -6.0)
 
 
@@ -2679,6 +2707,7 @@ func _tick_chill(delta: float) -> void:
 		write += 1
 	if write < cold_roads.size():
 		cold_roads.resize(write)
+	var any_root := false
 	for body in _bodies():
 		if not ("root_left" in body):
 			continue
@@ -2686,6 +2715,8 @@ func _tick_chill(delta: float) -> void:
 		if rooted < 0.0:
 			rooted = 0.0
 		body.root_left = rooted
+		if rooted > 0.0 and body.alive:
+			any_root = true
 		if not body.alive:
 			body.frost_time = 0.0
 			continue
@@ -2694,14 +2725,42 @@ func _tick_chill(delta: float) -> void:
 			if stood >= 3.0:
 				body.root_left = maxf(float(body.root_left), 1.0)
 				stood = 0.0
+				any_root = true
 			body.frost_time = stood
 		else:
 			body.frost_time = 0.0
+	fx_rooted = any_root
 
 
-func _note_slash(x0: float, x1: float, y: float) -> void:
-	slash_fx.append({"x0": x0, "x1": x1, "y": y, "left": 0.35})
+func _note_burst(x0: float, x1: float) -> void:
+	var top := lane_y(0) - 86.0
+	var bottom := lane_y(maxi(lane_ys.size() - 1, 0)) + 36.0
+	bursts.append({
+		"x0": x0,
+		"x1": x1,
+		"y0": top,
+		"y1": bottom,
+		"left": 0.66,
+		"life": 0.66,
+		"age": 0.0,
+	})
 	queue_redraw()
+	_redraw_fx()
+
+
+func _note_slash(x0: float, x1: float, y: float, near_x: float, far_x: float) -> void:
+	slash_fx.append({
+		"x0": x0,
+		"x1": x1,
+		"y": y,
+		"near": near_x,
+		"far": far_x,
+		"left": 1.05,
+		"life": 1.05,
+		"age": 0.0,
+	})
+	queue_redraw()
+	_redraw_fx()
 
 
 func _tick_slashes(delta: float) -> void:
@@ -2713,10 +2772,28 @@ func _tick_slashes(delta: float) -> void:
 		if left <= 0.0:
 			continue
 		mark["left"] = left
+		mark["age"] = float(mark.get("age", 0.0)) + delta
 		slash_fx[write] = mark
 		write += 1
 	if write < slash_fx.size():
 		slash_fx.resize(write)
+	queue_redraw()
+
+
+func _tick_bursts(delta: float) -> void:
+	if bursts.is_empty():
+		return
+	var write := 0
+	for mark in bursts:
+		var left := float(mark.get("left", 0.0)) - delta
+		if left <= 0.0:
+			continue
+		mark["left"] = left
+		mark["age"] = float(mark.get("age", 0.0)) + delta
+		bursts[write] = mark
+		write += 1
+	if write < bursts.size():
+		bursts.resize(write)
 	queue_redraw()
 
 
@@ -2730,28 +2807,35 @@ func lay_hazard(kind: String, road: int, at: Vector2, seconds: float, amount: fl
 		"x1": origin + 48.0,
 		"y": at.y,
 		"left": seconds,
+		"age": 0.0,
 		"tick": 0.25,
 		"dmg": amount,
 	})
 	queue_redraw()
 
 
-func lay_zone(kind: String, road: int, x0: float, x1: float, y: float, seconds: float, amount: float, spare) -> void:
+func lay_zone(kind: String, road: int, x0: float, x1: float, y: float, seconds: float, amount: float, spare, from_x: float = -1.0) -> void:
 	var left_x := minf(x0, x1)
 	var right_x := maxf(x0, x1)
+	var source := (left_x + right_x) * 0.5
+	if from_x >= 0.0:
+		source = from_x
 	hazards.append({
 		"kind": kind,
 		"lane": road,
 		"origin": (left_x + right_x) * 0.5,
+		"from_x": source,
 		"x0": left_x,
 		"x1": right_x,
 		"y": y,
 		"left": seconds,
+		"age": 0.0,
 		"tick": 0.25,
 		"dmg": amount,
 		"spare": spare,
 	})
 	queue_redraw()
+	_redraw_fx()
 
 
 func spread_road(road: int, toward_x: float, walls: Array) -> void:
@@ -2951,6 +3035,7 @@ func _tick_hazards(delta: float) -> void:
 		if left <= 0.0:
 			continue
 		patch["left"] = left
+		patch["age"] = float(patch.get("age", 0.0)) + delta
 		var tick := float(patch.get("tick", 0.0)) - delta
 		if tick <= 0.0:
 			_scorch(patch)
@@ -2994,59 +3079,18 @@ func _stands_in(body, road: int, x0: float, x1: float) -> bool:
 	return x >= x0 - 0.5 and x <= x1 + 0.5
 
 
+func _redraw_fx() -> void:
+	var hot := not bursts.is_empty() or not slash_fx.is_empty() or not hazards.is_empty() or fx_rooted
+	if not hot:
+		return
+	if fx_glow != null:
+		fx_glow.queue_redraw()
+	if fx_marks != null:
+		fx_marks.queue_redraw()
+
+
 func _draw() -> void:
-	for patch in hazards:
-		var kind := str(patch.get("kind", "fire"))
-		var x0 := float(patch.get("x0", 0.0))
-		var x1 := float(patch.get("x1", 0.0))
-		var y := float(patch.get("y", ground_y))
-		var span := maxf(8.0, x1 - x0)
-		var flames := clampi(int(span / 22.0), 1, 36)
-		var hot := Color("ff7a2a")
-		var core := Color("ffe08a")
-		if kind == "ice":
-			hot = Color("9fd4ff")
-			core = Color("eef7ff")
-		for flame_i in flames:
-			var fx := x0 + span * (float(flame_i) + 0.5) / float(flames)
-			var hop := sin(battle_time * 9.0 + fx * 0.07) * 4.0
-			var height := 16.0 + hop
-			if kind == "ice":
-				var top := Vector2(fx, y - height)
-				draw_colored_polygon(PackedVector2Array([
-					Vector2(fx, y + 5.0),
-					Vector2(fx + 6.0, y - height * 0.42),
-					top,
-					Vector2(fx - 6.0, y - height * 0.42),
-				]), hot)
-				draw_colored_polygon(PackedVector2Array([
-					Vector2(fx, y - 2.0),
-					Vector2(fx + 2.4, y - height * 0.48),
-					Vector2(fx, y - height * 0.72),
-					Vector2(fx - 2.4, y - height * 0.48),
-				]), core)
-			else:
-				draw_colored_polygon(PackedVector2Array([
-					Vector2(fx - 7.0, y + 6.0),
-					Vector2(fx + 7.0, y + 6.0),
-					Vector2(fx, y - height),
-				]), hot)
-				draw_colored_polygon(PackedVector2Array([
-					Vector2(fx - 3.0, y + 4.0),
-					Vector2(fx + 3.0, y + 4.0),
-					Vector2(fx, y - height * 0.45),
-				]), core)
-				var ember := Vector2(fx + sin(battle_time * 7.0 + fx) * 3.0, y - height - 4.0)
-				draw_circle(ember, 2.4, core)
-	for mark in slash_fx:
-		var sx0 := float(mark.get("x0", 0.0))
-		var sx1 := float(mark.get("x1", 0.0))
-		var sy := float(mark.get("y", ground_y))
-		var alpha := clampf(float(mark.get("left", 0.0)) / 0.35, 0.0, 1.0)
-		var slash_span := maxf(8.0, sx1 - sx0)
-		var cuts := clampi(int(slash_span / 70.0), 1, 12)
-		for cut in cuts:
-			var cx := sx0 + slash_span * (float(cut) + 0.5) / float(cuts)
-			draw_arc(Vector2(cx, sy - 10.0), 36.0, -1.1, 1.05, 12, Color(1, 0.94, 0.72, alpha), 8.0)
-			draw_arc(Vector2(cx, sy - 10.0), 24.0, -1.1, 1.05, 10, Color(0.86, 0.22, 0.16, alpha), 4.0)
+	if hazards.is_empty():
+		return
+	SkillFx.draw_ground(self, hazards)
 
