@@ -31,7 +31,7 @@ The other gate calls its own fighters. On levels 1 to 19 the fight starts with w
 
 Play lists seventy levels. The first is open. Winning a level opens the next. Levels 1 to 20 are monsters, and that is where each soldier is learned. Levels 21 to 40 are human soldiers. Levels 41 to 60 are monsters again, and the new monsters begin. Levels 61 to 70 alternate, monster then soldier, starting with monsters. The new soldiers begin on the soldier turns. Your purse stays the same. Theirs gets heavier as the levels climb, and it eases a little when the soldiers first arrive. Before you choose who to bring, the level shows the other side, each fighter with a skin and a name. Press a name to read blood, damage, attacking distance, attacking range, speed, and the special skill.
 
-Each level you open pays 100 diamonds. Clearing a level also pays coins. The base is 200 coins times the level. Three minutes or less doubles that, five minutes or less adds half, six minutes or less pays the base, and a longer clear pays half. On a level you have not cleared, the fight also pays 0.25% of that base each second it is still going. Those coins stay if your gate falls. A level you have already cleared does not pay this. On a cleared level, Automatic finish skips the fight and pays the coins from your last clear. You can take that 50 times. While any are missing, 5 return every half hour. Until a clear is remembered, the stake is the base. Coins are not diamonds. Home has Upgrade. The hero and each soldier you have learned can be ranked 20 times. Each rank adds 5% of that character's blood and damage. Reach, cost, and speed stay the same. Upgrade can also raise your castle blood by 200 a time, and your value by 0.1 each second a time. Twenty is the last.
+Each level you open pays 100 diamonds. Clearing a level also pays coins. The base is 200 coins times the level. Three minutes or less doubles that, five minutes or less adds half, six minutes or less pays the base, and a longer clear pays half. On a level you have not cleared, the fight also pays 0.25% of that base each second it is still going. Those coins stay if your gate falls. A level you have already cleared does not pay this. On a cleared level, Automatic finish skips the fight and pays the coins from your last clear. You can take that 50 times. While any are missing, 5 return every half hour. Until a clear is remembered, the stake is the base. Coins are not diamonds. Home has Upgrade. The hero and each soldier you have learned can be ranked 20 times. Each rank adds 5% of that character's blood and damage. Reach, cost, and speed stay the same. Upgrade can also raise your castle blood by 200 a time, and your value by 0.1 each second a time. Twenty is the last. Every 10 levels you choose a skill, skills rank up like fighters, and each use costs 60 value with no cooldown.
 
 Home is the night gate: Shop, Skin, Upgrade, the levels, and How to play are there, and the diamond count hangs by the lantern. During a fight, Home at the top returns you there.
 
@@ -69,6 +69,8 @@ var held_now: int = 0
 var hold_dirty: bool = false
 var hold_wait: float = 0.0
 var upgrades: Dictionary = {}
+var skill_marks: Dictionary = {}
+var skill_follow: Callable = Callable()
 var last_clear_time: float = 0.0
 var last_clear_coins: int = 0
 var last_clear_band: String = ""
@@ -426,6 +428,8 @@ func _show_menu() -> void:
 		return
 	if _needs_name():
 		_show_name()
+		return
+	if _offer_skill(Callable(self, "_show_menu")):
 		return
 	screen = "menu"
 	_clear_screens()
@@ -1682,6 +1686,8 @@ func rematch() -> void:
 	if Net.role != "":
 		Net.announce_rematch()
 		return
+	if _offer_skill(Callable(self, "rematch")):
+		return
 	_start_battle(loadout, "")
 
 
@@ -1689,6 +1695,8 @@ func change_squad() -> void:
 	Engine.time_scale = 1.0
 	if Net.role != "":
 		Net.announce_reselect()
+		return
+	if _offer_skill(Callable(self, "change_squad")):
 		return
 	_drop_battle()
 	foe_return = false
@@ -1710,6 +1718,8 @@ func show_title() -> void:
 
 func next_level() -> void:
 	Engine.time_scale = 1.0
+	if _offer_skill(Callable(self, "next_level")):
+		return
 	var nxt := _next_index()
 	if nxt < 1:
 		show_title()
@@ -1974,6 +1984,10 @@ func _pack_ranks() -> String:
 		var rank := _rank_of(str(id))
 		if rank > 1:
 			parts.append("%s:%d" % [str(id), rank])
+	for skill_id in ["ex", "ls", "fz", "en"]:
+		var owned := str(skill_id)
+		if upgrades.has(owned):
+			parts.append("%s:%d" % [owned, _rank_of(owned)])
 	return ",".join(parts)
 
 
@@ -1998,7 +2012,7 @@ func _tester_marked(raw: String) -> bool:
 
 func _unpack_ranks(raw: String) -> Dictionary:
 	var out: Dictionary = {}
-	var known: Array = ["hero", "sword", "archer", "shield", "saber", "lancer", "berserker", "horse", "suicide", "assassin", "heal", "level", "gate", "income"]
+	var known: Array = ["hero", "sword", "archer", "shield", "saber", "lancer", "berserker", "horse", "suicide", "assassin", "heal", "level", "gate", "income", "ex", "ls", "fz", "en"]
 	for piece in raw.split(",", false):
 		var bits: PackedStringArray = piece.split(":")
 		if bits.size() != 2:
@@ -2012,6 +2026,8 @@ func _unpack_ranks(raw: String) -> Dictionary:
 
 func _trim_ranks() -> void:
 	var allowed: Array = _rank_ids()
+	for skill_id in ["ex", "ls", "fz", "en"]:
+		allowed.append(str(skill_id))
 	var keep: Dictionary = {}
 	for key in upgrades.keys():
 		var id := str(key)
@@ -2026,7 +2042,102 @@ func _rank_dictionary() -> Dictionary:
 		var rank := _rank_of(str(id))
 		if rank > 1:
 			out[str(id)] = rank
+	for skill_id in ["ex", "ls", "fz", "en"]:
+		var owned := str(skill_id)
+		if upgrades.has(owned):
+			out[owned] = _rank_of(owned)
 	return out
+
+
+func _upgrade_ids() -> Array:
+	var ids: Array = _rank_ids()
+	for skill_id in ["ex", "ls", "fz", "en"]:
+		var id := str(skill_id)
+		if upgrades.has(id):
+			ids.append(id)
+	return ids
+
+
+func _pending_mark() -> int:
+	var step := 10
+	var top := mini(cleared, 70)
+	while step <= top:
+		if not skill_marks.has(step):
+			return step
+		step += 10
+	return 0
+
+
+func _pack_marks() -> String:
+	var parts: PackedStringArray = PackedStringArray()
+	var step := 10
+	while step <= 70:
+		if skill_marks.has(step):
+			parts.append(str(step))
+		step += 10
+	return ",".join(parts)
+
+
+func _unpack_marks(raw: String) -> void:
+	skill_marks = {}
+	for piece in raw.split(",", false):
+		var text := str(piece).strip_edges()
+		if not text.is_valid_int():
+			continue
+		var mark := int(text)
+		if mark >= 10 and mark <= 70 and mark % 10 == 0:
+			skill_marks[mark] = true
+
+
+func _offer_skill(after: Callable) -> bool:
+	if _harness() or _pending_mark() <= 0:
+		return false
+	skill_follow = after
+	_show_skill_pick()
+	return true
+
+
+func _show_skill_pick() -> void:
+	Engine.time_scale = 1.0
+	_drop_battle()
+	screen = "skill"
+	var mark := _pending_mark()
+	var box := _open_page("Choose a skill")
+	var lead := UiSkin.label("Level %d. Pick one. A new skill starts at rank 1. One you already have rises by one rank, up to 20." % mark, 16, Color("6b3a32"))
+	lead.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lead.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	lead.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(lead)
+	for skill_id in ["ex", "ls", "fz", "en"]:
+		var id := str(skill_id)
+		var next_rank := 1
+		if upgrades.has(id):
+			next_rank = mini(20, _rank_of(id) + 1)
+		var label := "%s\nrank %d" % [BattleScript.skill_name(id), next_rank]
+		var button := _menu_button(label, Color("e6c36a"), _claim_skill.bind(id), 420, 18)
+		button.set_meta("skill_id", id)
+		button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		box.add_child(button)
+
+
+func _claim_skill(id: String) -> void:
+	if not BattleScript.is_skill(id) or _pending_mark() <= 0:
+		return
+	var mark := _pending_mark()
+	if not upgrades.has(id):
+		upgrades[id] = 1
+	else:
+		var rank := _rank_of(id)
+		if rank < 20:
+			upgrades[id] = rank + 1
+	skill_marks[mark] = true
+	_save_progress()
+	var follow := skill_follow
+	skill_follow = Callable()
+	if follow.is_valid():
+		follow.call()
+	elif screen == "skill":
+		_show_menu()
 
 
 func _show_upgrade() -> void:
@@ -2037,7 +2148,7 @@ func _show_upgrade() -> void:
 	purse.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	purse.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(purse)
-	var lead := UiSkin.label("Each fighter rank adds 5% blood and damage. Castle blood rises by 200 a time. Value rises by 0.1 each second. Rank 20 is the last. Every row pays the coins below.", 15, Color("6b3a32"))
+	var lead := UiSkin.label("Each fighter rank adds 5% blood and damage. Castle blood rises by 200 a time. Value rises by 0.1 each second. Rank 20 is the last. Skills you own rank the same way. Every row pays the coins below.", 15, Color("6b3a32"))
 	lead.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lead.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	lead.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -2059,7 +2170,7 @@ func _show_upgrade() -> void:
 	list.add_theme_constant_override("separation", 8)
 	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(list)
-	for id in _rank_ids():
+	for id in _upgrade_ids():
 		list.add_child(_upgrade_row(str(id)))
 	var back := _menu_button("Back", Color("e6c36a"), _show_menu)
 	back.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
@@ -2073,6 +2184,8 @@ func _upgrade_who(id: String) -> String:
 		return "Value each second"
 	if id == "hero":
 		return "Hero"
+	if BattleScript.is_skill(id):
+		return BattleScript.skill_name(id)
 	var entry: Dictionary = Catalog.find_in(roster, id)
 	return str(entry.get("name", id))
 
@@ -2152,7 +2265,7 @@ func _keep_upgrade_place() -> void:
 	if scroller != null:
 		kept = scroller.scroll_vertical
 	var list := find_child("UpgradeList", true, false) as VBoxContainer
-	if list != null and list.get_child_count() == _rank_ids().size() and _paint_upgrade_page():
+	if list != null and list.get_child_count() == _upgrade_ids().size() and _paint_upgrade_page():
 		return
 	_show_upgrade()
 	var fresh := _find_scroll(self)
@@ -2166,7 +2279,7 @@ func _keep_upgrade_place() -> void:
 
 
 func _buy_rank(id: String) -> void:
-	if not _rank_ids().has(id):
+	if not _upgrade_ids().has(id):
 		return
 	var rank := _rank_of(id)
 	if rank >= 20:
@@ -2204,6 +2317,7 @@ func _load_progress() -> void:
 	auto_left = AUTO_STOCK
 	auto_at = 0.0
 	upgrades = {}
+	skill_marks = {}
 	saber_skin = false
 	saber_worn = "none"
 	sheet_owned = {}
@@ -2230,6 +2344,7 @@ func _load_progress() -> void:
 			auto_at = float(cfg.get_value("progress", "auto_at", 0.0))
 		var stored_ranks := str(cfg.get_value("progress", "upgrades", ""))
 		upgrades = _unpack_ranks(stored_ranks)
+		_unpack_marks(str(cfg.get_value("progress", "skill_marks", "")))
 		saber_skin = bool(cfg.get_value("progress", "saber_skin", false))
 		if cfg.has_section_key("progress", "saber_worn"):
 			saber_worn = str(cfg.get_value("progress", "saber_worn", "none"))
@@ -2335,6 +2450,7 @@ func _save_progress() -> void:
 	cfg.set_value("progress", "auto_left", auto_left)
 	cfg.set_value("progress", "auto_at", auto_at)
 	cfg.set_value("progress", "upgrades", _pack_upgrades())
+	cfg.set_value("progress", "skill_marks", _pack_marks())
 	cfg.set_value("progress", "saber_skin", saber_skin)
 	cfg.set_value("progress", "saber_worn", saber_worn)
 	cfg.set_value("progress", "sheet_owned", _pack_keys(sheet_owned))

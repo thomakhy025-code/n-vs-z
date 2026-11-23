@@ -57,6 +57,11 @@ var act_tool: String = "katana"
 var pending_kind: String = ""
 var numb: float = 0.0
 var bone_t: float = 0.0
+var root_left: float = 0.0
+var frost_time: float = 0.0
+var blaze: float = 0.0
+var blaze_clock: float = 0.0
+var blaze_factor: float = 1.0
 const RESPAWN: float = 6.0
 
 
@@ -158,6 +163,8 @@ func _go_down() -> void:
 		return
 	alive = false
 	hp = 0.0
+	blaze = 0.0
+	blaze_clock = 0.0
 	down_timer = RESPAWN
 	dragging = false
 	home_lock = 0.0
@@ -197,6 +204,7 @@ func _process(delta: float) -> void:
 	if battle.finished or battle.paused:
 		queue_redraw()
 		return
+	_tick_blaze(delta)
 	if numb > 0.0 or gust_lock > 0.0:
 		dragging = false
 		winding = false
@@ -237,16 +245,22 @@ func _move(delta: float) -> void:
 		step = stick.limit_length(1.0)
 	elif keys.length() > 0.15:
 		step = keys.normalized()
+	var pace := _pace()
+	if pace <= 0.0:
+		dragging = false
+		stepping = false
+		lane = battle.lane_index(position.y)
+		return
 	if step.length() > 0.12:
 		dragging = false
-		position += step * speed * delta
+		position += step * speed * pace * delta
 		bob_time += delta
 	elif dragging:
 		var delta_to: Vector2 = target - position
 		if delta_to.length() <= 6.0:
 			dragging = false
 		else:
-			position += delta_to.normalized() * minf(speed * delta, delta_to.length())
+			position += delta_to.normalized() * minf(speed * pace * delta, delta_to.length())
 			bob_time += delta
 	position.x = clampf(position.x, min_x, max_x)
 	position.y = clampf(position.y, min_y, max_y)
@@ -291,14 +305,20 @@ func _land_hero() -> void:
 		return
 	strike_sent = true
 	lunge = 1.0
+	var boosted := blaze > 0.0
 	if pending_kind == "sword":
 		slash = 0.28
 		Sfx.play(Painter.hit_id("katana"), randf_range(0.97, 1.05), -4.0)
+		var power := sword_damage * damage_multiplier
+		if boosted:
+			power *= 3.0 * blaze_factor
 		var melee = _nearest(sword_reach())
-		if melee != null:
-			melee.take_damage(sword_damage * damage_multiplier, true, "hero", sword_reach())
+		if boosted:
+			_blaze_melee(melee, power)
+		elif melee != null:
+			melee.take_damage(power, true, "hero", sword_reach())
 		elif _gate_in(sword_reach()):
-			battle.damage_gate(1 - side, sword_damage * damage_multiplier)
+			battle.damage_gate(1 - side, power)
 	else:
 		muzzle = 0.2
 		Sfx.play(Painter.hit_id("bow"), 1.04, -4.0)
@@ -311,7 +331,77 @@ func _land_hero() -> void:
 			aim_x = float(ranged.position.x)
 		elif _gate_in(shoot_reach):
 			aim_x = gate_x
-		battle.fire_arrow(Vector2(position.x, road_y), Vector2(aim_x, road_y), shoot_damage * damage_multiplier, side, Color("fff6c8"), shoot_reach, road, true, _gate_in(shoot_reach), false, "hero")
+		var shot := shoot_damage * damage_multiplier
+		var splash := 0.0
+		var burn_kind := ""
+		var burn := 0.0
+		if boosted:
+			shot *= 3.0 * blaze_factor
+			splash = 70.0
+			burn_kind = "fire"
+			burn = 9.0
+			if battle.has_method("ember_damage"):
+				burn = float(battle.ember_damage())
+		battle.fire_arrow(Vector2(position.x, road_y), Vector2(aim_x, road_y), shot, side, Color("fff6c8"), shoot_reach, road, true, _gate_in(shoot_reach), false, "hero", burn_kind, burn, splash)
+
+
+func _pace() -> float:
+	if root_left > 0.0:
+		return 0.0
+	if battle != null and battle.has_method("chill_pace"):
+		return float(battle.chill_pace(self))
+	return 1.0
+
+
+func _tick_blaze(delta: float) -> void:
+	if blaze <= 0.0 or not alive:
+		return
+	var before := blaze
+	blaze = maxf(0.0, blaze - delta)
+	blaze_clock += before - blaze
+	while blaze_clock >= 1.0 and alive:
+		blaze_clock -= 1.0
+		_bleed(max_hp * 0.125)
+	if blaze <= 0.0:
+		blaze = 0.0
+		blaze_clock = 0.0
+
+
+func _bleed(amount: float) -> void:
+	if not alive:
+		return
+	hp -= amount
+	if battle != null:
+		battle.register_damage()
+		battle.float_text(position + Vector2(0, -58), str(int(round(amount))), Color("ff7a2a"))
+	if hp <= 0.0:
+		hp = 0.0
+		blaze = 0.0
+		blaze_clock = 0.0
+		_go_down()
+
+
+func _blaze_melee(melee, power: float) -> void:
+	var at := position + Vector2(facing * 48.0, 0.0)
+	var struck := false
+	if melee != null:
+		at = melee.position
+		struck = true
+	elif _gate_in(sword_reach()):
+		var gate_x: float = float(battle.enemy_front) if side == 0 else float(battle.player_front)
+		at = Vector2(gate_x, position.y)
+		battle.damage_gate(1 - side, power)
+		struck = true
+	if not struck:
+		return
+	if battle.has_method("splash_foes"):
+		battle.splash_foes(at, lane, power, side, 70.0)
+	elif melee != null:
+		melee.take_damage(power, true, "hero", 400.0)
+	var burn := 9.0
+	if battle.has_method("ember_damage"):
+		burn = float(battle.ember_damage())
+	battle.lay_hazard("fire", lane, at, 3.0, burn)
 
 
 func _act_clock() -> Vector2:
@@ -436,6 +526,30 @@ func _draw() -> void:
 		draw_circle(Vector2(32, -85), 3.5, Color("e6c36a"))
 	if bone_t > 0.0 or numb > 0.0:
 		Painter.paint_ailment(self, bone_t, numb, bob_time)
+	_draw_blaze()
+
+
+func _draw_blaze() -> void:
+	if blaze <= 0.0:
+		return
+	var hot := Color("ff7a2a")
+	var core := Color("ffe08a")
+	var stamp := Time.get_ticks_msec() * 0.001
+	for flame_i in 3:
+		var fx := -12.0 + float(flame_i) * 12.0
+		var hop := sin(stamp * 9.0 + fx) * 3.0
+		var base_y := 8.0
+		var height := 16.0 + hop
+		draw_colored_polygon(PackedVector2Array([
+			Vector2(fx - 6.0, base_y),
+			Vector2(fx + 6.0, base_y),
+			Vector2(fx, base_y - height),
+		]), hot)
+		draw_colored_polygon(PackedVector2Array([
+			Vector2(fx - 2.4, base_y - 2.0),
+			Vector2(fx + 2.4, base_y - 2.0),
+			Vector2(fx, base_y - height * 0.48),
+		]), core)
 
 
 func _draw_slash() -> void:

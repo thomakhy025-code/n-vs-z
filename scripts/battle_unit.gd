@@ -83,6 +83,8 @@ var sit_left: float = 0.0
 var rounds: int = 4
 var loading: float = 0.0
 var smoke_tick: float = 0.15
+var root_left: float = 0.0
+var frost_time: float = 0.0
 var _phase_name: String = "idle"
 var _phase_t: float = 0.0
 var _phase_beat: int = 0
@@ -355,6 +357,22 @@ func _process(delta: float) -> void:
 	_keep_picture()
 
 
+func _pace() -> float:
+	if root_left > 0.0:
+		return 0.0
+	if battle != null and battle.has_method("chill_pace"):
+		return float(battle.chill_pace(self))
+	return 1.0
+
+
+func _walk(delta: float, rush: float = 1.0) -> void:
+	var pace := _pace()
+	if pace <= 0.0:
+		moving = false
+		return
+	position.x += facing * float(data["speed"]) * rush * pace * delta
+
+
 func _fight(delta: float) -> void:
 	if role == "fan":
 		_fan(delta)
@@ -386,7 +404,7 @@ func _fight(delta: float) -> void:
 		_try_strike(null, gate)
 	else:
 		moving = true
-		position.x += facing * float(data["speed"]) * rush * delta
+		_walk(delta, rush)
 		_clamp_x()
 
 
@@ -436,7 +454,7 @@ func _support(delta: float) -> void:
 		moving = false
 		return
 	moving = true
-	position.x += facing * float(data["speed"]) * delta
+	_walk(delta)
 	_clamp_x()
 
 
@@ -452,28 +470,31 @@ func _hunt(delta: float) -> void:
 			moving = true
 			_step_toward_lane(int(prey.lane), delta)
 			if _along(prey) > reach:
-				position.x += facing * float(data["speed"]) * delta
+				_walk(delta)
 				_clamp_x()
 			return
 		if _along(prey) <= reach:
 			_try_strike(prey, gate)
 			return
 		moving = true
-		position.x += facing * float(data["speed"]) * delta
+		_walk(delta)
 		_clamp_x()
 		return
 	if gate != null and abs(position.x - gate.front_x) <= siege + 6.0:
 		_try_strike(null, gate)
 		return
 	moving = true
-	position.x += facing * float(data["speed"]) * delta
+	_walk(delta)
 	_clamp_x()
 
 
 func _step_toward_lane(index: int, delta: float) -> void:
+	var pace := _pace()
+	if pace <= 0.0:
+		return
 	var goal_y: float = battle.lane_y(index)
 	var gap: float = goal_y - position.y
-	var step := float(data["speed"]) * delta
+	var step := float(data["speed"]) * pace * delta
 	if absf(gap) <= step:
 		position.y = goal_y
 		lane = index
@@ -482,7 +503,7 @@ func _step_toward_lane(index: int, delta: float) -> void:
 
 
 func _try_blink() -> void:
-	if blink_wait > 0.0:
+	if blink_wait > 0.0 or _pace() <= 0.0:
 		return
 	var blocker = null
 	var blocker_along := 100000.0
@@ -529,8 +550,12 @@ func _herald(delta: float) -> void:
 
 func _howler(delta: float) -> void:
 	moving = false
+	var pace := _pace()
 	if diving:
-		_swing_step(delta)
+		if pace > 0.0:
+			_swing_step(delta * pace)
+		return
+	if pace <= 0.0:
 		return
 	if swing_wait > 0.0:
 		swing_wait -= delta
@@ -729,7 +754,7 @@ func _fan(delta: float) -> void:
 		_try_strike(null, gate)
 		return
 	moving = true
-	position.x += facing * float(data["speed"]) * delta
+	_walk(delta)
 	_clamp_x()
 
 
@@ -851,7 +876,7 @@ func _halted_by_air(delta: float) -> bool:
 		moving = false
 		return true
 	moving = true
-	position.x += facing * float(data["speed"]) * delta
+	_walk(delta)
 	_clamp_x()
 	return true
 
@@ -866,7 +891,7 @@ func _smog(delta: float) -> void:
 		moving = false
 		return
 	moving = true
-	position.x += facing * float(data["speed"]) * delta
+	_walk(delta)
 	_clamp_x()
 
 
@@ -874,7 +899,7 @@ func _elder(delta: float) -> void:
 	var mark = _nearest_anybody()
 	if mark == null:
 		moving = true
-		position.x += facing * float(data["speed"]) * 0.45 * delta
+		_walk(delta, 0.45)
 		_clamp_x()
 		return
 	var dx := float(mark.position.x) - position.x
@@ -884,7 +909,7 @@ func _elder(delta: float) -> void:
 		_try_strike(mark, null)
 		return
 	moving = true
-	position.x += facing * float(data["speed"]) * delta
+	_walk(delta)
 	_clamp_x()
 
 
@@ -929,7 +954,7 @@ func _glut(delta: float) -> void:
 		return
 	if meal != null:
 		moving = true
-		position.x += facing * float(data["speed"]) * delta
+		_walk(delta)
 		_clamp_x()
 		return
 	var gate = battle.gate_for_attacker(side)
@@ -938,7 +963,7 @@ func _glut(delta: float) -> void:
 		_try_strike(null, gate)
 		return
 	moving = true
-	position.x += facing * float(data["speed"]) * delta
+	_walk(delta)
 	_clamp_x()
 
 

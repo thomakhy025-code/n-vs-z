@@ -12,6 +12,7 @@ signal terms_got(mode: String)
 signal begin_match(left: Array, right: Array, skins: Dictionary)
 signal input_got(x: float, y: float, dragging: bool, sword: bool, shoot: bool)
 signal buy_got(unit_id: String)
+signal skill_got(skill_id: String)
 signal state_got(packet: Array)
 signal arrow_got(payload: Array)
 signal pause_got
@@ -248,6 +249,8 @@ func _browser_line(line: String) -> void:
 		input_got.emit(float(msg.get("x", 0.0)), float(msg.get("y", 0.0)), bool(msg.get("dragging", false)), bool(msg.get("sword", false)), bool(msg.get("shoot", false)))
 	elif kind == "buy" and role == "host":
 		buy_got.emit(str(msg.get("id", "")))
+	elif kind == "skill" and role == "host":
+		skill_got.emit(str(msg.get("id", "")))
 	elif kind == "state" and role == "guest":
 		var packet: Variant = msg.get("p", [])
 		if packet is Array:
@@ -313,6 +316,15 @@ func announce_buy(unit_id: String) -> void:
 		_send({"t": "buy", "id": unit_id})
 		return
 	ask_buy.rpc_id(1, unit_id)
+
+
+func announce_skill(skill_id: String) -> void:
+	if role != "guest":
+		return
+	if _browser:
+		_send({"t": "skill", "id": skill_id})
+		return
+	ask_skill.rpc_id(1, skill_id)
 
 
 func announce_arrow(payload: Array) -> void:
@@ -399,6 +411,13 @@ func ask_buy(unit_id: String) -> void:
 	if not multiplayer.is_server():
 		return
 	buy_got.emit(unit_id)
+
+
+@rpc("any_peer", "reliable")
+func ask_skill(skill_id: String) -> void:
+	if not multiplayer.is_server():
+		return
+	skill_got.emit(skill_id)
 
 
 @rpc("authority", "unreliable")

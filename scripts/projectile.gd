@@ -17,9 +17,10 @@ var cosmetic: bool = false
 var from_id: String = ""
 var hazard: String = ""
 var hazard_dmg: float = 0.0
+var splash: float = 0.0
 
 
-func setup(from: Vector2, aim: Vector2, amount: float, side: int, color: Color, reach: float, road: int, field, heavy: bool = false, may_hit_gate: bool = true, seek_cross: bool = false, shot_from: String = "", hazard_kind: String = "", hazard_amount: float = 0.0) -> void:
+func setup(from: Vector2, aim: Vector2, amount: float, side: int, color: Color, reach: float, road: int, field, heavy: bool = false, may_hit_gate: bool = true, seek_cross: bool = false, shot_from: String = "", hazard_kind: String = "", hazard_amount: float = 0.0, splash_reach: float = 0.0) -> void:
 	battle = field
 	position = from
 	damage = amount
@@ -34,6 +35,7 @@ func setup(from: Vector2, aim: Vector2, amount: float, side: int, color: Color, 
 	from_id = shot_from
 	hazard = hazard_kind
 	hazard_dmg = hazard_amount
+	splash = splash_reach
 	var delta := aim - from
 	if not seek_cross:
 		delta.y = 0.0
@@ -66,8 +68,12 @@ func _process(delta: float) -> void:
 			var road := lane
 			if "lane" in foe:
 				road = int(foe.lane)
-			_drop_hazard(Vector2(float(foe.position.x), battle.lane_y(road)), road)
-			foe.take_damage(damage, false, from_id, max_dist)
+			var at := Vector2(float(foe.position.x), battle.lane_y(road))
+			_drop_hazard(at, road)
+			if splash > 0.0 and battle.has_method("splash_foes"):
+				battle.splash_foes(at, road, damage, shooter_side, splash)
+			else:
+				foe.take_damage(damage, false, from_id, max_dist)
 			_end()
 			return
 	if not hits_gate:
@@ -76,8 +82,11 @@ func _process(delta: float) -> void:
 	if gate != null and gate.hp > 0.0:
 		var gx: float = gate.front_x - position.x
 		if abs(gx) <= 22.0 and gx * velocity.x >= -10.0:
-			_drop_hazard(Vector2(gate.front_x, road_y), lane)
+			var gate_at := Vector2(gate.front_x, road_y)
+			_drop_hazard(gate_at, lane)
 			gate.take_damage(damage)
+			if splash > 0.0 and battle.has_method("splash_foes"):
+				battle.splash_foes(gate_at, lane, damage, shooter_side, splash)
 			_end()
 
 

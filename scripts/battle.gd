@@ -28,6 +28,8 @@ const ENEMY_INCOME_BASE := 7.2
 const ENEMY_GROWTH := 0.065
 const MAX_SIDE := 24
 const BREAK_TIME := 2.55
+const SKILL_COST := 60.0
+const SPLASH_REACH := 70.0
 
 
 static func castle_blood(rank: int) -> int:
@@ -47,6 +49,24 @@ static func income_line(rate: float) -> String:
 	var whole := int(float(tenths) / 10.0)
 	var frac := tenths - whole * 10
 	return "+%d.%d each second" % [whole, frac]
+
+
+static func is_skill(id: String) -> bool:
+	return id == "ex" or id == "ls" or id == "fz" or id == "en"
+
+
+static func skill_name(id: String) -> String:
+	match id:
+		"ex":
+			return "Explosion"
+		"ls":
+			return "Light smashing"
+		"fz":
+			return "Freezing"
+		"en":
+			return "Enhancement"
+		_:
+			return id
 
 
 var mode: String = ""
@@ -170,6 +190,9 @@ var _hud_hp_hot: bool = false
 var _hud_pfill: float = -1.0
 var _hud_efill: float = -1.0
 var _hud_p_hot: bool = false
+var skill_buttons: Array = []
+var cold_roads: Array = []
+var slash_fx: Array = []
 
 
 func start(chosen: Array, run_mode: String, level_index: int = 1) -> void:
@@ -391,6 +414,7 @@ func _build_hud() -> void:
 		btn.clip_text = true
 		hud.add_child(btn)
 		slot_buttons.append(btn)
+	_build_skill_buttons()
 	stick = JoyScript.new()
 	stick.moved.connect(_on_stick)
 	hud.add_child(stick)
@@ -492,6 +516,10 @@ func _stick_blocked(point: Vector2) -> bool:
 		var slot_btn: Button = raw_slot
 		if slot_btn.get_global_rect().has_point(point):
 			return true
+	for raw_skill in skill_buttons:
+		var skill_btn: Button = raw_skill
+		if is_instance_valid(skill_btn) and skill_btn.get_global_rect().has_point(point):
+			return true
 	return false
 
 
@@ -565,6 +593,21 @@ func _layout_hud() -> void:
 		btn.custom_minimum_size = btn.size
 		btn.position = Vector2(slots_left + float(i) * (slot_w + slot_gap), slot_y)
 		btn.add_theme_font_size_override("font_size", slot_font)
+	if not skill_buttons.is_empty():
+		var skill_count := skill_buttons.size()
+		var skill_gap := 8.0
+		var skill_h := 46.0
+		var skill_span := maxf(96.0, size.x - 40.0 - skill_gap * float(skill_count - 1))
+		var skill_w := minf(176.0, skill_span / float(skill_count))
+		var row_w := skill_w * float(skill_count) + skill_gap * float(skill_count - 1)
+		var skill_x := (size.x - row_w) * 0.5
+		var skill_y := slot_y - skill_h - 8.0
+		for skill_i in skill_count:
+			var skill_btn: Button = skill_buttons[skill_i]
+			skill_btn.size = Vector2(skill_w, skill_h)
+			skill_btn.custom_minimum_size = skill_btn.size
+			skill_btn.position = Vector2(skill_x + float(skill_i) * (skill_w + skill_gap), skill_y)
+			skill_btn.add_theme_font_size_override("font_size", 15)
 	if stick != null:
 		var stick_size := float(box["stick"])
 		var hold_center := stick.position + stick.size * 0.5
@@ -639,6 +682,8 @@ func _process(delta: float) -> void:
 			enemy_cd[id] = maxf(0.0, float(enemy_cd[id]) - delta)
 		player_value += player_income * delta
 		_tick_hazards(delta)
+		_tick_chill(delta)
+		_tick_slashes(delta)
 		_tick_smokes(delta)
 		if duel:
 			enemy_value += enemy_income * delta
@@ -997,7 +1042,7 @@ func rank_factor(unit_id: String, side: int) -> float:
 
 
 func _parse_ranks(raw: String) -> Dictionary:
-	var known: Array = ["hero", "sword", "archer", "shield", "saber", "lancer", "berserker", "horse", "suicide", "assassin", "heal", "level", "gate", "income"]
+	var known: Array = ["hero", "sword", "archer", "shield", "saber", "lancer", "berserker", "horse", "suicide", "assassin", "heal", "level", "gate", "income", "ex", "ls", "fz", "en"]
 	var out: Dictionary = {}
 	for piece in raw.split(",", false):
 		var bits: PackedStringArray = piece.split(":")
@@ -1322,9 +1367,9 @@ func damage_gate(defender_side: int, amount: float) -> void:
 		gate.take_damage(amount)
 
 
-func fire_arrow(from: Vector2, aim: Vector2, amount: float, side: int, color: Color, reach: float, road: int, bold: bool = false, hits_gate: bool = true, homing: bool = false, from_id: String = "", hazard_kind: String = "", hazard_amount: float = 0.0) -> void:
+func fire_arrow(from: Vector2, aim: Vector2, amount: float, side: int, color: Color, reach: float, road: int, bold: bool = false, hits_gate: bool = true, homing: bool = false, from_id: String = "", hazard_kind: String = "", hazard_amount: float = 0.0, splash: float = 0.0) -> void:
 	var arrow = ArrowScript.new()
-	arrow.setup(from, aim, amount, side, color, reach, road, self, bold, hits_gate, homing, from_id, hazard_kind, hazard_amount)
+	arrow.setup(from, aim, amount, side, color, reach, road, self, bold, hits_gate, homing, from_id, hazard_kind, hazard_amount, splash)
 	world.add_child(arrow)
 	if duel and Net.role == "host":
 		var start := _to_norm(from)
@@ -2046,6 +2091,8 @@ func _bind_duel_signals() -> void:
 		Net.pause_got.connect(_on_pause_ask)
 	if not Net.arrow_got.is_connected(_on_arrow):
 		Net.arrow_got.connect(_on_arrow)
+	if not Net.skill_got.is_connected(_on_net_skill):
+		Net.skill_got.connect(_on_net_skill)
 
 
 func _exit_tree() -> void:
@@ -2060,6 +2107,8 @@ func _exit_tree() -> void:
 		Net.pause_got.disconnect(_on_pause_ask)
 	if Net.arrow_got.is_connected(_on_arrow):
 		Net.arrow_got.disconnect(_on_arrow)
+	if Net.skill_got.is_connected(_on_net_skill):
+		Net.skill_got.disconnect(_on_net_skill)
 
 
 func _on_hand(x: float, y: float, dragging: bool, sword: bool, shoot: bool) -> void:
@@ -2078,6 +2127,12 @@ func _on_net_buy(unit_id: String) -> void:
 	if puppet:
 		return
 	summon_foe(unit_id)
+
+
+func _on_net_skill(id: String) -> void:
+	if puppet:
+		return
+	cast_skill(id, 1)
 
 
 func _on_pause_ask() -> void:
@@ -2149,6 +2204,7 @@ func _pack_hero(who) -> Array:
 		who.down_timer,
 		who.hurt,
 		1 if who.winding else 0,
+		who.blaze,
 	]
 
 
@@ -2232,6 +2288,8 @@ func _apply_hero(who, blob: Variant, local_control: bool) -> void:
 	who.down_timer = float(row[7])
 	who.hurt = float(row[8])
 	who.winding = int(row[9]) == 1
+	if row.size() > 10:
+		who.blaze = float(row[10])
 	var returned: bool = bool(who.alive) and not was_alive
 	if returned or not local_control or not who.alive or absf(who.position.x - hx) > 140.0:
 		who.position = Vector2(hx, hy)
@@ -2359,6 +2417,309 @@ func _ink(color: Color) -> Color:
 	return Color("1c140e") if lum > 0.62 else Color("f3e6c8")
 
 
+func _local_side() -> int:
+	if duel:
+		return local_side
+	return 0
+
+
+func _rank_table(side: int) -> Dictionary:
+	if duel and side == 1:
+		return rank_right
+	return rank_left
+
+
+func owns_skill(id: String, side: int) -> bool:
+	return _rank_table(side).has(id)
+
+
+func skill_rank(id: String, side: int) -> int:
+	var table := _rank_table(side)
+	if not table.has(id):
+		return 0
+	if rank_mode == "max":
+		return RANK_CAP
+	return clampi(int(table[id]), 1, RANK_CAP)
+
+
+func skill_factor(id: String, side: int) -> float:
+	var rank := skill_rank(id, side)
+	if rank < 1:
+		rank = 1
+	return 1.0 + 0.05 * float(rank - 1)
+
+
+func ember_damage() -> float:
+	var entry: Dictionary = Catalog.find_in(player_roster, "firebow")
+	if entry.is_empty():
+		return 9.0
+	return float(entry.get("burn", 9.0))
+
+
+func _build_skill_buttons() -> void:
+	var side := _local_side()
+	for skill_id in ["ex", "ls", "fz", "en"]:
+		var id := str(skill_id)
+		if not owns_skill(id, side):
+			continue
+		var btn := Button.new()
+		btn.text = skill_name(id)
+		btn.focus_mode = Control.FOCUS_NONE
+		btn.clip_text = true
+		btn.mouse_filter = Control.MOUSE_FILTER_STOP
+		btn.z_index = 8
+		var cloth := Color("c44536")
+		if id == "ls":
+			cloth = Color("e6c36a")
+		elif id == "fz":
+			cloth = Color("7eb6e0")
+		elif id == "en":
+			cloth = Color("ff7a2a")
+		UiSkin.apply(btn, cloth, 15, _ink(cloth))
+		btn.set_meta("skill_id", id)
+		btn.pressed.connect(_press_skill.bind(id))
+		hud.add_child(btn)
+		skill_buttons.append(btn)
+
+
+func _press_skill(id: String) -> void:
+	if finished or paused:
+		return
+	if duel and puppet:
+		if player_value < SKILL_COST:
+			return
+		Net.announce_skill(id)
+		return
+	cast_skill(id, _local_side())
+
+
+func cast_skill(id: String, side: int) -> bool:
+	if finished or paused or not is_skill(id):
+		return false
+	if not owns_skill(id, side):
+		return false
+	var who = _hero_for(side)
+	if who == null:
+		return false
+	if not _spend_skill(side, SKILL_COST):
+		return false
+	var factor := skill_factor(id, side)
+	if id == "ex":
+		_cast_explosion(who, 400.0 * factor)
+	elif id == "ls":
+		_cast_smash(who, 320.0 * factor)
+	elif id == "fz":
+		_cast_freeze(who, 40.0 * factor)
+	else:
+		who.blaze = 8.0
+		who.blaze_factor = factor
+	return true
+
+
+func _spend_skill(side: int, cost: float) -> bool:
+	if side == 0:
+		if player_value < cost:
+			return false
+		player_value -= cost
+		return true
+	if enemy_value < cost:
+		return false
+	enemy_value -= cost
+	return true
+
+
+func _toward_enemy(side: int) -> float:
+	return 1.0 if side == 0 else -1.0
+
+
+func _field_length() -> float:
+	return maxf(1.0, vp.x)
+
+
+func _ahead_box(who, portion: float) -> Vector2:
+	var reach := _field_length() * portion
+	var origin := float(who.position.x)
+	var dest := origin + _toward_enemy(int(who.side)) * reach
+	var x0 := clampf(minf(origin, dest), 0.0, vp.x)
+	var x1 := clampf(maxf(origin, dest), 0.0, vp.x)
+	return Vector2(x0, x1)
+
+
+func _bodies() -> Array:
+	var found: Array = []
+	for unit in units:
+		if is_instance_valid(unit):
+			found.append(unit)
+	if hero != null and is_instance_valid(hero):
+		found.append(hero)
+	if foe != null and is_instance_valid(foe):
+		found.append(foe)
+	return found
+
+
+func _on_road(body, road: int) -> bool:
+	if body == null or not is_instance_valid(body) or not body.alive:
+		return false
+	if is_berserker(body) or is_boss(body):
+		return true
+	if not ("lane" in body):
+		return false
+	return int(body.lane) == road
+
+
+func _band_has(body, road: int, x0: float, x1: float) -> bool:
+	if road >= 0:
+		return _stands_in(body, road, x0, x1)
+	if body == null or not is_instance_valid(body) or not body.alive:
+		return false
+	var x := float(body.position.x)
+	return x >= x0 - 0.5 and x <= x1 + 0.5
+
+
+func _hurt_band(caster, x0: float, x1: float, road: int, amount: float, foes: bool, allies: bool) -> void:
+	var side := int(caster.side)
+	for body in _bodies():
+		if body == caster or not body.alive or not body.has_method("take_damage"):
+			continue
+		if not _band_has(body, road, x0, x1):
+			continue
+		var enemy := int(body.side) != side
+		if enemy and not foes:
+			continue
+		if not enemy and not allies:
+			continue
+		body.take_damage(amount, true, "hero", 400.0)
+
+
+func _root_allies(caster, road: int, seconds: float) -> void:
+	var side := int(caster.side)
+	for body in _bodies():
+		if not body.alive or int(body.side) != side:
+			continue
+		if not _stands_in(body, road, -4.0, vp.x + 4.0):
+			continue
+		if not ("root_left" in body):
+			continue
+		body.root_left = maxf(float(body.root_left), seconds)
+
+
+func _cast_explosion(who, amount: float) -> void:
+	var span := _ahead_box(who, 0.25)
+	_hurt_band(who, span.x, span.y, -1, amount, true, true)
+	var burn := ember_damage()
+	for road in lane_ys.size():
+		var y := lane_y(road)
+		lay_zone("fire", road, span.x, span.y, y, 3.0, burn, who)
+		poof(Vector2((span.x + span.y) * 0.5, y), Color("ff7a2a"))
+	Sfx.play("hit", 0.86, -4.0)
+
+
+func _cast_smash(who, amount: float) -> void:
+	var span := _ahead_box(who, 2.0 / 3.0)
+	var road := int(who.lane)
+	_hurt_band(who, span.x, span.y, road, amount, true, true)
+	_note_slash(span.x, span.y, lane_y(road))
+	Sfx.play(Painter.hit_id("katana"), 0.92, -4.0)
+
+
+func _cast_freeze(who, amount: float) -> void:
+	var road := int(who.lane)
+	_hurt_band(who, 0.0, vp.x, road, amount, true, false)
+	_root_allies(who, road, 3.0)
+	_hold_cold(road)
+	lay_zone("ice", road, 0.0, vp.x, lane_y(road), 6.0, 0.0, null)
+	Sfx.play("wind", 1.15, -6.0)
+
+
+func _hold_cold(road: int) -> void:
+	for patch in cold_roads:
+		if int(patch.get("lane", -1)) == road:
+			patch["left"] = 6.0
+			return
+	cold_roads.append({"lane": road, "left": 6.0})
+
+
+func splash_foes(at: Vector2, road: int, amount: float, side: int, radius: float = SPLASH_REACH) -> void:
+	for body in _bodies():
+		if not body.alive or not body.has_method("take_damage"):
+			continue
+		if int(body.side) == side:
+			continue
+		var wide := is_berserker(body) or is_boss(body)
+		if not wide and int(body.lane) != road:
+			continue
+		if absf(float(body.position.x) - at.x) > radius:
+			continue
+		body.take_damage(amount, true, "hero", 400.0)
+
+
+func chill_pace(body) -> float:
+	if _standing_on_cold(body):
+		return 0.5
+	return 1.0
+
+
+func _standing_on_cold(body) -> bool:
+	if body == null or not is_instance_valid(body) or not body.alive:
+		return false
+	for patch in cold_roads:
+		if _on_road(body, int(patch.get("lane", -1))):
+			return true
+	return false
+
+
+func _tick_chill(delta: float) -> void:
+	var write := 0
+	for patch in cold_roads:
+		var left := float(patch.get("left", 0.0)) - delta
+		if left <= 0.0:
+			continue
+		patch["left"] = left
+		cold_roads[write] = patch
+		write += 1
+	if write < cold_roads.size():
+		cold_roads.resize(write)
+	for body in _bodies():
+		if not ("root_left" in body):
+			continue
+		var rooted := float(body.root_left) - delta
+		if rooted < 0.0:
+			rooted = 0.0
+		body.root_left = rooted
+		if not body.alive:
+			body.frost_time = 0.0
+			continue
+		if _standing_on_cold(body):
+			var stood := float(body.frost_time) + delta
+			if stood >= 3.0:
+				body.root_left = maxf(float(body.root_left), 1.0)
+				stood = 0.0
+			body.frost_time = stood
+		else:
+			body.frost_time = 0.0
+
+
+func _note_slash(x0: float, x1: float, y: float) -> void:
+	slash_fx.append({"x0": x0, "x1": x1, "y": y, "left": 0.35})
+	queue_redraw()
+
+
+func _tick_slashes(delta: float) -> void:
+	if slash_fx.is_empty():
+		return
+	var write := 0
+	for mark in slash_fx:
+		var left := float(mark.get("left", 0.0)) - delta
+		if left <= 0.0:
+			continue
+		mark["left"] = left
+		slash_fx[write] = mark
+		write += 1
+	if write < slash_fx.size():
+		slash_fx.resize(write)
+	queue_redraw()
+
+
 func lay_hazard(kind: String, road: int, at: Vector2, seconds: float, amount: float) -> void:
 	var origin := at.x
 	hazards.append({
@@ -2371,6 +2732,24 @@ func lay_hazard(kind: String, road: int, at: Vector2, seconds: float, amount: fl
 		"left": seconds,
 		"tick": 0.25,
 		"dmg": amount,
+	})
+	queue_redraw()
+
+
+func lay_zone(kind: String, road: int, x0: float, x1: float, y: float, seconds: float, amount: float, spare) -> void:
+	var left_x := minf(x0, x1)
+	var right_x := maxf(x0, x1)
+	hazards.append({
+		"kind": kind,
+		"lane": road,
+		"origin": (left_x + right_x) * 0.5,
+		"x0": left_x,
+		"x1": right_x,
+		"y": y,
+		"left": seconds,
+		"tick": 0.25,
+		"dmg": amount,
+		"spare": spare,
 	})
 	queue_redraw()
 
@@ -2592,13 +2971,16 @@ func _scorch(patch: Dictionary) -> void:
 	var kind := str(patch.get("kind", "fire"))
 	if amount <= 0.0:
 		return
+	var spare: Variant = patch.get("spare", null)
 	var bodies: Array = units.duplicate()
 	for body in bodies:
+		if spare != null and body == spare:
+			continue
 		if _stands_in(body, road, x0, x1):
 			body.take_damage(amount, true, kind, 0.0)
-	if _stands_in(hero, road, x0, x1):
+	if (spare == null or hero != spare) and _stands_in(hero, road, x0, x1):
 		hero.take_damage(amount, true, kind)
-	if _stands_in(foe, road, x0, x1):
+	if (spare == null or foe != spare) and _stands_in(foe, road, x0, x1):
 		foe.take_damage(amount, true, kind)
 
 
@@ -2656,4 +3038,15 @@ func _draw() -> void:
 				]), core)
 				var ember := Vector2(fx + sin(battle_time * 7.0 + fx) * 3.0, y - height - 4.0)
 				draw_circle(ember, 2.4, core)
+	for mark in slash_fx:
+		var sx0 := float(mark.get("x0", 0.0))
+		var sx1 := float(mark.get("x1", 0.0))
+		var sy := float(mark.get("y", ground_y))
+		var alpha := clampf(float(mark.get("left", 0.0)) / 0.35, 0.0, 1.0)
+		var slash_span := maxf(8.0, sx1 - sx0)
+		var cuts := clampi(int(slash_span / 70.0), 1, 12)
+		for cut in cuts:
+			var cx := sx0 + slash_span * (float(cut) + 0.5) / float(cuts)
+			draw_arc(Vector2(cx, sy - 10.0), 36.0, -1.1, 1.05, 12, Color(1, 0.94, 0.72, alpha), 8.0)
+			draw_arc(Vector2(cx, sy - 10.0), 24.0, -1.1, 1.05, 10, Color(0.86, 0.22, 0.16, alpha), 4.0)
 
