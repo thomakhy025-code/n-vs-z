@@ -3322,6 +3322,8 @@ func _on_rematch() -> void:
 
 func _layout_check() -> void:
 	layout_account = true
+	cleared = 0
+	unlocked = 1
 	get_window().size = Vector2i(1280, 720)
 	for _i in 2:
 		await get_tree().process_frame
@@ -3352,6 +3354,17 @@ func _layout_check() -> void:
 		var play_rect := play.get_global_rect()
 		play_ok = play_rect.position.y >= 0.0 and play_rect.end.y <= vp.y + 1.0
 		print("TITLE play=", play_rect, " vp=", vp, " ok=", play_ok)
+	var play_name := ""
+	var quit_name := ""
+	var duel_name := ""
+	if play != null:
+		play_name = play.text
+	if quit_b != null:
+		quit_name = quit_b.text
+	if duel_b != null:
+		duel_name = duel_b.text
+	var names_ok := play_name == "Play" and quit_name == "Quit" and duel_name == "1 vs 1"
+	print("TITLE names=", names_ok, " play=", play_name, " quit=", quit_name, " duel=", duel_name)
 	_show_how()
 	for _i in 5:
 		await get_tree().process_frame
@@ -3397,7 +3410,45 @@ func _layout_check() -> void:
 		if roads <= Levels.count():
 			var road_rules: Dictionary = Levels.level(roads)
 			print("LEVEL ", b.disabled, " ", b.text.replace("\n", " / "), " +", float(road_rules["income"]))
-	var win := play_ok and quit_ok and duel_ok and how_ok and back_ok and roads == Levels.count() and first_open and saw_end and body_h > scroll_h and scroll_h > 40.0
+	_start_battle(["sword", "archer", "shield", "lancer", "berserker", "heal"], "layout", 1)
+	for _i in 6:
+		await get_tree().process_frame
+	vp = get_viewport().get_visible_rect().size
+	var battle := _battle_node()
+	var board := _control_meta(self, "note_board")
+	var road_top := vp.y * 0.34 - 16.0
+	var road_floor := vp.y - 14.0 - sqrt(vp.x * vp.y / 20.0) - 20.0
+	var board_rect := Rect2()
+	var board_ok := false
+	if board != null:
+		board_rect = board.get_global_rect()
+		board_ok = board_rect.position.y <= 30.0 and board_rect.end.y <= road_top and board_rect.size.x > vp.x * 0.7 and board_rect.size.y > 70.0
+		print("BATTLE board=", board_rect, " road_top=", road_top, " ok=", board_ok)
+	else:
+		print("BATTLE board missing ok=false")
+	var slots_ok := false
+	if battle != null:
+		var slots: Array = battle.get("slot_buttons")
+		slots_ok = not slots.is_empty()
+		for raw_slot in slots:
+			var slot_btn: Button = raw_slot
+			var slot_rect := slot_btn.get_global_rect()
+			var slot_fit := slot_rect.position.y >= road_floor and slot_rect.position.y > vp.y * 0.55 and slot_rect.end.y <= vp.y + 1.0
+			if board != null:
+				slot_fit = slot_fit and slot_rect.position.y > board_rect.end.y
+			if not slot_fit:
+				slots_ok = false
+			print("BATTLE slot=", slot_btn.text.replace("\n", " "), " ", slot_rect, " ok=", slot_fit)
+	else:
+		print("BATTLE missing")
+	print("BATTLE slots=", slots_ok, " road_floor=", road_floor)
+	if DisplayServer.get_name() != "headless":
+		await RenderingServer.frame_post_draw
+		var hud_image := get_viewport().get_texture().get_image()
+		var hud_path := ProjectSettings.globalize_path("res://shots/battle_hud.png")
+		DirAccess.make_dir_recursive_absolute(hud_path.get_base_dir())
+		print("HUD SHOT ", hud_path, " err=", hud_image.save_png(hud_path))
+	var win := play_ok and quit_ok and duel_ok and how_ok and back_ok and roads == Levels.count() and first_open and saw_end and body_h > scroll_h and scroll_h > 40.0 and board_ok and slots_ok and names_ok
 	print("LAYOUT ", "OK" if win else "FAIL")
 	get_tree().quit(0 if win else 1)
 
@@ -3435,10 +3486,15 @@ func _win_check() -> void:
 		get_tree().quit(1)
 		return
 	battle.call("on_gate_fallen", 1)
-	for _i in 4:
+	var nxt: Button = null
+	var win_wait := 0.0
+	while win_wait < 5.5:
 		await get_tree().process_frame
+		win_wait += get_process_delta_time()
+		nxt = _button_named(self, "Next level")
+		if nxt != null:
+			break
 	var vp := get_viewport().get_visible_rect().size
-	var nxt := _button_named(self, "Next level")
 	var onscreen := false
 	if nxt != null:
 		var rect := nxt.get_global_rect()
@@ -3483,6 +3539,16 @@ func _find_scroll(node: Node) -> ScrollContainer:
 		return node as ScrollContainer
 	for child in node.get_children():
 		var found := _find_scroll(child)
+		if found != null:
+			return found
+	return null
+
+
+func _control_meta(node: Node, key: String) -> Control:
+	if node is Control and (node as Control).has_meta(key):
+		return node as Control
+	for child in node.get_children():
+		var found := _control_meta(child, key)
 		if found != null:
 			return found
 	return null

@@ -26,6 +26,7 @@ const ENEMY_START := 22.0
 const ENEMY_INCOME_BASE := 7.2
 const ENEMY_GROWTH := 0.065
 const MAX_SIDE := 24
+const BREAK_TIME := 2.55
 
 
 static func castle_blood(rank: int) -> int:
@@ -90,8 +91,9 @@ var fx: Node2D
 var layer: CanvasLayer
 var hud: Control
 var value_label: Label
-var income_label: Label
+var coin_label: Label
 var level_label: Label
+var note_board: Panel
 var player_hp_label: Label
 var enemy_hp_label: Label
 var player_bar_fill: ColorRect
@@ -142,6 +144,14 @@ var hand_seen: float = -1.0
 var fallen_side: int = -1
 var yard_stay: Dictionary = {}
 var full_note: float = 0.0
+var leaving: bool = false
+var win_banked: bool = false
+var ending_sent: bool = false
+var castle_break: float = -1.0
+var break_side: int = -1
+var break_cam: Camera2D = null
+var break_from: Vector2 = Vector2.ZERO
+var break_aim: Vector2 = Vector2.ZERO
 var _yard_seen: Dictionary = {}
 var _yard_drop: Array = []
 var _list_frame: int = -1
@@ -296,20 +306,26 @@ func _build_hud() -> void:
 	hurt_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hurt_flash.color = Color(0, 0, 0, 0)
 	hud.add_child(hurt_flash)
-	player_hp_label = _plain(str(int(round(player_gate.hp))), 22, Color("f3e6c8"))
-	enemy_hp_label = _plain(str(int(round(enemy_gate.hp))), 22, Color("f3e6c8"))
+	note_board = Panel.new()
+	note_board.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	note_board.clip_contents = true
+	note_board.z_index = 3
+	note_board.set_meta("note_board", true)
+	note_board.add_theme_stylebox_override("panel", UiSkin.panel(Color(0.06, 0.045, 0.06, 0.88), Color("e6c36a"), 12, 2))
+	player_hp_label = _plain("Clan gate  %d" % int(round(player_gate.hp)), 16, Color("f3e6c8"))
+	enemy_hp_label = _plain("Cursed gate  %d" % int(round(enemy_gate.hp)), 16, Color("f3e6c8"))
 	enemy_hp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	value_label = _plain("Value  16", 32, Color("e6c36a"))
+	value_label = _plain("Value  16    ·    %s" % income_line(_shown_income()), 22, Color("e6c36a"))
 	value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	income_label = _plain(income_line(_shown_income()), 16, Color("f3e6c8"))
-	income_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	coin_label = _plain(_coin_board_text(), 16, Color("f3e6c8"))
+	coin_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	level_label = _plain("Level %d  ·  %s" % [level_no, str(rules["name"])], 18, Color("f3e6c8"))
 	level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	level_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hint = _plain("The stick moves the hero. Calls sit beside it. Sword and Shoot are on the right.", 16, Color("f3e6c8"))
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	down_label = _plain("", 20, Color("ffb4a8"))
+	down_label = _plain("", 18, Color("ffb4a8"))
 	down_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	player_track = _bar_track()
 	enemy_track = _bar_track()
@@ -317,15 +333,16 @@ func _build_hud() -> void:
 	enemy_bar_fill = _bar_fill(Color("e24b3b"))
 	player_track.add_child(player_bar_fill)
 	enemy_track.add_child(enemy_bar_fill)
-	hud.add_child(player_hp_label)
-	hud.add_child(enemy_hp_label)
-	hud.add_child(value_label)
-	hud.add_child(income_label)
-	hud.add_child(level_label)
+	note_board.add_child(player_hp_label)
+	note_board.add_child(enemy_hp_label)
+	note_board.add_child(value_label)
+	note_board.add_child(coin_label)
+	note_board.add_child(level_label)
+	note_board.add_child(down_label)
+	note_board.add_child(player_track)
+	note_board.add_child(enemy_track)
+	hud.add_child(note_board)
 	hud.add_child(hint)
-	hud.add_child(down_label)
-	hud.add_child(player_track)
-	hud.add_child(enemy_track)
 	player_track.set_meta("bar", true)
 	if not duel:
 		pause_btn = Button.new()
@@ -333,13 +350,13 @@ func _build_hud() -> void:
 		pause_btn.focus_mode = Control.FOCUS_NONE
 		UiSkin.apply(pause_btn, Color("f3e6c8"), 16)
 		pause_btn.pressed.connect(_toggle_pause)
-		hud.add_child(pause_btn)
+		note_board.add_child(pause_btn)
 		home_btn = Button.new()
 		home_btn.text = "Home"
 		home_btn.focus_mode = Control.FOCUS_NONE
 		UiSkin.apply(home_btn, Color("e6c36a"), 16)
 		home_btn.pressed.connect(_go_home)
-		hud.add_child(home_btn)
+		note_board.add_child(home_btn)
 	sword_btn = Button.new()
 	sword_btn.text = "SWORD"
 	shoot_btn = Button.new()
@@ -360,8 +377,9 @@ func _build_hud() -> void:
 		UiSkin.apply(btn, cloth, 16, _ink(cloth))
 		btn.set_meta("slot_short", str(entry["short"]))
 		btn.set_meta("slot_cost", int(entry["cost"]))
+		btn.set_meta("call_slot", true)
 		btn.mouse_filter = Control.MOUSE_FILTER_STOP
-		btn.z_index = 4
+		btn.z_index = 6
 		var slot_index := slot_buttons.size()
 		slot_hold.append(false)
 		btn.button_down.connect(_press_slot.bind(slot_index))
@@ -463,36 +481,49 @@ func _layout_hud() -> void:
 		stick.custom_minimum_size = stick.size
 		stick.position = box["stick_pos"]
 		stick.queue_redraw()
-	player_hp_label.position = Vector2(pad.x + 16.0, top + 8.0)
-	player_hp_label.size = Vector2(250, 30)
-	enemy_hp_label.position = Vector2(size.x - pad.z - 266.0, top + 8.0)
-	enemy_hp_label.size = Vector2(250, 30)
-	value_label.position = Vector2(size.x * 0.5 - 170.0, top + 4.0)
-	value_label.size = Vector2(340, 46)
-	value_label.add_theme_font_size_override("font_size", 40)
-	income_label.position = Vector2(size.x * 0.5 - 170.0, top + 50.0)
-	income_label.size = Vector2(340, 24)
-	if level_label != null:
-		level_label.position = Vector2(size.x * 0.5 - 360.0, top + 76.0)
-		level_label.size = Vector2(720, 26)
-	hint.position = Vector2(size.x * 0.5 - 280.0, top + 104.0)
-	hint.size = Vector2(560, 48)
-	down_label.position = Vector2(size.x * 0.5 - 180.0, top + 156.0)
-	down_label.size = Vector2(360, 28)
+	var sky_bottom := size.y * 0.34 - 22.0
+	var board_top := top + 6.0
+	var board_h := minf(132.0, maxf(0.0, sky_bottom - board_top - 4.0))
+	var board_x := pad.x + 10.0
+	var board_w := maxf(320.0, size.x - pad.x - pad.z - 20.0)
+	if note_board != null:
+		note_board.position = Vector2(board_x, board_top)
+		note_board.size = Vector2(board_w, board_h)
+	var side_w := 210.0
+	player_hp_label.position = Vector2(14.0, 74.0)
+	player_hp_label.size = Vector2(side_w, 24)
+	enemy_hp_label.position = Vector2(board_w - side_w - 14.0, 74.0)
+	enemy_hp_label.size = Vector2(side_w, 24)
 	if player_track != null:
-		player_track.position = Vector2(pad.x + 16.0, top + 40.0)
-		enemy_track.position = Vector2(size.x - pad.z - 236.0, top + 40.0)
-	var chrome := Vector2(148, 76)
+		player_track.position = Vector2(14.0, 102.0)
+		enemy_track.position = Vector2(board_w - 234.0, 102.0)
+	var mid_w := maxf(280.0, board_w - 460.0)
+	var mid_x := (board_w - mid_w) * 0.5
+	level_label.position = Vector2(mid_x, 8.0)
+	level_label.size = Vector2(mid_w, 26)
+	if coin_label != null:
+		coin_label.position = Vector2(mid_x, 36.0)
+		coin_label.size = Vector2(mid_w, 22)
+	value_label.position = Vector2(mid_x, 58.0)
+	value_label.size = Vector2(mid_w, 28)
+	value_label.add_theme_font_size_override("font_size", 22)
+	down_label.position = Vector2(mid_x, 96.0)
+	down_label.size = Vector2(mid_w, 24)
+	var hint_y := board_top + board_h + 4.0
+	hint.position = Vector2(size.x * 0.5 - 300.0, hint_y)
+	hint.size = Vector2(600, 36)
+	hint.visible = hint_y + 32.0 < sky_bottom
+	var chrome := Vector2(136, 58)
 	if pause_btn != null:
 		pause_btn.size = chrome
 		pause_btn.custom_minimum_size = chrome
-		pause_btn.position = Vector2(size.x - pad.z - 164.0, top + 56.0)
-		pause_btn.add_theme_font_size_override("font_size", 22)
+		pause_btn.position = Vector2(board_w - chrome.x - 12.0, 8.0)
+		pause_btn.add_theme_font_size_override("font_size", 20)
 	if home_btn != null:
 		home_btn.size = chrome
 		home_btn.custom_minimum_size = chrome
-		home_btn.position = Vector2(pad.x + 16.0, top + 56.0)
-		home_btn.add_theme_font_size_override("font_size", 22)
+		home_btn.position = Vector2(12.0, 8.0)
+		home_btn.add_theme_font_size_override("font_size", 20)
 
 
 func _process(delta: float) -> void:
@@ -501,6 +532,7 @@ func _process(delta: float) -> void:
 	if puppet:
 		_send_hand()
 		_update_hud(delta)
+		_tick_castle_break(delta)
 		_run_harness()
 		return
 	if not finished and not paused:
@@ -546,6 +578,7 @@ func _process(delta: float) -> void:
 		_tick_castle_yard(delta)
 	_send_state(delta)
 	_update_hud(delta)
+	_tick_castle_break(delta)
 	_run_harness()
 
 
@@ -901,6 +934,22 @@ func _castle_for(side: int) -> int:
 
 func _income_for(side: int) -> float:
 	return income_rate(_side_rank(side, "income"))
+
+
+func _coin_board_text() -> String:
+	var purse := 0
+	var host := get_parent()
+	if host != null:
+		var raw = host.get("coins")
+		if raw != null:
+			purse = int(raw)
+	var text := "Coins  %d" % purse
+	if duel or host == null or not host.has_method("hold_hud"):
+		return text
+	var rate := str(host.hold_hud(level_no))
+	if rate != "":
+		text += "   ·   " + rate
+	return text
 
 
 func _shown_income() -> float:
@@ -1407,7 +1456,7 @@ func on_gate_fallen(defender_side: int) -> void:
 	if finished:
 		return
 	if duel:
-		_finish_battle(defender_side)
+		_finish_battle(defender_side, true)
 		return
 	if defender_side == 1 and str(rules.get("lesson", "")) != "" and not trial_on:
 		_begin_trial()
@@ -1415,7 +1464,7 @@ func on_gate_fallen(defender_side: int) -> void:
 	if defender_side == 1 and bool(rules.get("boss", false)) and not boss_up:
 		_summon_boss()
 		return
-	_finish_battle(defender_side)
+	_finish_battle(defender_side, true)
 
 
 func _begin_trial() -> void:
@@ -1454,7 +1503,7 @@ func _summon_boss() -> void:
 		hint.text = "The general walks. The level ends when the general dies."
 
 
-func _finish_battle(defender_side: int) -> void:
+func _finish_battle(defender_side: int, from_gate: bool = false) -> void:
 	if finished:
 		return
 	finished = true
@@ -1471,13 +1520,85 @@ func _finish_battle(defender_side: int) -> void:
 	if mode != "" and mode != "duel":
 		return
 	_close_pause()
+	_bank_win(defender_side)
+	if _battle_is_quitting():
+		return
+	if from_gate:
+		_start_castle_break(defender_side)
+		return
+	_show_result(defender_side)
+
+
+func _bank_win(defender_side: int) -> void:
+	if win_banked:
+		return
+	win_banked = true
+	var won := defender_side == 1
+	if duel:
+		won = defender_side != local_side
+	if not won or duel:
+		return
+	var host := get_parent()
+	if host != null and host.has_method("note_clear"):
+		host.note_clear(level_no, battle_time)
+
+
+func _show_result(defender_side: int) -> void:
+	if ending_sent or _battle_is_quitting():
+		return
+	ending_sent = true
+	var won := defender_side == 1
+	if duel:
+		won = defender_side != local_side
 	if won and not duel:
 		var host := get_parent()
-		if host != null and host.has_method("note_clear"):
-			host.note_clear(level_no, battle_time)
 		if host != null and host.has_method("play_clear_story") and host.play_clear_story(level_no, _present_end.bind(defender_side)):
 			return
 	_present_end(defender_side)
+
+
+func _battle_is_quitting() -> bool:
+	if leaving or not is_inside_tree():
+		return true
+	return get_tree() == null
+
+
+func _start_castle_break(defender_side: int) -> void:
+	break_side = defender_side
+	castle_break = 0.0
+	var gate = player_gate if defender_side == 0 else enemy_gate
+	if gate != null and is_instance_valid(gate) and gate.has_method("begin_break"):
+		gate.begin_break()
+	var view := get_viewport_rect().size
+	break_from = view * 0.5
+	break_aim = break_from
+	if gate != null and is_instance_valid(gate):
+		break_aim = gate.position
+	if break_cam == null or not is_instance_valid(break_cam):
+		break_cam = Camera2D.new()
+		add_child(break_cam)
+	break_cam.position = break_from
+	break_cam.zoom = Vector2.ONE
+	break_cam.enabled = true
+	break_cam.make_current()
+
+
+func _tick_castle_break(delta: float) -> void:
+	if castle_break < 0.0:
+		return
+	if _battle_is_quitting():
+		castle_break = -2.0
+		return
+	castle_break += delta
+	if break_cam != null and is_instance_valid(break_cam):
+		var blend := clampf(castle_break / 0.78, 0.0, 1.0)
+		var ease := blend * blend * (3.0 - 2.0 * blend)
+		break_cam.position = break_from.lerp(break_aim, ease)
+		var zoom := lerpf(1.0, 2.45, ease)
+		break_cam.zoom = Vector2(zoom, zoom)
+	if castle_break >= BREAK_TIME:
+		castle_break = -2.0
+		_show_result(break_side)
 
 
 func _present_end(defender_side: int) -> void:
@@ -1548,7 +1669,14 @@ func _toggle_pause() -> void:
 	layer.add_child(pause_layer)
 
 
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST:
+		leaving = true
+
+
 func _go_home() -> void:
+	leaving = true
+	castle_break = -2.0
 	var host := get_parent()
 	if host != null and host.has_method("flush_hold"):
 		host.flush_hold()
@@ -1643,28 +1771,20 @@ func _update_hud(delta: float) -> void:
 	if hp_hot != _hud_hp_hot:
 		_hud_hp_hot = hp_hot
 		player_hp_label.add_theme_color_override("font_color", Color("ffb4a8") if hp_hot else Color("f3e6c8"))
-	var value_text := "Value  %d" % int(floor(player_value))
+	var value_text := "Value  %d    ·    %s" % [int(floor(player_value)), income_line(_shown_income())]
 	if value_label.text != value_text:
 		value_label.text = value_text
-	var income_text := income_line(_shown_income())
-	if income_label.text != income_text:
-		income_label.text = income_text
+	if coin_label != null:
+		var coin_text := _coin_board_text()
+		if coin_label.text != coin_text:
+			coin_label.text = coin_text
 	if level_label != null and not duel:
-		var hold := ""
-		if mode == "":
-			var host := get_parent()
-			if host != null and host.has_method("hold_hud"):
-				hold = str(host.hold_hud(level_no))
 		var level_text := "Level %d  ·  %s" % [level_no, str(rules["name"])]
-		var level_size := 18
-		if hold != "":
-			level_text = "Level %d  ·  %s  ·  %s" % [level_no, str(rules["name"]), hold]
-			level_size = 15
 		if level_label.text != level_text:
 			level_label.text = level_text
-		if level_size != _hud_level_size:
-			_hud_level_size = level_size
-			level_label.add_theme_font_size_override("font_size", level_size)
+		if _hud_level_size != 18:
+			_hud_level_size = 18
+			level_label.add_theme_font_size_override("font_size", 18)
 	var pfill := 220.0 * clampf(player_ratio, 0.0, 1.0)
 	if absf(pfill - _hud_pfill) >= 0.5:
 		_hud_pfill = pfill
@@ -1964,7 +2084,7 @@ func _on_state(packet: Array) -> void:
 	_apply_cd_row(player_cd, cd_row)
 	_apply_units(packet[11])
 	if int(packet[5]) == 1 and not finished:
-		_finish_battle(int(packet[6]))
+		_finish_battle(int(packet[6]), true)
 
 
 func _apply_cd_row(table: Dictionary, row: Array) -> void:
