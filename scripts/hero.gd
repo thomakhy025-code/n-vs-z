@@ -583,9 +583,7 @@ func _draw_slash() -> void:
 		var px: float = facing * (16.0 + t * 96.0)
 		var py: float = -8.0 - sin(t * PI) * 40.0
 		var frame: int = puff % SkillFx.FRAMES
-		var fade: float = 0.62 + 0.38 * t
-		SkillFx.blit(self, "en", frame, Rect2(px - 34.0, py - 46.0, 68.0, 84.0), false, Color(1, 1, 1, fade))
-		SkillFx.blit(self, "en", (frame + 3) % SkillFx.FRAMES, Rect2(px - 18.0, py - 28.0, 36.0, 48.0), false, Color(1, 0.96, 0.78, fade))
+		SkillFx.blit(self, "en", frame, Rect2(px - 34.0, py - 46.0, 68.0, 84.0), false, Color(1, 1, 1, 1))
 		puff += 1
 
 

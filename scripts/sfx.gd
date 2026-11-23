@@ -83,7 +83,10 @@ func speak(id: String) -> float:
 		return 0.0
 	_voice.stream = stream
 	_voice.pitch_scale = 1.0
-	_voice.volume_db = -2.0
+	var loud: float = -2.0
+	if id.begins_with("say_"):
+		loud = 0.0
+	_voice.volume_db = loud
 	_voice.play()
 	_voice_len = stream.get_length()
 	return _voice_len

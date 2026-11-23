@@ -117,14 +117,36 @@ def speed(samples, factor):
     return out
 
 
+def rms(samples):
+    if not samples:
+        return 0.0
+    total = 0.0
+    for sample in samples:
+        total += sample * sample
+    return math.sqrt(total / float(len(samples)))
+
+
+def peak_of(samples):
+    loudest = 0.0
+    for sample in samples:
+        loudest = max(loudest, abs(sample))
+    return loudest
+
+
 def shoutify(samples, rate):
-    cleaned = trim(samples, rate, 0.015)
-    dur = len(cleaned) / float(rate)
+    cleaned = trim(samples, rate, 0.004)
+    # Pitch the line up into a yell, and keep the whole word.
+    pitched = speed(cleaned, 1.36)
+    dur = len(pitched) / float(rate)
     factor = 1.0
-    if dur > 1.25:
-        factor = dur / 1.05
-    sped = speed(cleaned, factor)
-    driven = [math.tanh(sample * 1.55) for sample in sped]
+    if dur > 1.05:
+        factor = dur / 0.9
+    sped = speed(pitched, factor)
+    bright = highpass(sped, 900, rate)
+    mixed = []
+    for plain, air in zip(sped, bright):
+        mixed.append(plain + air * 0.55)
+    driven = [math.tanh(sample * 6.5) for sample in mixed]
     return normalize(driven, 0.98), rate
 
 
@@ -144,7 +166,7 @@ $s.Rate = 1
 $s.SetOutputToWaveFile('%s')
 $ssml = @"
 <speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='en-US'>
-  <prosody pitch='high' volume='x-loud'><emphasis level='strong'>%s</emphasis></prosody>
+  <prosody pitch='x-high' volume='x-loud'><emphasis level='strong'>%s</emphasis></prosody>
 </speak>
 "@
 try { $s.SpeakSsml($ssml) } catch { $s.Speak('%s') }
@@ -338,17 +360,31 @@ def main():
         dest = os.path.join(OUT, name + ".wav")
         write_wav(dest, shouted, out_rate)
         os.remove(raw_path)
-        print("%s voice=%s dur=%.2fs" % (name, voice, len(shouted) / float(out_rate)))
-    effects = {
-        "fx_ex": bomb(),
-        "fx_ls": sword(),
-        "fx_fz": ice(),
-        "fx_en": fire(),
-    }
-    for name, samples in effects.items():
+        print(
+            "%s voice=%s dur=%.2fs rms=%.3f peak=%.3f"
+            % (name, voice, len(shouted) / float(out_rate), rms(shouted), peak_of(shouted))
+        )
+    shout_level = 0.0
+    counted = 0
+    for name, _text in LINES:
+        spoken, _rate = read_wav(os.path.join(OUT, name + ".wav"))
+        shout_level += rms(spoken)
+        counted += 1
+    if counted:
+        shout_level /= float(counted)
+    for name in ("fx_ex", "fx_ls", "fx_fz", "fx_en"):
         dest = os.path.join(OUT, name + ".wav")
-        write_wav(dest, samples, RATE)
-        print("%s dur=%.2fs" % (name, len(samples) / float(RATE)))
+        samples, rate = read_wav(dest)
+        level = rms(samples)
+        top = peak_of(samples)
+        print("%s dur=%.2fs rms=%.3f peak=%.3f" % (name, len(samples) / float(rate), level, top))
+        if top >= 0.2:
+            continue
+        gain = min(6.0, 0.9 / max(top, 1e-4))
+        lifted = [math.tanh(sample * gain) for sample in samples]
+        lifted = normalize(lifted, 0.94)
+        write_wav(dest, lifted, rate)
+        print("  raised %s gain=%.2f rms=%.3f peak=%.3f" % (name, gain, rms(lifted), peak_of(lifted)))
 
 
 if __name__ == "__main__":

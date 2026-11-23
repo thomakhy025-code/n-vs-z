@@ -220,6 +220,8 @@ static func _ice_cover(patch: Dictionary) -> Vector2:
 
 
 static func _draw_burst(ci: CanvasItem, patch: Dictionary, bloom: bool) -> void:
+	if bloom:
+		return
 	var age: float = float(patch.get("age", 0.0))
 	var x0: float = float(patch.get("x0", 0.0))
 	var x1: float = float(patch.get("x1", 0.0))
@@ -232,30 +234,16 @@ static func _draw_burst(ci: CanvasItem, patch: Dictionary, bloom: bool) -> void:
 	var diam: float = minf(full_w, full_h)
 	if age < 0.62:
 		var u: float = clampf(age / 0.62, 0.0, 1.0)
-		var grow: float = 0.18 + 0.82 * (1.0 - (1.0 - u) * (1.0 - u))
+		var grow: float = 0.28 + 0.72 * (1.0 - (1.0 - u) * (1.0 - u))
 		var frame: int = mini(3, int(u * 3.99))
-		var body: float = diam * grow
-		var ring: float = minf(diam, body + diam * 0.1)
-		if bloom:
-			_blit_square(ci, "ex", 3, cx, cy, ring, Color(1, 0.96, 0.82, 0.4))
-			_blit_square(ci, "ex", frame, cx, cy, body * 0.72, Color(1, 0.9, 0.65, 0.6))
-			return
-		_blit_square(ci, "ex", 3, cx, cy, ring, Color(1, 1, 1, 0.92))
-		_blit_square(ci, "ex", frame, cx, cy, body, Color(1, 1, 1, 1.0))
-		if frame >= 1:
-			_blit_square(ci, "ex", 0, cx, cy, body * 0.42, Color(1, 0.98, 0.9, 0.72))
+		_blit_square(ci, "ex", frame, cx, cy, diam * grow, Color(1, 1, 1, 1))
 		return
 	var tail: float = clampf((age - 0.62) / 3.08, 0.0, 0.999)
 	var ember: int = 4 + mini(3, int(tail * 3.99))
 	var fade: float = 1.0
 	if age > 3.25:
 		fade = clampf((3.7 - age) / 0.45, 0.0, 1.0)
-	var ember_d: float = diam * 0.94
-	var ember_y: float = cy + diam * 0.03
-	if bloom:
-		_blit_square(ci, "ex", ember, cx, ember_y, ember_d * 0.48, Color(1.0, 0.62, 0.28, fade * 0.34))
-		return
-	_blit_square(ci, "ex", ember, cx, ember_y, ember_d, Color(1, 1, 1, fade))
+	_blit_square(ci, "ex", ember, cx, cy + diam * 0.04, diam * 0.9, Color(1, 1, 1, fade))
 
 
 static func _blit_square(ci: CanvasItem, kind: String, frame: int, cx: float, cy: float, diam: float, tint: Color) -> void:
@@ -265,6 +253,8 @@ static func _blit_square(ci: CanvasItem, kind: String, frame: int, cx: float, cy
 
 
 static func _draw_slash(ci: CanvasItem, mark: Dictionary, bloom: bool) -> void:
+	if bloom:
+		return
 	var life: float = float(mark.get("life", 1.05))
 	var age: float = float(mark.get("age", 0.0))
 	var near: float = float(mark.get("near", 0.0))
@@ -345,69 +335,51 @@ static func _paint_blast(ci: CanvasItem, frame: int, size: Vector2) -> void:
 	if frame >= 4:
 		_paint_embers(ci, frame, center, w)
 		return
-	var spin: float = float(frame) * 0.7
-	_disc(ci, center, w * 0.47, Color(1.0, 0.28, 0.04, 0.7))
-	_disc(ci, center, w * 0.38, Color(0.62, 0.08, 0.01, 1.0))
-	_disc(ci, center, w * 0.27, Color(1.0, 0.4, 0.05, 1.0))
-	_disc(ci, center, w * 0.15, Color(1.0, 0.8, 0.28, 1.0))
-	_disc(ci, center, w * 0.07, Color(1.0, 0.98, 0.9, 1.0))
-	_ring_tongues(ci, center, w * 0.28, w * 0.18, 18 + frame * 2, spin, Color(1.0, 0.36, 0.04, 1.0), Color(1.0, 0.78, 0.28, 1.0))
-	_ring_tongues(ci, center, w * 0.14, w * 0.12, 11 + frame, -spin * 1.4, Color(1.0, 0.62, 0.1, 1.0), Color(1.0, 0.96, 0.7, 1.0))
-	_shock(ci, center, w * (0.33 + float(frame) * 0.035), 4.5 + float(frame) * 1.4, Color(1.0, 0.94, 0.75, 0.95))
-	_shock(ci, center, w * (0.24 + float(frame) * 0.02), 2.2, Color(1.0, 0.7, 0.22, 0.65))
-	var ray_i: int = 0
-	var rays: int = 16 + frame * 2
-	while ray_i < rays:
-		var ang: float = TAU * float(ray_i) / float(rays) + spin
+	var spin: float = float(frame) * 0.62
+	var shock_r: float = w * (0.34 + float(frame) * 0.012)
+	var fire_r: float = shock_r * 0.62
+	_hoop(ci, center, shock_r, 18.0, Color("f3e6c8"))
+	_hoop(ci, center, fire_r, 12.0, Color("e07a28"))
+	var tongue: int = 0
+	var tongues: int = 8
+	while tongue < tongues:
+		var ang: float = TAU * float(tongue) / float(tongues) + spin
 		var dir: Vector2 = Vector2(cos(ang), sin(ang))
-		var length: float = w * (0.12 + 0.22 * _unit(ray_i * 13 + frame * 5))
-		var thick: float = 2.4 + 3.4 * _unit(ray_i * 3 + 9)
-		_ray(ci, center + dir * (w * 0.08), dir, length, thick, Color(1.0, 0.92, 0.6, 0.9))
-		ray_i += 1
-	_sparks(ci, center, w * 0.44, 16 + frame * 5, spin * 2.0, 1.15 + float(frame) * 0.2)
-	var chunk_i: int = 0
-	while chunk_i < 8 + frame * 2:
-		var ang_c: float = spin * 0.8 + float(chunk_i) * 0.85
-		var dist: float = w * (0.3 + 0.14 * _unit(chunk_i * 11 + frame))
-		var at: Vector2 = center + Vector2(cos(ang_c), sin(ang_c)) * dist
-		_rock(ci, at, 4.5 + _unit(chunk_i) * 5.0, ang_c, Color(0.32, 0.14, 0.06, 0.95))
-		_rock(ci, at + Vector2(4, -3), 2.2, ang_c + 0.8, Color(1.0, 0.72, 0.22, 0.9))
-		chunk_i += 1
-	var filament: int = 0
-	while filament < 7:
-		var a0: float = spin + float(filament) * 0.9
-		ci.draw_arc(center, w * (0.12 + 0.02 * float(filament % 3)), a0, a0 + 1.15, 10, Color(1, 0.97, 0.86, 0.92), 2.6)
-		filament += 1
+		var tall: float = w * (0.085 + 0.03 * _unit(tongue * 5 + frame * 3))
+		var base: Vector2 = center + dir * (fire_r * 0.72)
+		_flame_out(ci, base, dir, tall, tall * 0.48, Color("c44536"), Color("e6c36a"))
+		tongue += 1
+	_coin(ci, center, w * 0.125, Color("c44536"))
+	_coin(ci, center, w * 0.074, Color("e6c36a"))
+	_coin(ci, center, w * 0.036, Color("fff6c8"))
+	var spark: int = 0
+	while spark < 7:
+		var ang_s: float = spin * 1.35 + float(spark) * 0.9
+		var dist_s: float = shock_r * (0.98 + 0.07 * _unit(spark * 11 + frame))
+		var at_s: Vector2 = center + Vector2(cos(ang_s), sin(ang_s)) * dist_s
+		_coin(ci, at_s, 5.2 + _unit(spark * 3 + frame) * 3.2, Color("fff6c8"))
+		spark += 1
 
 
 static func _paint_embers(ci: CanvasItem, frame: int, center: Vector2, w: float) -> void:
-	var spin: float = float(frame) * 0.9
-	_disc(ci, center, w * 0.44, Color(0.85, 0.18, 0.03, 0.34))
-	_disc(ci, center + Vector2(0, w * 0.03), w * 0.3, Color(0.55, 0.1, 0.02, 0.45))
-	var i: int = 0
-	while i < 26:
-		var ang: float = TAU * float(i) / 26.0 + spin * 0.2
-		var dist: float = w * (0.06 + 0.32 * _unit(i * 13 + frame * 7))
-		var at: Vector2 = center + Vector2(cos(ang) * dist, sin(ang) * dist * 0.82 + w * 0.03)
-		var tall: float = w * (0.045 + 0.055 * _unit(i * 5 + frame))
-		var hot: Color = Color(1.0, 0.38, 0.05, 0.96)
-		var core: Color = Color(1.0, 0.88, 0.42, 1.0)
-		_flame(ci, at + Vector2(0, tall * 0.25), tall, tall * 0.32, hot, core)
-		_disc(ci, at + Vector2(0, -tall * 0.15), 2.0 + _unit(i + frame) * 2.2, Color(1, 0.86, 0.4, 0.95))
-		i += 1
+	var ground: float = center.y + w * 0.16
+	var coal: int = 0
+	while coal < 6:
+		var x: float = center.x + (float(coal) - 2.5) * w * 0.13
+		var bob: float = (_unit(coal * 9 + frame * 4) - 0.5) * w * 0.05
+		var tall: float = w * (0.07 + 0.045 * _unit(coal * 5 + frame))
+		var hot: Color = Color("c44536")
+		if coal % 2 == 1:
+			hot = Color("e07a28")
+		_flame(ci, Vector2(x, ground + bob), tall, tall * 0.42, hot, Color("e6c36a"))
+		_coin(ci, Vector2(x, ground + bob - tall * 0.7), 4.0, Color("fff6c8"))
+		coal += 1
 	var spark: int = 0
-	while spark < 18:
-		var ang_s: float = spin + float(spark) * 1.7
-		var dist_s: float = w * (0.1 + 0.32 * _unit(spark * 19 + frame))
-		var at_s: Vector2 = center + Vector2(cos(ang_s) * dist_s, sin(ang_s) * dist_s * 0.78)
-		_disc(ci, at_s, 1.7 + _unit(spark * 3) * 2.4, Color(1, 0.95, 0.7, 1))
+	while spark < 4:
+		var ang_s: float = float(spark) * 1.4 + float(frame) * 0.35
+		var at_s: Vector2 = center + Vector2(cos(ang_s) * w * 0.14, -w * 0.02 + sin(ang_s) * w * 0.05)
+		_coin(ci, at_s, 4.5, Color("e6c36a"))
 		spark += 1
-	var smoke_i: int = 0
-	while smoke_i < 7:
-		var ang_m: float = float(smoke_i) * 0.9 + spin
-		var at_m: Vector2 = center + Vector2(cos(ang_m), sin(ang_m) * 0.72) * w * (0.16 + 0.04 * float(smoke_i % 3))
-		_disc(ci, at_m, w * 0.055, Color(0.32, 0.18, 0.12, 0.32))
-		smoke_i += 1
 
 
 static func _paint_slash(ci: CanvasItem, frame: int, size: Vector2) -> void:
@@ -427,39 +399,26 @@ static func _paint_slash(ci: CanvasItem, frame: int, size: Vector2) -> void:
 	var p1: Vector2 = Vector2(w * 0.4, h * 0.05)
 	var p2: Vector2 = Vector2(w * 0.92, h * 0.58)
 	_paint_cut_ground(ci, size, reveal, frame)
-	_curve(ci, p0, p1, p2, 28.0, Color(0.42, 0.1, 0.04, 0.96), 16, 0.0, reveal)
-	_curve(ci, p0, p1, p2, 16.0, Color(0.98, 0.52, 0.1, 1.0), 16, 0.0, reveal)
-	_curve(ci, p0, p1, p2, 8.0, Color(1.0, 0.86, 0.42, 1.0), 16, 0.0, reveal)
-	_curve(ci, p0, p1, p2, 2.8, Color(1.0, 0.99, 0.94, 1.0), 16, 0.0, reveal)
+	_curve(ci, p0, p1, p2, 30.0, Color("1c140e"), 14, 0.0, reveal)
+	_curve(ci, p0, p1, p2, 18.0, Color("c44536"), 14, 0.0, reveal)
+	_curve(ci, p0, p1, p2, 10.0, Color("e6c36a"), 14, 0.0, reveal)
+	_curve(ci, p0, p1, p2, 3.2, Color("fff6c8"), 14, 0.0, reveal)
 	var spark: int = 0
-	while spark < 11:
-		var t: float = 0.06 + float(spark) * 0.08
-		if t > reveal:
-			spark += 1
-			continue
-		var at: Vector2 = _bez(p0, p1, p2, t)
-		var jitter: Vector2 = Vector2(_unit(spark * 5 + frame) * 12.0 - 6.0, _unit(spark * 9) * 10.0 - 4.0)
-		_disc(ci, at + jitter, 2.2 + _unit(spark + frame) * 2.4, Color(1, 0.95, 0.72, 0.95))
+	while spark < 5:
+		var t: float = 0.14 + float(spark) * 0.16
+		if t <= reveal:
+			var at: Vector2 = _bez(p0, p1, p2, t)
+			_coin(ci, at, 4.6, Color("fff6c8"))
 		spark += 1
 	if frame < 4:
 		return
-	var flash_r: float = 24.0 + float(frame - 4) * 20.0
-	_glow(ci, p2, flash_r * 1.35, Color(1.0, 0.72, 0.28, 0.95))
-	_disc(ci, p2, flash_r, Color(1.0, 0.5, 0.08, 1.0))
-	_disc(ci, p2, flash_r * 0.55, Color(1.0, 0.9, 0.55, 1.0))
-	_disc(ci, p2, flash_r * 0.22, Color(1, 1, 1, 1))
-	var ray_i: int = 0
-	while ray_i < 14:
-		var ang: float = TAU * float(ray_i) / 14.0 + float(frame) * 0.4
-		var dir: Vector2 = Vector2(cos(ang), sin(ang))
-		_ray(ci, p2, dir, flash_r * (1.05 + 0.45 * _unit(ray_i * 7 + frame)), 3.4, Color(1.0, 0.95, 0.75, 0.95))
-		ray_i += 1
-	_sparks(ci, p2, flash_r * 1.1, 14, float(frame), 1.3)
+	_coin(ci, p2, 14.0, Color("e07a28"))
+	_coin(ci, p2, 7.0, Color("fff6c8"))
 	var bit: int = 0
-	while bit < 6:
-		var ang_b: float = float(bit) + float(frame)
-		var at_b: Vector2 = p2 + Vector2(cos(ang_b), sin(ang_b)) * (flash_r * 0.8)
-		_rock(ci, at_b, 5.0 + _unit(bit * 4) * 4.0, ang_b, Color(0.34, 0.24, 0.16, 1.0))
+	while bit < 5:
+		var ang_b: float = TAU * float(bit) / 5.0 + float(frame) * 0.2
+		var dir_b: Vector2 = Vector2(cos(ang_b), sin(ang_b))
+		_flame_out(ci, p2 + dir_b * 12.0, dir_b, 16.0, 6.0, Color("c44536"), Color("e6c36a"))
 		bit += 1
 
 
@@ -479,10 +438,8 @@ static func _paint_cut_ground(ci: CanvasItem, size: Vector2, reveal: float, fram
 		var side: float = -1.0
 		if rock_i % 2 == 0:
 			side = 1.0
-		_rock(ci, Vector2(x, y0 + side * (7.0 + lift * 0.25)), rad, float(rock_i) + float(frame), Color(0.3, 0.22, 0.15, 1.0))
-		_rock(ci, Vector2(x + 5.0, y0 + side * 3.0), rad * 0.45, float(rock_i) + 0.7, Color(0.52, 0.38, 0.26, 1.0))
-		_disc(ci, Vector2(x, y0 - 12.0 - lift), 8.0 + lift * 0.35, Color(0.74, 0.62, 0.44, 0.5))
-		_disc(ci, Vector2(x + 8.0, y0 - 6.0 - lift * 0.4), 4.5, Color(0.9, 0.82, 0.66, 0.35))
+		_rock(ci, Vector2(x, y0 + side * (7.0 + lift * 0.25)), rad, float(rock_i) + float(frame), Color("5c4636"))
+		_rock(ci, Vector2(x + 5.0, y0 + side * 3.0), rad * 0.45, float(rock_i) + 0.7, Color("6b5340"))
 		rock_i += 1
 
 
@@ -498,16 +455,11 @@ static func _paint_fissure(ci: CanvasItem, size: Vector2, frame: int) -> void:
 	while i < count:
 		var t: float = (float(i) + 0.35) / float(count)
 		var x: float = lerpf(18.0, w - 18.0, t)
-		var lift: float = 10.0 + _unit(i * 13 + frame * 2) * 20.0
 		var side: float = 1.0
 		if i % 2 == 0:
 			side = -1.0
-		_rock(ci, Vector2(x, y0 + side * 14.0), 6.0 + _unit(i * 3 + frame) * 6.0, float(i) + float(frame), Color(0.28, 0.2, 0.14, 1))
-		_disc(ci, Vector2(x, y0 - lift), 9.0 + lift * 0.28, Color(0.76, 0.64, 0.46, 0.52))
-		_disc(ci, Vector2(x + 7.0, y0 - lift * 0.55), 4.5, Color(0.92, 0.84, 0.68, 0.34))
+		_rock(ci, Vector2(x, y0 + side * 14.0), 6.0 + _unit(i * 3 + frame) * 6.0, float(i) + float(frame), Color("5c4636"))
 		i += 1
-	if frame >= 7:
-		_glow(ci, Vector2(w * 0.5, y0), w * 0.16, Color(1.0, 0.58, 0.16, 0.55))
 
 
 static func _fissure_poly(ci: CanvasItem, x0: float, x1: float, y0: float, frame: int, alpha: float) -> void:
@@ -521,8 +473,8 @@ static func _fissure_poly(ci: CanvasItem, x0: float, x1: float, y0: float, frame
 		var t: float = float(i) / float(steps)
 		var x: float = lerpf(x0, x1, t)
 		var jag: float = (_unit(i * 17 + frame * 5) - 0.5) * 11.0
-		top.append(Vector2(x, y0 - 8.0 + jag))
-		bot.append(Vector2(x, y0 + 15.0 + (_unit(i * 29 + frame) - 0.35) * 9.0))
+		top.append(Vector2(x, y0 - 14.0 + jag))
+		bot.append(Vector2(x, y0 + 22.0 + (_unit(i * 29 + frame) - 0.35) * 8.0))
 		i += 1
 	var pts: PackedVector2Array = PackedVector2Array()
 	i = 0
@@ -533,13 +485,15 @@ static func _fissure_poly(ci: CanvasItem, x0: float, x1: float, y0: float, frame
 	while i >= 0:
 		pts.append(bot[i])
 		i -= 1
-	_poly(ci, pts, Color(0.1, 0.06, 0.04, alpha))
+	var crack: Color = Color("1c140e")
+	crack.a = alpha
+	_poly(ci, pts, crack)
 	var hot: PackedVector2Array = PackedVector2Array()
 	var hot_bot: PackedVector2Array = PackedVector2Array()
 	i = 0
 	while i < top.size():
-		hot.append(top[i] + Vector2(0, 5))
-		hot_bot.append(top[i] + Vector2(0, 9))
+		hot.append(top[i] + Vector2(0, 8))
+		hot_bot.append(top[i] + Vector2(0, 16))
 		i += 1
 	var seam: PackedVector2Array = PackedVector2Array()
 	i = 0
@@ -550,10 +504,14 @@ static func _fissure_poly(ci: CanvasItem, x0: float, x1: float, y0: float, frame
 	while i >= 0:
 		seam.append(hot_bot[i])
 		i -= 1
-	_poly(ci, seam, Color(1.0, 0.46, 0.08, 0.9 * alpha))
+	var seam_c: Color = Color("e07a28")
+	seam_c.a = alpha
+	_poly(ci, seam, seam_c)
+	var cream: Color = Color("fff6c8")
+	cream.a = alpha
 	i = 0
 	while i < top.size() - 1:
-		ci.draw_line(top[i] + Vector2(0, 7), top[i + 1] + Vector2(0, 7), Color(1.0, 0.93, 0.7, 0.95 * alpha), 1.6)
+		ci.draw_line(top[i] + Vector2(0, 12), top[i + 1] + Vector2(0, 12), cream, 3.2)
 		i += 1
 
 
@@ -570,147 +528,157 @@ static func _paint_frost(ci: CanvasItem, frame: int, size: Vector2) -> void:
 static func _paint_race(ci: CanvasItem, frame: int, size: Vector2) -> void:
 	var w: float = size.x
 	var h: float = size.y
-	var origin: Vector2 = Vector2(w * 0.06, h * 0.52)
-	var mist: int = 0
-	while mist < 6:
-		var mx: float = w * (0.18 + float(mist) * 0.12)
-		var my: float = h * (0.28 + float(mist % 3) * 0.16)
-		_disc(ci, Vector2(mx, my), 14.0 + float(frame + mist) * 2.0, Color(0.72, 0.9, 1.0, 0.2))
-		mist += 1
-	var count: int = 12 + frame * 3
+	var origin: Vector2 = Vector2(w * 0.08, h * 0.55)
 	var shard: int = 0
-	while shard < count:
-		var spread: float = (float(shard) / float(count) - 0.5) * 1.25
+	while shard < 6:
+		var spread: float = (float(shard) / 5.0 - 0.5) * 0.95
 		var dir: Vector2 = Vector2(cos(spread), sin(spread))
-		var length: float = w * (0.28 + 0.5 * _unit(shard * 11 + frame * 4))
-		var thick: float = 3.2 + _unit(shard * 5 + frame) * 5.5
-		_shard(ci, origin, dir, length, thick, Color(0.42, 0.76, 0.98, 1.0), Color(0.94, 0.99, 1.0, 1.0))
+		var length: float = w * (0.4 + 0.28 * _unit(shard * 7 + frame * 3))
+		var thick: float = 7.0 + _unit(shard * 4 + frame) * 4.0
+		_shard(ci, origin, dir, length, thick, Color("7eb6e0"), Color("e7f6ff"))
 		shard += 1
-	var gem_i: int = 0
-	while gem_i < 9:
-		var gx: float = w * (0.2 + _unit(gem_i * 17 + frame) * 0.68)
-		var gy: float = h * (0.12 + _unit(gem_i * 9 + 2) * 0.74)
-		_gem(ci, Vector2(gx, gy), 3.5 + _unit(gem_i + frame) * 5.5, Color(0.68, 0.9, 1.0, 0.95), Color(1, 1, 1, 1))
-		gem_i += 1
-	_disc(ci, Vector2(w * 0.9, h * 0.5), 14.0 + float(frame) * 4.0, Color(1, 1, 1, 0.95))
-	_disc(ci, Vector2(w * 0.9, h * 0.5), 6.0, Color(0.72, 0.92, 1.0, 1.0))
-	_shock(ci, Vector2(w * 0.7, h * 0.5), 16.0 + float(frame) * 10.0, 2.2, Color(0.88, 0.97, 1.0, 0.75))
+	var lead: Vector2 = Vector2(w * 0.84, h * 0.5)
+	_coin(ci, lead, 16.0 + float(frame) * 2.5, Color("e7f6ff"))
+	_coin(ci, lead, 7.0, Color("7eb6e0"))
 
 
 static func _paint_ice_sheet(ci: CanvasItem, frame: int, size: Vector2) -> void:
 	var w: float = size.x
 	var h: float = size.y
-	ci.draw_rect(Rect2(0, 0, w, h), Color(0.32, 0.66, 0.9, 0.9))
-	ci.draw_rect(Rect2(0, 0, w, h * 0.24), Color(0.9, 0.98, 1.0, 0.96))
-	ci.draw_rect(Rect2(0, h * 0.58, w, h * 0.42), Color(0.14, 0.4, 0.66, 0.94))
-	ci.draw_rect(Rect2(0, h * 0.3, w, h * 0.16), Color(0.78, 0.93, 1.0, 0.38))
-	var shine_x: float = w * (0.08 + 0.14 * float(frame % 4))
-	_poly(ci, PackedVector2Array([
-		Vector2(shine_x, 0),
-		Vector2(shine_x + w * 0.16, 0),
-		Vector2(shine_x + w * 0.05, h),
-		Vector2(shine_x - w * 0.07, h),
-	]), Color(1, 1, 1, 0.3))
+	ci.draw_rect(Rect2(0, 0, w, h), Color("7eb6e0"))
+	ci.draw_rect(Rect2(0, 0, w, h * 0.2), Color("e7f6ff"))
+	ci.draw_rect(Rect2(0, h * 0.72, w, h * 0.28), Color("3d6f99"))
+	ci.draw_line(Vector2(0, 3), Vector2(w, 3), Color("1c140e"), 5.0)
+	ci.draw_line(Vector2(0, h - 3), Vector2(w, h - 3), Color("1c140e"), 5.0)
 	var crack: int = 0
-	while crack < 8:
-		var x: float = w * (0.05 + float((crack * 3 + frame) % 9) * 0.1)
-		var bend: float = (_unit(crack * 19 + frame) - 0.5) * 30.0
-		ci.draw_line(Vector2(x, h * 0.05), Vector2(x + bend, h * 0.52), Color(0.05, 0.18, 0.36, 0.92), 2.4)
-		ci.draw_line(Vector2(x + bend, h * 0.52), Vector2(x + bend * 0.35, h * 0.97), Color(0.04, 0.14, 0.3, 0.88), 2.0)
-		ci.draw_line(Vector2(x + bend, h * 0.46), Vector2(x + bend + 18.0, h * 0.74), Color(0.08, 0.22, 0.4, 0.75), 1.5)
+	while crack < 4:
+		var x: float = w * (0.16 + float(crack) * 0.2)
+		var bend: float = 16.0
+		if crack % 2 == 0:
+			bend = -16.0
+		var knee: Vector2 = Vector2(x + bend, h * 0.48)
+		ci.draw_line(Vector2(x, h * 0.1), knee, Color("1c140e"), 5.0)
+		ci.draw_line(knee, Vector2(x + bend * 0.4, h * 0.9), Color("1c140e"), 5.0)
+		ci.draw_line(knee, Vector2(knee.x + bend, h * 0.74), Color("1c140e"), 4.0)
+		ci.draw_line(Vector2(x, h * 0.1), knee, Color("e7f6ff"), 1.8)
 		crack += 1
+	var tooth: int = 0
+	while tooth < 6:
+		var tx: float = w * (float(tooth) + 0.5) / 6.0
+		var th: float = 14.0 + float((tooth + frame) % 3) * 6.0
+		_fill_ink(ci, PackedVector2Array([
+			Vector2(tx - 7.0, 5.0),
+			Vector2(tx + 7.0, 5.0),
+			Vector2(tx, 5.0 + th),
+		]), Color("e7f6ff"))
+		tooth += 1
 	var gem_i: int = 0
-	while gem_i < 8:
-		var gx: float = w * (float(gem_i) + 0.45) / 8.0
-		var gy: float = h * (0.2 + _unit(gem_i * 8 + frame) * 0.55)
-		_gem(ci, Vector2(gx, gy), 5.5 + _unit(gem_i * 4 + frame) * 5.0, Color(0.8, 0.95, 1.0, 0.96), Color(1, 1, 1, 1))
+	while gem_i < 4:
+		var gx: float = w * (0.18 + float(gem_i) * 0.2)
+		var gy: float = h * (0.36 + float((gem_i + frame) % 2) * 0.16)
+		_gem(ci, Vector2(gx, gy), 7.5, Color("d7eef8"), Color("fffefe"))
 		gem_i += 1
-	var icicle: int = 0
-	while icicle < 11:
-		var ix: float = w * (float(icicle) + 0.3) / 11.0
-		var ih: float = 9.0 + float((icicle * 2 + frame) % 5) * 5.0
-		_poly(ci, PackedVector2Array([
-			Vector2(ix - 4.2, 1.0),
-			Vector2(ix + 4.2, 1.0),
-			Vector2(ix, 1.0 + ih),
-		]), Color(0.86, 0.97, 1.0, 0.96))
-		_poly(ci, PackedVector2Array([
-			Vector2(ix - 1.5, 2.0),
-			Vector2(ix + 1.1, 2.0),
-			Vector2(ix - 0.3, ih * 0.72),
-		]), Color(1, 1, 1, 0.88))
-		icicle += 1
-	var spark: int = 0
-	while spark < 16:
-		var sx: float = w * _unit(spark * 13 + frame * 3)
-		var sy: float = h * (0.16 + _unit(spark * 29 + frame) * 0.72)
-		_disc(ci, Vector2(sx, sy), 1.5 + _unit(spark + frame) * 1.8, Color(1, 1, 1, 0.95))
-		spark += 1
-	var needle: int = 0
-	while needle < 8:
-		var nx: float = w * (float(needle) + 0.4) / 8.0
-		_shard(ci, Vector2(nx, h * 0.84), Vector2(0.2, -1.0).normalized(), 14.0 + _unit(needle * 6 + frame) * 16.0, 2.3, Color(0.78, 0.94, 1, 0.92), Color(1, 1, 1, 1))
-		needle += 1
 
 
 static func _paint_lock(ci: CanvasItem, size: Vector2) -> void:
-	var c := Vector2(size.x * 0.5, size.y * 0.58)
-	ci.draw_arc(c + Vector2(0, -16.0), 26.0, PI + 0.15, TAU - 0.15, 14, Color(0.9, 0.98, 1.0, 1.0), 9.0)
-	ci.draw_arc(c + Vector2(0, -16.0), 26.0, PI + 0.35, PI + 1.3, 6, Color(1, 1, 1, 0.9), 3.0)
-	var body := Rect2(c.x - 34.0, c.y - 6.0, 68.0, 48.0)
-	ci.draw_rect(body, Color(0.5, 0.82, 1.0, 1.0))
-	ci.draw_rect(Rect2(body.position.x + 5.0, body.position.y + 5.0, body.size.x - 10.0, 10.0), Color(0.92, 0.98, 1.0, 1.0))
-	_disc(ci, c + Vector2(0, 16.0), 7.0, Color(0.08, 0.2, 0.34, 1.0))
-	ci.draw_rect(Rect2(c.x - 3.0, c.y + 16.0, 6.0, 12.0), Color(0.08, 0.2, 0.34, 1.0))
+	var c: Vector2 = Vector2(size.x * 0.5, size.y * 0.58)
+	var shackle: float = size.x * 0.22
+	var hinge: Vector2 = c + Vector2(0, -shackle * 0.2)
+	ci.draw_arc(hinge, shackle, PI + 0.15, TAU - 0.15, 18, Color("1c140e"), shackle * 0.55, false)
+	ci.draw_arc(hinge, shackle, PI + 0.15, TAU - 0.15, 18, Color("e7f6ff"), shackle * 0.28, false)
+	var body: Rect2 = Rect2(c.x - size.x * 0.28, c.y, size.x * 0.56, size.y * 0.38)
+	ci.draw_rect(body.grow(6.0), Color("1c140e"))
+	ci.draw_rect(body, Color("7eb6e0"))
+	ci.draw_rect(Rect2(body.position.x + 8.0, body.position.y + 8.0, body.size.x - 16.0, body.size.y * 0.22), Color("e7f6ff"))
+	_coin(ci, c + Vector2(0, body.size.y * 0.42), 9.0, Color("1c140e"))
 
 
 static func _paint_aura(ci: CanvasItem, frame: int, size: Vector2) -> void:
-	var center: Vector2 = Vector2(size.x * 0.5, size.y * 0.58)
+	var center: Vector2 = Vector2(size.x * 0.5, size.y * 0.56)
 	var spin: float = TAU * float(frame) / 8.0
-	_glow(ci, center, size.x * 0.46, Color(1.0, 0.32, 0.04, 0.9))
-	_disc(ci, center, size.x * 0.18, Color(1.0, 0.42, 0.05, 0.28))
 	var tongue: int = 0
-	var tongues: int = 20
-	while tongue < tongues:
-		var ang: float = TAU * float(tongue) / float(tongues) + spin * 0.35
-		var dir: Vector2 = Vector2(cos(ang), sin(ang))
-		var up: float = clampf(-dir.y, 0.0, 1.0)
-		var wobble: float = 0.5 + 0.5 * sin(float(frame) * 1.35 + float(tongue) * 1.15)
-		var inner: float = size.x * 0.15
-		var outer: float = inner + size.y * (0.07 + 0.1 * wobble + 0.13 * up)
-		var base: Vector2 = center + dir * inner
-		var tip: Vector2 = center + dir * outer
-		var side: Vector2 = Vector2(-dir.y, dir.x) * (4.5 + wobble * 7.0)
-		_poly(ci, PackedVector2Array([base - side, tip, base + side]), Color(1.0, 0.26, 0.03, 0.97))
-		_poly(ci, PackedVector2Array([
-			base - side * 0.4,
-			tip - dir * (outer - inner) * 0.22,
-			base + side * 0.4,
-		]), Color(1.0, 0.7, 0.2, 1.0))
+	while tongue < 8:
+		var ang: float = TAU * float(tongue) / 8.0 + spin
+		var dir: Vector2 = Vector2(cos(ang), sin(ang) * 0.9)
+		if dir.length() < 0.01:
+			dir = Vector2(0.0, -1.0)
+		else:
+			dir = dir.normalized()
+		var wobble: float = 0.78 + 0.22 * sin(float(frame) * 1.3 + float(tongue) * 1.15)
+		var base: Vector2 = center + dir * (size.x * 0.2)
+		var length: float = size.y * (0.09 + 0.07 * wobble)
+		_flame_out(ci, base, dir, length, 8.0 + wobble * 5.0, Color("c44536"), Color("e6c36a"))
 		tongue += 1
 	var mid_i: int = 0
-	while mid_i < 12:
-		var ang_m: float = spin + TAU * float(mid_i) / 12.0
+	while mid_i < 5:
+		var ang_m: float = spin * 1.5 + TAU * float(mid_i) / 5.0
 		var dir_m: Vector2 = Vector2(cos(ang_m), sin(ang_m))
-		var up_m: float = clampf(-dir_m.y, 0.0, 1.0)
-		var a: Vector2 = center + dir_m * (size.x * 0.09)
-		var b: Vector2 = center + dir_m * (size.x * (0.2 + 0.08 * up_m) + float((mid_i + frame) % 3) * 3.0)
-		var nrm: Vector2 = Vector2(-dir_m.y, dir_m.x) * 5.5
-		_poly(ci, PackedVector2Array([a - nrm, b, a + nrm]), Color(1.0, 0.55, 0.08, 1.0))
-		_poly(ci, PackedVector2Array([a - nrm * 0.35, b - dir_m * 6.0, a + nrm * 0.35]), Color(1.0, 0.96, 0.72, 1.0))
+		var inner_at: Vector2 = center + dir_m * (size.x * 0.08)
+		_flame_out(ci, inner_at, dir_m, size.y * 0.08, 6.0, Color("e07a28"), Color("fff6c8"))
 		mid_i += 1
-	_flame(ci, center + Vector2(0, size.y * 0.08), size.y * 0.36, size.x * 0.07, Color(1.0, 0.42, 0.05, 1), Color(1.0, 0.95, 0.7, 1))
-	_flame(ci, center + Vector2(-12, size.y * 0.1), size.y * 0.24, size.x * 0.045, Color(1.0, 0.3, 0.03, 0.96), Color(1.0, 0.84, 0.38, 1))
-	_flame(ci, center + Vector2(12, size.y * 0.11), size.y * 0.22, size.x * 0.042, Color(1.0, 0.3, 0.03, 0.96), Color(1.0, 0.84, 0.38, 1))
-	_disc(ci, center + Vector2(0, -size.y * 0.02), size.x * 0.055, Color(1, 0.98, 0.9, 1))
 	var ember: int = 0
-	while ember < 12:
-		var ang_e: float = spin * 1.7 + float(ember) * 0.8
-		var lift: float = float((ember + frame * 2) % 5) * 8.0
-		var at: Vector2 = center + Vector2(cos(ang_e) * size.x * 0.42, sin(ang_e) * size.y * 0.32 - lift)
-		_disc(ci, at, 2.4 + _unit(ember * 3 + frame) * 2.6, Color(1.0, 0.94, 0.68, 1.0))
-		_disc(ci, at + Vector2(0, -3), 1.2, Color(1, 1, 1, 0.9))
+	while ember < 5:
+		var ang_e: float = spin * 2.0 + float(ember) * 1.25
+		var at: Vector2 = center + Vector2(cos(ang_e) * size.x * 0.38, sin(ang_e) * size.y * 0.28)
+		_coin(ci, at, 4.2 + _unit(ember * 3 + frame) * 2.4, Color("fff6c8"))
 		ember += 1
+
+
+static func _fill_ink(ci: CanvasItem, pts: PackedVector2Array, fill: Color) -> void:
+	var count: int = pts.size()
+	if count < 3:
+		return
+	var mid: Vector2 = Vector2.ZERO
+	var i: int = 0
+	while i < count:
+		mid += pts[i]
+		i += 1
+	mid /= float(count)
+	var grown: PackedVector2Array = PackedVector2Array()
+	i = 0
+	while i < count:
+		var spoke: Vector2 = pts[i] - mid
+		var reach: float = spoke.length()
+		if reach < 0.2:
+			grown.append(pts[i])
+		else:
+			grown.append(mid + spoke * ((reach + 4.0) / reach))
+		i += 1
+	ci.draw_colored_polygon(grown, Color("1c140e"))
+	ci.draw_colored_polygon(pts, fill)
+
+
+static func _coin(ci: CanvasItem, at: Vector2, radius: float, fill: Color) -> void:
+	if radius < 1.0:
+		return
+	ci.draw_circle(at, radius + 3.4, Color("1c140e"))
+	ci.draw_circle(at, radius, fill)
+
+
+static func _hoop(ci: CanvasItem, at: Vector2, radius: float, width: float, fill: Color) -> void:
+	if radius < 2.0 or width < 1.0:
+		return
+	ci.draw_arc(at, radius, 0.0, TAU, 64, Color("1c140e"), width + 8.0, false)
+	ci.draw_arc(at, radius, 0.0, TAU, 64, fill, width, false)
+
+
+static func _flame_out(ci: CanvasItem, base: Vector2, dir: Vector2, length: float, half: float, hot: Color, core: Color) -> void:
+	var side: Vector2 = Vector2(-dir.y, dir.x)
+	if side.length() < 0.01:
+		side = Vector2(0.0, 1.0)
+	else:
+		side = side.normalized()
+	var tip: Vector2 = base + dir * length
+	_fill_ink(ci, PackedVector2Array([
+		base - side * half,
+		base + side * half,
+		tip,
+	]), hot)
+	_poly(ci, PackedVector2Array([
+		base - side * half * 0.36 + dir * length * 0.24,
+		base + side * half * 0.36 + dir * length * 0.24,
+		base + dir * length * 0.62,
+	]), core)
 
 
 static func _glow(ci: CanvasItem, at: Vector2, radius: float, color: Color) -> void:
@@ -770,16 +738,16 @@ static func _rock(ci: CanvasItem, at: Vector2, radius: float, tilt: float, color
 	var s: float = sin(tilt)
 	var axis: Vector2 = Vector2(c, s) * radius
 	var side: Vector2 = Vector2(-s, c) * (radius * 0.72)
-	_poly(ci, PackedVector2Array([
+	_fill_ink(ci, PackedVector2Array([
 		at - axis - side,
 		at + side * 1.15,
 		at + axis * 0.85 - side * 0.3,
 	]), color)
-	var lite: Color = Color(minf(color.r + 0.22, 1.0), minf(color.g + 0.16, 1.0), minf(color.b + 0.1, 1.0), color.a)
+	var lite: Color = Color(minf(color.r + 0.16, 1.0), minf(color.g + 0.12, 1.0), minf(color.b + 0.08, 1.0), 1.0)
 	_poly(ci, PackedVector2Array([
-		at - axis * 0.15,
-		at + side * 0.45,
-		at + axis * 0.35,
+		at - axis * 0.12,
+		at + side * 0.4,
+		at + axis * 0.28,
 	]), lite)
 
 
@@ -787,7 +755,7 @@ static func _shard(ci: CanvasItem, origin: Vector2, dir: Vector2, length: float,
 	var side: Vector2 = Vector2(-dir.y, dir.x) * width
 	var tip: Vector2 = origin + dir * length
 	var mid: Vector2 = origin + dir * length * 0.42
-	_poly(ci, PackedVector2Array([
+	_fill_ink(ci, PackedVector2Array([
 		origin - side * 0.25,
 		mid - side,
 		tip,
@@ -795,9 +763,9 @@ static func _shard(ci: CanvasItem, origin: Vector2, dir: Vector2, length: float,
 		origin + side * 0.25,
 	]), body)
 	_poly(ci, PackedVector2Array([
-		origin,
-		tip,
-		mid + side * 0.16,
+		origin + dir * (length * 0.16),
+		tip - dir * (length * 0.22),
+		mid + side * 0.22,
 	]), edge)
 
 
@@ -808,12 +776,12 @@ static func _gem(ci: CanvasItem, at: Vector2, radius: float, fill: Color, edge: 
 		var ang: float = TAU * float(k) / 6.0 - 0.4
 		pts.append(at + Vector2(cos(ang), sin(ang)) * radius)
 		k += 1
-	_poly(ci, pts, fill)
+	_fill_ink(ci, pts, fill)
 	var inner: PackedVector2Array = PackedVector2Array()
 	k = 0
 	while k < 6:
 		var ang_i: float = TAU * float(k) / 6.0 - 0.4
-		inner.append(at + Vector2(cos(ang_i), sin(ang_i)) * radius * 0.38)
+		inner.append(at + Vector2(cos(ang_i), sin(ang_i)) * radius * 0.4)
 		k += 1
 	_poly(ci, inner, edge)
 
@@ -825,17 +793,16 @@ static func _unit(seed: int) -> float:
 	n = (n * 1103515245 + 12345) % 2147483647
 	return float(n % 10000) / 10000.0
 static func _flame(ci: CanvasItem, base: Vector2, tall: float, half: float, hot: Color, core: Color) -> void:
-	var lean: float = half * 0.28
-	var tip: Vector2 = base + Vector2(lean, -tall)
-	_poly(ci, PackedVector2Array([
+	var tip: Vector2 = base + Vector2(half * 0.15, -tall)
+	_fill_ink(ci, PackedVector2Array([
 		base + Vector2(-half, 0.0),
 		base + Vector2(half, 0.0),
 		tip,
 	]), hot)
 	_poly(ci, PackedVector2Array([
-		base + Vector2(-half * 0.4, -tall * 0.16),
-		base + Vector2(half * 0.4, -tall * 0.16),
-		tip + Vector2(-lean * 0.2, tall * 0.3),
+		base + Vector2(-half * 0.34, -tall * 0.22),
+		base + Vector2(half * 0.28, -tall * 0.22),
+		tip + Vector2(0.0, tall * 0.4),
 	]), core)
 
 

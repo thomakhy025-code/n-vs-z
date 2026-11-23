@@ -161,6 +161,5 @@ func _draw_fire_trail() -> void:
 		var fade: float = float(i + 1) / float(count)
 		var frame: int = i % SkillFx.FRAMES
 		var wide: float = 38.0 + fade * 30.0
-		SkillFx.blit(self, "en", frame, Rect2(spot.x - wide * 0.5, spot.y - wide * 1.05, wide, wide * 1.35), false, Color(1, 1, 1, 0.5 + fade * 0.5))
-		SkillFx.blit(self, "en", (frame + 4) % SkillFx.FRAMES, Rect2(spot.x - wide * 0.28, spot.y - wide * 0.72, wide * 0.56, wide * 0.82), false, Color(1, 0.95, 0.72, 0.4 + fade * 0.55))
+		SkillFx.blit(self, "en", frame, Rect2(spot.x - wide * 0.5, spot.y - wide * 1.05, wide, wide * 1.35), false, Color(1, 1, 1, 0.85 + fade * 0.15))
 		i += 1

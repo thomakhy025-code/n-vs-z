@@ -29,7 +29,7 @@ const ENEMY_INCOME_BASE := 7.2
 const ENEMY_GROWTH := 0.065
 const MAX_SIDE := 24
 const BREAK_TIME := 2.55
-const SKILL_COST := 60.0
+const SKILL_COST := 45.0
 const SPLASH_REACH := 70.0
 
 
@@ -316,9 +316,6 @@ func _build_world() -> void:
 	var glow = SkillFx.GlowLayer.new()
 	glow.field = self
 	glow.z_index = 500
-	var glow_mat := CanvasItemMaterial.new()
-	glow_mat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
-	glow.material = glow_mat
 	add_child(glow)
 	fx_glow = glow
 	var body = SkillFx.BodyLayer.new()
@@ -2546,7 +2543,7 @@ func cast_skill(id: String, side: int) -> bool:
 
 func _shout_skill(id: String) -> void:
 	Sfx.speak("say_" + id)
-	Sfx.play("fx_" + id, 1.0, -2.0)
+	Sfx.play("fx_" + id, 1.0, 0.0)
 
 
 func _spend_skill(side: int, cost: float) -> bool:
