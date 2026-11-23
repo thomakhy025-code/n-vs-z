@@ -27,7 +27,7 @@ If a runner slips past the line, you are the one who runs back. If your gate bre
 
 When their gate is down to a quarter of its blood, they immediately gain their starting gold again. At half blood, on every level, they gain 100 value at once. From level 20 on they also gain 100 value when the gate is still at 70% blood.
 
-The other gate calls its own fighters. On levels 1 to 19 the fight starts with walkers, and each other monster of that band joins on a later level, one at a time. From level 20 they are walkers, runners, a howler, a viper, a storm, a herald, a shell, a reaver, and an oni. From level 41 those monsters are faster and harder, and Moth, Elder, Glut, and Brood join them. The howler hangs behind its castle. Only an archer can hit it there. It swings from behind the castle onto the road, and onto an archer, a leveling caster, or a healing caster when one is alive, then stays on the road. The viper's bite holds one fighter still for 2 seconds. For a short time they cannot move or attack, and they hold the hurt pose until it ends. A healing caster can clear it. If two fighters are in front, it bites the one who hits harder and does not hold them. Most blows miss the viper. The storm waits 4 seconds, then lightning hits the fighter in front and jumps to four others, one by one, and holds each for 1 second. The herald calls two other monsters every 3 seconds. The shell is slow, hits softly, and carries a great deal of blood. The reaver is a harder hitter for a moderate call. Moth flies on one road. A short weapon cannot hit it, and those fighters stop beneath it, though they still fight a closer fighter on the ground. Elder appears somewhere on the road, strikes whoever is nearest, friend or foe, and fades after 15 seconds. Many blows miss Elder. Glut is very slow. It eats the fighter in front, except a berserker or a flyer, then sits for 5 seconds and heals. Brood bites, and when it dies three quick Lings crawl out. On soldier levels they wear modern kit, and they hit harder than before. Knives match the sword soldier. The firebow is thin-blooded and hits hard, then leaves fire on that spot for 3 seconds. The fan is thin-blooded, barely hurts, and once every 10 seconds it blows its road, pushing fighters in front of it back by a quarter of the road. A berserker ignores that gust and covers the fighters behind him. That gust also stretches any fire or ice and keeps it burning 2 seconds longer. Each road holds at most two. The ward carries a great shield, a great deal of blood, and hits for 5. The javelin throws five long heavy shots, then fights up close with a short sword. The drum lifts three allies at once, the way a leveling caster lifts one. On levels 21 to 40 a cow waits 4 seconds, then the first charge hits harder than the blows after it, and it fights up close, slower and softer than a rider. From level 41 a crow does the same and hits harder: it waits 3 seconds, strikes the first enemy hard, then fights like the horse rider. From level 61, Smog, Buck, Scope, and Aria join them. Smog deals no damage and lays smoke where it walks. The smoke hides that stretch for 10 seconds. Buck fires a shotgun once a second, four times, then reloads for 2 seconds. Scope fires a long heavy shot every 3 seconds and has little blood. Aria sings, and the lift is half of a leveling caster, on every ally on every road at once. The bomber is fragile, its hit is heavy, and it strikes the berserker when one is alive. Level 40's general is an officer.
+The other gate calls its own fighters. On levels 1 to 19 the fight starts with walkers, and each other monster of that band joins on a later level, one at a time. From level 20 they are walkers, runners, a howler, a viper, a storm, a herald, a shell, a reaver, and an oni. From level 41 those monsters are faster and harder, and Moth, Elder, Glut, and Brood join them. The howler hangs behind its castle. Only an archer can hit it there. It swings from behind the castle onto the road, and onto an archer, a leveling caster, or a healing caster when one is alive, then stays on the road. The viper's bite holds one fighter still for 2 seconds. For a short time they cannot move or attack, and they hold the hurt pose until it ends. A healing caster can clear it. If two fighters are in front, it bites the one who hits harder and does not hold them. Most blows miss the viper. The storm waits 4 seconds, then lightning hits the fighter in front and jumps to four others, one by one, and holds each for 1 second. The herald calls two other monsters every 3 seconds. The shell is slow, hits softly, and carries a great deal of blood. The reaver is a harder hitter for a moderate call. Moth flies on one road. A short weapon cannot hit it, and those fighters stop beneath it, though they still fight a closer fighter on the ground. Elder appears somewhere on the road, strikes whoever is nearest, friend or foe, and fades after 15 seconds. Many blows miss Elder. Glut is very slow. It eats the fighter in front, except a berserker or a flyer, then sits for 5 seconds and heals. Brood bites, and when it dies three quick Lings crawl out. On soldier levels they wear modern kit, and they hit harder than before. Knives match the sword soldier. The firebow is thin-blooded and hits hard, then leaves fire on that spot for 3 seconds. The fan is thin-blooded, barely hurts, and once every 10 seconds it blows its road. The gust hits only the other side, pushing those fighters in front of it back by a quarter of the road. A berserker ignores that gust and covers the fighters behind him. That gust also stretches any fire or ice and keeps it burning 2 seconds longer. Each road holds at most two. The ward carries a great shield, a great deal of blood, and hits for 5. The javelin throws five long heavy shots, then fights up close with a short sword. The drum lifts three allies at once, the way a leveling caster lifts one. On levels 21 to 40 a cow waits 4 seconds, then the first charge hits harder than the blows after it, and it fights up close, slower and softer than a rider. From level 41 a crow does the same and hits harder: it waits 3 seconds, strikes the first enemy hard, then fights like the horse rider. From level 61, Smog, Buck, Scope, and Aria join them. Smog deals no damage and lays smoke where it walks. The smoke hides that stretch for 10 seconds. Buck fires a shotgun once a second, four times, then reloads for 2 seconds. Scope fires a long heavy shot every 3 seconds and has little blood. Aria sings, and the lift is half of a leveling caster, on every ally on every road at once. The bomber is fragile, its hit is heavy, and it strikes the berserker when one is alive. Level 40's general is an officer.
 
 Play lists seventy levels. The first is open. Winning a level opens the next. Levels 1 to 20 are monsters, and that is where each soldier is learned. Levels 21 to 40 are human soldiers. Levels 41 to 60 are monsters again, and the new monsters begin. Levels 61 to 70 alternate, monster then soldier, starting with monsters. The new soldiers begin on the soldier turns. Your purse stays the same. Theirs gets heavier as the levels climb, and it eases a little when the soldiers first arrive. Before you choose who to bring, the level shows the other side, each fighter with a skin and a name. Press a name to read blood, damage, attacking distance, attacking range, speed, and the special skill.
 
@@ -245,15 +245,17 @@ const WEB_NAME_CLOSE := """
 """
 const WEB_FULLSCREEN := """
 (function () {
-  var el = document.fullscreenElement || document.webkitFullscreenElement;
-  if (el) {
+  var active = document.fullscreenElement || document.webkitFullscreenElement;
+  if (active) {
     if (document.exitFullscreen) document.exitFullscreen();
     else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
     return;
   }
-  var root = document.documentElement;
-  var ask = root.requestFullscreen || root.webkitRequestFullscreen;
-  if (ask) ask.call(root);
+  var canvas = document.getElementById('canvas');
+  if (canvas && canvas.requestFullscreen) canvas.requestFullscreen();
+  else if (canvas && canvas.webkitRequestFullscreen) canvas.webkitRequestFullscreen();
+  else if (document.documentElement && document.documentElement.requestFullscreen) document.documentElement.requestFullscreen();
+  else if (document.documentElement && document.documentElement.webkitRequestFullscreen) document.documentElement.webkitRequestFullscreen();
 })();
 """
 var chosen_level: int = 1
@@ -510,10 +512,7 @@ func _show_menu() -> void:
 		))
 	else:
 		box.add_child(_menu_button("Code", Color("c4a574"), _show_code, 420, 18))
-	box.add_child(_home_pair(
-		"Full screen", Color("f3e6c8"), _toggle_fullscreen,
-		"Quit", Color("6b3a32"), func() -> void: get_tree().quit()
-	))
+	box.add_child(_screen_quit_row())
 	_begin_duel_gift(root)
 
 
@@ -1264,7 +1263,7 @@ func _foe_skill(entry: Dictionary, kind: String) -> String:
 		"firebow":
 			return "Thin blood and a hard shot, then fire stays on that spot for 3 seconds and deals %d." % int(entry.get("burn", 0))
 		"fan":
-			return "Thin blood. The hit stays at 3. Once every %s seconds it blows its road, pushing fighters in front of it back by a quarter of the road. A berserker ignores the gust and covers the fighters behind him. The gust also stretches any fire or ice and keeps it burning 2 seconds longer. Each road holds at most two." % _num(float(entry.get("interval", 10.0)))
+			return "Thin blood. The hit stays at 3. Once every %s seconds it blows its road. The gust hits only the other side, pushing those fighters in front of it back by a quarter of the road. A berserker ignores the gust and covers the fighters behind him. The gust also stretches any fire or ice and keeps it burning 2 seconds longer. Each road holds at most two." % _num(float(entry.get("interval", 10.0)))
 		"ward":
 			return "A great shield and a great deal of blood. The hit stays at 5."
 		"javelin":
@@ -3105,15 +3104,40 @@ func _adopt_early(cfg: ConfigFile, packed_token: String) -> void:
 	early_fresh = true
 
 
+func _screen_quit_row() -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 12)
+	var full := Button.new()
+	full.text = "Full screen"
+	full.disabled = false
+	full.mouse_filter = Control.MOUSE_FILTER_STOP
+	full.custom_minimum_size = Vector2(204, 52)
+	full.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var full_bg := Color("f3e6c8")
+	var full_lum := full_bg.r * 0.3 + full_bg.g * 0.59 + full_bg.b * 0.11
+	UiSkin.apply(full, full_bg, 18, Color("1c140e") if full_lum > 0.62 else Color("f3e6c8"))
+	full.pressed.connect(_toggle_fullscreen)
+	var quit := _menu_button("Quit", Color("6b3a32"), func() -> void: get_tree().quit(), 204, 18)
+	quit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(full)
+	row.add_child(quit)
+	return row
+
+
 func _toggle_fullscreen() -> void:
-	if OS.has_feature("web"):
+	# The browser grants fullscreen only inside this press, so the canvas call is first.
+	if OS.has_feature("web") or OS.get_name() == "Web":
 		JavaScriptBridge.eval(WEB_FULLSCREEN, true)
+		Sfx.play("click", 1.0, -6.0)
 		return
-	var mode := DisplayServer.window_get_mode()
-	if mode == DisplayServer.WINDOW_MODE_FULLSCREEN or mode == DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN:
-		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
-	else:
-		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
+	if DisplayServer.get_name() != "headless":
+		var mode := DisplayServer.window_get_mode()
+		if mode == DisplayServer.WINDOW_MODE_FULLSCREEN or mode == DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN:
+			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+		else:
+			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
+	Sfx.play("click", 1.0, -6.0)
 
 
 func _unpack_seen(text: String) -> Dictionary:

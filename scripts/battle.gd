@@ -2397,7 +2397,8 @@ func blow_road(road: int, attacker_side: int, amount: float, from_id: String, fa
 	var road_len := absf(enemy_front - player_front)
 	var push := road_len * 0.25
 	var moved_any := false
-	var walls := _gust_walls(road)
+	var cover_side := 1 - attacker_side
+	var walls := _gust_walls(road, cover_side)
 	var bodies: Array = []
 	for unit in units:
 		if is_instance_valid(unit) and unit.alive:
@@ -2412,11 +2413,14 @@ func blow_road(road: int, attacker_side: int, amount: float, from_id: String, fa
 		var bx := float(body.position.x)
 		if bx >= fan_x - 0.01:
 			continue
-		if int(body.side) != attacker_side and body.has_method("take_damage"):
-			body.take_damage(amount, true, from_id, 1200.0)
-		# The shove and the fire stretch stop on a berserker, and on anyone already downwind of him.
+		# The gust only hits the other side. Allies are not pushed, hurt, or used to stretch fire.
+		if int(body.side) == attacker_side:
+			continue
+		# A living berserker of that side stops the shove, the hit, and the fire stretch.
 		if _gust_spares(body, walls):
 			continue
+		if body.has_method("take_damage"):
+			body.take_damage(amount, true, from_id, 1200.0)
 		if _shove_home(body, push):
 			moved_any = true
 	if moved_any:
@@ -2451,11 +2455,12 @@ func _berserker_blocks(unit, road: int) -> bool:
 	return int(unit.lane) == road
 
 
-func _gust_walls(road: int) -> Array:
+func _gust_walls(road: int, cover_side: int) -> Array:
 	var found: Array = []
 	for unit in units:
-		if _berserker_blocks(unit, road):
-			found.append(float(unit.position.x))
+		if int(unit.side) != cover_side or not _berserker_blocks(unit, road):
+			continue
+		found.append(float(unit.position.x))
 	return found
 
 
