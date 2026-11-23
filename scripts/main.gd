@@ -1413,7 +1413,7 @@ func _make_card(entry: Dictionary) -> PanelContainer:
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	panel.add_child(label)
 	var id := str(entry["id"])
-	panel.gui_input.connect(_on_card_input.bind(id))
+	panel.gui_input.connect(_on_card_input.bind(panel, id))
 	card_panels[id] = panel
 	return panel
 
@@ -1457,11 +1457,26 @@ func _num(value: float) -> String:
 	return "%.1f" % value
 
 
-func _on_card_input(event: InputEvent, id: String) -> void:
+func _on_card_input(event: InputEvent, panel: Control, id: String) -> void:
 	if duel_sent:
 		return
-	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		_toggle(id)
+	if not (event is InputEventMouseButton):
+		return
+	var press := event as InputEventMouseButton
+	if press.button_index != MOUSE_BUTTON_LEFT or press.pressed:
+		return
+	if _list_ate_tap(panel):
+		return
+	_toggle(id)
+
+
+func _list_ate_tap(start: Node) -> bool:
+	var node: Node = start
+	while node != null:
+		if node.has_method("scroll_ate_tap"):
+			return bool(node.call("scroll_ate_tap"))
+		node = node.get_parent()
+	return false
 
 
 func _toggle(id: String) -> void:
