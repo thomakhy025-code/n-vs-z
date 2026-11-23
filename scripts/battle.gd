@@ -196,6 +196,7 @@ var cold_roads: Array = []
 var slash_fx: Array = []
 var bursts: Array = []
 var fx_glow = null
+var fx_body = null
 var fx_marks = null
 var fx_rooted: bool = false
 
@@ -320,6 +321,11 @@ func _build_world() -> void:
 	glow.material = glow_mat
 	add_child(glow)
 	fx_glow = glow
+	var body = SkillFx.BodyLayer.new()
+	body.field = self
+	body.z_index = 470
+	add_child(body)
+	fx_body = body
 	var marks = SkillFx.MarkLayer.new()
 	marks.field = self
 	marks.z_index = 640
@@ -2534,7 +2540,13 @@ func cast_skill(id: String, side: int) -> bool:
 	else:
 		who.blaze = 8.0
 		who.blaze_factor = factor
+		_shout_skill("en")
 	return true
+
+
+func _shout_skill(id: String) -> void:
+	Sfx.speak("say_" + id)
+	Sfx.play("fx_" + id, 1.0, -2.0)
 
 
 func _spend_skill(side: int, cost: float) -> bool:
@@ -2634,7 +2646,7 @@ func _cast_explosion(who, amount: float) -> void:
 		lay_zone("fire", road, span.x, span.y, y, 3.0, burn, who)
 		poof(Vector2((span.x + span.y) * 0.5, y), Color("ff7a2a"))
 	_note_burst(span.x, span.y)
-	Sfx.play("hit", 0.86, -4.0)
+	_shout_skill("ex")
 
 
 func _cast_smash(who, amount: float) -> void:
@@ -2647,7 +2659,7 @@ func _cast_smash(who, amount: float) -> void:
 		near_x = span.y
 		far_x = span.x
 	_note_slash(span.x, span.y, lane_y(road), near_x, far_x)
-	Sfx.play(Painter.hit_id("katana"), 0.92, -4.0)
+	_shout_skill("ls")
 
 
 func _cast_freeze(who, amount: float) -> void:
@@ -2656,7 +2668,7 @@ func _cast_freeze(who, amount: float) -> void:
 	_root_allies(who, road, 3.0)
 	_hold_cold(road)
 	lay_zone("ice", road, 0.0, vp.x, lane_y(road), 6.0, 0.0, null, float(who.position.x))
-	Sfx.play("wind", 1.15, -6.0)
+	_shout_skill("fz")
 
 
 func _hold_cold(road: int) -> void:
@@ -2740,8 +2752,8 @@ func _note_burst(x0: float, x1: float) -> void:
 		"x1": x1,
 		"y0": top,
 		"y1": bottom,
-		"left": 0.66,
-		"life": 0.66,
+		"left": 3.7,
+		"life": 3.7,
 		"age": 0.0,
 	})
 	queue_redraw()
@@ -3085,6 +3097,8 @@ func _redraw_fx() -> void:
 		return
 	if fx_glow != null:
 		fx_glow.queue_redraw()
+	if fx_body != null:
+		fx_body.queue_redraw()
 	if fx_marks != null:
 		fx_marks.queue_redraw()
 

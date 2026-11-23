@@ -557,8 +557,8 @@ func _sync_aura() -> void:
 		_aura.texture = tex
 	var frame: int = posmod(int(Time.get_ticks_msec() / 70), SkillFx.FRAMES)
 	_aura.region_rect = SkillFx.region("en", frame)
-	_aura.position = Vector2(0.0, -24.0)
-	_aura.scale = Vector2(1.25, 1.25)
+	_aura.position = Vector2(0.0, -36.0)
+	_aura.scale = Vector2(1.32, 1.32)
 
 
 func _draw_slash() -> void:
@@ -575,16 +575,17 @@ func _draw_slash() -> void:
 		return
 	var along: float = 1.0 - clampf(slash / 0.28, 0.0, 1.0)
 	var puff: int = 0
-	while puff < 6:
-		var t: float = float(puff) / 5.0
+	while puff < 8:
+		var t: float = float(puff) / 7.0
 		if t > along + 0.02:
 			puff += 1
 			continue
-		var px: float = facing * (18.0 + t * 84.0)
-		var py: float = -10.0 - sin(t * PI) * 36.0
-		var frame: int = 4 + (puff % 4)
-		var fade: float = 0.55 + 0.4 * t
-		SkillFx.blit(self, "ex", frame, Rect2(px - 18.0, py - 26.0, 36.0, 42.0), false, Color(1, 1, 1, fade))
+		var px: float = facing * (16.0 + t * 96.0)
+		var py: float = -8.0 - sin(t * PI) * 40.0
+		var frame: int = puff % SkillFx.FRAMES
+		var fade: float = 0.62 + 0.38 * t
+		SkillFx.blit(self, "en", frame, Rect2(px - 34.0, py - 46.0, 68.0, 84.0), false, Color(1, 1, 1, fade))
+		SkillFx.blit(self, "en", (frame + 3) % SkillFx.FRAMES, Rect2(px - 18.0, py - 28.0, 36.0, 48.0), false, Color(1, 0.96, 0.78, fade))
 		puff += 1
 
 
