@@ -2443,7 +2443,7 @@ func _paint_upgrade_page() -> bool:
 	for child in list.get_children():
 		if child is HBoxContainer and str(child.name) != "UpgradeReset":
 			_paint_upgrade_row(child)
-	var reset_row := list.get_node_or_null("UpgradeReset") as HBoxContainer
+	var reset_row := list.get_node_or_null("UpgradeReset") as VBoxContainer
 	if reset_row == null:
 		return false
 	_paint_reset_row(reset_row)
@@ -2486,13 +2486,18 @@ func _buy_rank(id: String) -> void:
 
 
 
-func _make_reset_row() -> HBoxContainer:
+func _make_reset_row() -> VBoxContainer:
+	var stack := VBoxContainer.new()
+	stack.name = "UpgradeReset"
+	stack.set_meta("reset_armed", false)
+	stack.set_meta("reset_kind", "idle")
+	stack.set_meta("reset_back", 0)
+	stack.set_meta("reset_scroll", -1)
+	stack.set_meta("reset_latch_wait", 0)
+	stack.add_theme_constant_override("separation", 8)
+	stack.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	stack.z_index = 2
 	var row := HBoxContainer.new()
-	row.name = "UpgradeReset"
-	row.set_meta("reset_armed", false)
-	row.set_meta("reset_kind", "idle")
-	row.set_meta("reset_back", 0)
-	row.set_meta("reset_scroll", -1)
 	row.add_theme_constant_override("separation", 12)
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -2523,20 +2528,38 @@ func _make_reset_row() -> HBoxContainer:
 		_press_upgrade_reset()
 	)
 	row.add_child(button)
-	_paint_reset_row(row)
-	return row
+	stack.add_child(row)
+	var confirm := ResetPayButton.new()
+	confirm.name = "ResetConfirm"
+	confirm.visible = false
+	confirm.z_index = 8
+	confirm.mouse_filter = Control.MOUSE_FILTER_STOP
+	confirm.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	confirm.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	confirm.clip_text = false
+	confirm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	confirm.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	confirm.custom_minimum_size = Vector2(280, 88)
+	UiSkin.apply(confirm, Color("1c140e"), 18, Color("f3e6c8"))
+	confirm.pressed.connect(func() -> void:
+		Sfx.play("click", 1.0, -6.0)
+		_press_upgrade_confirm()
+	)
+	stack.add_child(confirm)
+	_paint_reset_row(stack)
+	return stack
 
 
-func _reset_row() -> HBoxContainer:
+func _reset_row() -> VBoxContainer:
 	return _live_reset(self)
 
 
-func _live_reset(node: Node) -> HBoxContainer:
+func _live_reset(node: Node) -> VBoxContainer:
 	if node.is_queued_for_deletion():
 		return null
-	if node.name == "UpgradeReset" and node is HBoxContainer:
-		return node as HBoxContainer
-	var found: HBoxContainer = null
+	if node.name == "UpgradeReset" and node is VBoxContainer:
+		return node as VBoxContainer
+	var found: VBoxContainer = null
 	for child in node.get_children():
 		found = _live_reset(child)
 		if found != null:
@@ -2544,22 +2567,31 @@ func _live_reset(node: Node) -> HBoxContainer:
 	return null
 
 
-func _paint_reset_row(row: HBoxContainer) -> void:
+func _paint_reset_row(row: VBoxContainer) -> void:
 	var note := row.find_child("ResetNote", true, false) as Label
 	if note == null:
 		return
-	if bool(row.get_meta("reset_armed", false)):
-		note.text = "This will return %d coins and set every rank to 1." % _upgrade_refund()
+	var confirm := row.find_child("ResetConfirm", true, false) as Button
+	var armed := bool(row.get_meta("reset_armed", false))
+	if not armed:
+		if confirm != null:
+			confirm.visible = false
+		var kind: String = str(row.get_meta("reset_kind", "idle"))
+		if kind == "poor":
+			note.text = "You need 500 diamonds."
+			return
+		if kind == "done":
+			var back: int = int(row.get_meta("reset_back", 0))
+			note.text = "%d coins came back." % back
+			return
+		note.text = "Returns the coins spent on ranks and sets every rank to 1."
 		return
-	var kind: String = str(row.get_meta("reset_kind", "idle"))
-	if kind == "poor":
-		note.text = "You need 500 diamonds."
+	var back_coins: int = _upgrade_refund()
+	note.text = "This will return %d coins and set every rank to 1." % back_coins
+	if confirm == null:
 		return
-	if kind == "done":
-		var back: int = int(row.get_meta("reset_back", 0))
-		note.text = "%d coins came back." % back
-		return
-	note.text = "Returns the coins spent on ranks and sets every rank to 1."
+	confirm.text = "Confirm reset · 500 diamonds\n%d coins come back. Every rank returns to 1." % back_coins
+	confirm.visible = true
 
 
 func _on_upgrade_scrolled(_value: float) -> void:
@@ -2581,6 +2613,15 @@ func _latch_reset_scroll() -> void:
 	var row := _reset_row()
 	if row == null or not bool(row.get_meta("reset_armed", false)):
 		return
+	var confirm := row.find_child("ResetConfirm", true, false) as Button
+	var waits: int = int(row.get_meta("reset_latch_wait", 0))
+	if confirm != null and confirm.visible and confirm.size.y < 20.0 and waits < 3:
+		row.set_meta("reset_latch_wait", waits + 1)
+		var tree := get_tree()
+		if tree != null and not tree.process_frame.is_connected(_latch_reset_scroll):
+			tree.process_frame.connect(_latch_reset_scroll, CONNECT_ONE_SHOT)
+		return
+	_reveal_reset_confirm(row)
 	var scroller := _find_scroll(self)
 	var at := 0
 	if scroller != null:
@@ -2588,8 +2629,25 @@ func _latch_reset_scroll() -> void:
 	row.set_meta("reset_scroll", at)
 
 
-func _arm_upgrade_reset(row: HBoxContainer) -> void:
+func _reveal_reset_confirm(row: VBoxContainer) -> void:
+	var confirm := row.find_child("ResetConfirm", true, false) as Button
+	if confirm == null or not confirm.visible or confirm.size.y < 20.0:
+		return
+	var scroller := _find_scroll(self)
+	if scroller == null:
+		return
+	var overflow := confirm.get_global_rect().end.y - (scroller.get_global_rect().end.y - 8.0)
+	if overflow <= 1.0:
+		return
+	var next := scroller.scroll_vertical + int(ceil(overflow))
+	if next < 0:
+		next = 0
+	scroller.scroll_vertical = next
+
+
+func _arm_upgrade_reset(row: VBoxContainer) -> void:
 	row.set_meta("reset_scroll", -1)
+	row.set_meta("reset_latch_wait", 0)
 	_mark_reset(row, true, "armed", 0)
 	var tree := get_tree()
 	if tree == null:
@@ -2599,7 +2657,7 @@ func _arm_upgrade_reset(row: HBoxContainer) -> void:
 	tree.process_frame.connect(_latch_reset_scroll, CONNECT_ONE_SHOT)
 
 
-func _mark_reset(row: HBoxContainer, armed_now: bool, kind_now: String, back_now: int) -> void:
+func _mark_reset(row: VBoxContainer, armed_now: bool, kind_now: String, back_now: int) -> void:
 	upgrade_reset_hold += 1
 	row.set_meta("reset_armed", armed_now)
 	row.set_meta("reset_kind", kind_now)
@@ -2627,13 +2685,25 @@ func _press_upgrade_reset() -> void:
 	if diamonds < RESET_DIAMONDS:
 		_mark_reset(row, false, "poor", 0)
 		return
-	if not bool(row.get_meta("reset_armed", false)):
-		_arm_upgrade_reset(row)
+	if bool(row.get_meta("reset_armed", false)):
+		return
+	_arm_upgrade_reset(row)
+
+
+func _press_upgrade_confirm() -> void:
+	var row := _reset_row()
+	if row == null or not bool(row.get_meta("reset_armed", false)):
+		return
+	if diamonds < RESET_DIAMONDS:
+		_mark_reset(row, false, "poor", 0)
 		return
 	_commit_upgrade_reset(row)
 
 
-func _commit_upgrade_reset(row: HBoxContainer) -> void:
+func _commit_upgrade_reset(row: VBoxContainer) -> void:
+	if diamonds < RESET_DIAMONDS:
+		_mark_reset(row, false, "poor", 0)
+		return
 	var refund := _upgrade_refund()
 	diamonds -= RESET_DIAMONDS
 	var room := 20000000 - coins
