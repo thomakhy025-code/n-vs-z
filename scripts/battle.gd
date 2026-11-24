@@ -31,6 +31,8 @@ const ENEMY_GROWTH := 0.065
 const MAX_SIDE := 24
 const BREAK_TIME := 2.55
 const SKILL_COST := 45.0
+# One lock for every hero skill on that side. It falls with soldier cooldowns, so pause holds it.
+const SKILL_LOCK := 10.0
 const SPLASH_REACH := 70.0
 
 
@@ -193,6 +195,8 @@ var _hud_pfill: float = -1.0
 var _hud_efill: float = -1.0
 var _hud_p_hot: bool = false
 var skill_buttons: Array = []
+var skill_lock_left: float = 0.0
+var skill_lock_right: float = 0.0
 var cold_roads: Array = []
 var slash_fx: Array = []
 var bursts: Array = []
@@ -626,7 +630,7 @@ func _layout_hud() -> void:
 	if not skill_buttons.is_empty():
 		var skill_count := skill_buttons.size()
 		var skill_gap := 8.0
-		var skill_h := 46.0
+		var skill_h := 68.0
 		var skill_span := maxf(96.0, size.x - 40.0 - skill_gap * float(skill_count - 1))
 		var skill_w := minf(176.0, skill_span / float(skill_count))
 		var row_w := skill_w * float(skill_count) + skill_gap * float(skill_count - 1)
@@ -699,6 +703,8 @@ func _process(delta: float) -> void:
 		ex_aiming = false
 	if ex_aiming:
 		_redraw_fx()
+	if not finished and not paused:
+		_tick_skill_lock(delta)
 	if puppet:
 		_send_hand()
 		_update_hud(delta)
@@ -2011,6 +2017,7 @@ func _update_hud(delta: float) -> void:
 	if hint != null and battle_time > 11.0 and hint.modulate.a > 0.0:
 		hint.modulate.a = maxf(0.0, hint.modulate.a - delta * 0.45)
 	_paint_slots()
+	_paint_skills()
 	if hurt_flash != null and hurt_flash.color.a > 0.0:
 		var fade: Color = hurt_flash.color
 		fade.a = move_toward(fade.a, 0.0, delta * 0.9)
@@ -2515,7 +2522,9 @@ func _build_skill_buttons() -> void:
 			cloth = Color("7eb6e0")
 		elif id == "en":
 			cloth = Color("ff7a2a")
-		UiSkin.apply(btn, cloth, 15, _ink(cloth))
+		var ink := _ink(cloth)
+		UiSkin.apply(btn, cloth, 15, ink)
+		btn.add_theme_color_override("font_disabled_color", ink)
 		btn.set_meta("skill_id", id)
 		if id == "ex":
 			btn.button_down.connect(_arm_explosion)
@@ -2525,13 +2534,63 @@ func _build_skill_buttons() -> void:
 		skill_buttons.append(btn)
 
 
+func _skill_wait(side: int) -> float:
+	if side == 0:
+		return skill_lock_left
+	return skill_lock_right
+
+
+func _skill_locked(side: int) -> bool:
+	return _skill_wait(side) > 0.0
+
+
+func _arm_skill_lock(side: int) -> void:
+	if side == 0:
+		skill_lock_left = SKILL_LOCK
+	else:
+		skill_lock_right = SKILL_LOCK
+
+
+func _tick_skill_lock(delta: float) -> void:
+	if skill_lock_left > 0.0:
+		skill_lock_left = maxf(0.0, skill_lock_left - delta)
+	if skill_lock_right > 0.0:
+		skill_lock_right = maxf(0.0, skill_lock_right - delta)
+
+
+func _paint_skills() -> void:
+	if skill_buttons.is_empty():
+		return
+	var left: float = _skill_wait(_local_side())
+	var cooling: bool = left > 0.0
+	var shown_left: float = 0.0
+	if cooling:
+		var tenths: int = ceili(left * 10.0)
+		shown_left = float(tenths) / 10.0
+	for raw_skill in skill_buttons:
+		var skill_btn: Button = raw_skill
+		if not is_instance_valid(skill_btn):
+			continue
+		var skill_id := str(skill_btn.get_meta("skill_id", ""))
+		var shown := skill_name(skill_id)
+		if cooling:
+			shown = "%s\n%.1fs" % [shown, shown_left]
+		if skill_btn.text != shown:
+			skill_btn.text = shown
+		if skill_btn.disabled != cooling:
+			skill_btn.disabled = cooling
+
+
 func _press_skill(id: String) -> void:
 	if finished or paused:
+		return
+	if _skill_locked(_local_side()):
 		return
 	if duel and puppet:
 		if player_value < SKILL_COST:
 			return
 		Net.announce_skill(id)
+		_arm_skill_lock(_local_side())
 		return
 	cast_skill(id, _local_side())
 
@@ -2541,6 +2600,8 @@ func cast_skill(id: String, side: int, aim: Vector2 = Vector2(-99999, -99999)) -
 		return false
 	if not owns_skill(id, side):
 		return false
+	if _skill_locked(side):
+		return false
 	var who = _hero_for(side)
 	if who == null:
 		return false
@@ -2549,10 +2610,12 @@ func cast_skill(id: String, side: int, aim: Vector2 = Vector2(-99999, -99999)) -
 			return false
 		if not _spend_skill(side, SKILL_COST):
 			return false
+		_arm_skill_lock(side)
 		_cast_explosion_at(who, 400.0 * skill_factor(id, side), aim)
 		return true
 	if not _spend_skill(side, SKILL_COST):
 		return false
+	_arm_skill_lock(side)
 	var factor := skill_factor(id, side)
 	if id == "ls":
 		_cast_smash(who, 320.0 * factor)
@@ -2661,6 +2724,8 @@ func _root_allies(caster, road: int, seconds: float) -> void:
 func _arm_explosion() -> void:
 	if finished or paused or ex_aiming:
 		return
+	if _skill_locked(_local_side()):
+		return
 	if not owns_skill("ex", _local_side()):
 		return
 	if _hero_for(_local_side()) == null:
@@ -2710,11 +2775,14 @@ func _drop_explosion() -> void:
 	_redraw_fx()
 	if finished or paused:
 		return
+	if _skill_locked(_local_side()):
+		return
 	if duel and puppet:
 		if player_value < SKILL_COST:
 			return
 		var norm := _to_norm(point)
 		Net.announce_skill("ex", norm.x, norm.y)
+		_arm_skill_lock(_local_side())
 		return
 	cast_skill("ex", _local_side(), point)
 
