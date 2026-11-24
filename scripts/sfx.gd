@@ -5,6 +5,7 @@ var _bank: Dictionary = {}
 var _index: int = 0
 var _bed: AudioStreamPlayer
 var _voice: AudioStreamPlayer
+var _shout: AudioStreamPlayer
 var _mood: String = ""
 var _voice_len: float = 0.0
 const SHOUT_DB := 6.0
@@ -22,12 +23,17 @@ func _ready() -> void:
 	_voice = AudioStreamPlayer.new()
 	_voice.volume_db = -2.0
 	add_child(_voice)
+	_shout = AudioStreamPlayer.new()
+	_shout.volume_db = SHOUT_DB
+	add_child(_shout)
 
 
 func _process(_delta: float) -> void:
 	if _bed == null or _mood == "":
 		return
-	if _voice != null and _voice.playing:
+	var voice_on := _voice != null and _voice.playing
+	var shout_on := _shout != null and _shout.playing
+	if voice_on or shout_on:
 		_bed.volume_db = -22.0
 	else:
 		_bed.volume_db = _mood_db(_mood)
@@ -75,6 +81,8 @@ func narration_length() -> float:
 
 func speak(id: String) -> float:
 	_voice_len = 0.0
+	if id.begins_with("say_") and _voice != null and _voice.playing and _stream_is_shout(_voice.stream):
+		return _layer_shout(id)
 	if _voice != null and _voice.playing:
 		_voice.stop()
 	if id == "" or _voice == null:
@@ -97,6 +105,8 @@ func hush() -> void:
 	_voice_len = 0.0
 	if _voice != null:
 		_voice.stop()
+	if _shout != null:
+		_shout.stop()
 
 
 func stop_mood() -> void:
@@ -106,6 +116,8 @@ func stop_mood() -> void:
 		_bed.stop()
 	if _voice != null:
 		_voice.stop()
+	if _shout != null:
+		_shout.stop()
 
 
 func _mood_db(id: String) -> float:
@@ -128,6 +140,32 @@ func _mood_id(place: String) -> String:
 			return "story_high"
 		_:
 			return "story_road"
+
+
+func _layer_shout(id: String) -> float:
+	if _shout == null:
+		return 0.0
+	var stream := _stream(id)
+	if stream == null:
+		return 0.0
+	if _shout.playing:
+		_shout.stop()
+	_shout.stream = stream
+	_shout.pitch_scale = 1.0
+	_shout.volume_db = SHOUT_DB
+	_shout.play()
+	return stream.get_length()
+
+
+func _stream_is_shout(stream: AudioStream) -> bool:
+	if stream == null:
+		return false
+	if stream.resource_path.find("say_") >= 0:
+		return true
+	for key in _bank.keys():
+		if str(key).begins_with("say_") and _bank[key] == stream:
+			return true
+	return false
 
 
 func play(id: String, pitch: float = 1.0, db: float = -2.0) -> void:

@@ -34,6 +34,11 @@ const BREAK_TIME := 2.55
 const SKILL_COST := 45.0
 # One lock for every hero skill on that side. It falls with soldier cooldowns, so pause holds it.
 const SKILL_LOCK := 10.0
+# PCM frames / 22050 Hz for audio/say_ex, say_ls, say_fz, say_en. Each shout has its own length.
+const SHOUT_EX := 12665.0 / 22050.0
+const SHOUT_LS := 13616.0 / 22050.0
+const SHOUT_FZ := 10221.0 / 22050.0
+const SHOUT_EN := 13588.0 / 22050.0
 const SPLASH_REACH := 70.0
 
 
@@ -198,6 +203,7 @@ var _hud_p_hot: bool = false
 var skill_buttons: Array = []
 var skill_lock_left: float = 0.0
 var skill_lock_right: float = 0.0
+var skill_winds: Array = []
 var cold_roads: Array = []
 var slash_fx: Array = []
 var bursts: Array = []
@@ -706,6 +712,7 @@ func _process(delta: float) -> void:
 		_redraw_fx()
 	if not finished and not paused:
 		_tick_skill_lock(delta)
+		_tick_skill_winds(delta)
 	if puppet:
 		_send_hand()
 		_update_hud(delta)
@@ -1690,6 +1697,8 @@ func _finish_battle(defender_side: int, from_gate: bool = false) -> void:
 		return
 	finished = true
 	paused = false
+	skill_winds.clear()
+	_redraw_cast()
 	_release_stick()
 	fallen_side = defender_side
 	var won := defender_side == 1
@@ -2601,37 +2610,133 @@ func cast_skill(id: String, side: int, aim: Vector2 = Vector2(-99999, -99999)) -
 		return false
 	if not owns_skill(id, side):
 		return false
-	if _skill_locked(side):
+	if _skill_locked(side) or _skill_winding(side):
 		return false
 	var who = _hero_for(side)
 	if who == null:
 		return false
+	var factor := skill_factor(id, side)
 	if id == "ex":
 		if aim.x < -9000.0:
 			return false
 		if not _spend_skill(side, SKILL_COST):
 			return false
 		_arm_skill_lock(side)
-		_cast_explosion_at(who, 400.0 * skill_factor(id, side), aim)
+		_begin_wind(id, side, who, 400.0 * factor, aim, factor)
 		return true
 	if not _spend_skill(side, SKILL_COST):
 		return false
 	_arm_skill_lock(side)
-	var factor := skill_factor(id, side)
+	var amount := 0.0
 	if id == "ls":
-		_cast_smash(who, 320.0 * factor)
+		amount = 320.0 * factor
 	elif id == "fz":
-		_cast_freeze(who, 40.0 * factor)
-	else:
-		who.blaze = 8.0
-		who.blaze_factor = factor
-		_shout_skill("en")
+		amount = 40.0 * factor
+	_begin_wind(id, side, who, amount, aim, factor)
 	return true
 
 
-func _shout_skill(id: String) -> void:
-	Sfx.speak("say_" + id)
+func _shout_span(id: String) -> float:
+	match id:
+		"ex":
+			return SHOUT_EX
+		"ls":
+			return SHOUT_LS
+		"fz":
+			return SHOUT_FZ
+		_:
+			return SHOUT_EN
+
+
+func _shout_skill(id: String) -> float:
+	var span := _shout_span(id)
+	var heard := Sfx.speak("say_" + id)
+	if heard > span:
+		return heard
+	return span
+
+
+func _skill_winding(side: int) -> bool:
+	for raw in skill_winds:
+		var wind: Dictionary = raw
+		if int(wind.get("side", -1)) == side:
+			return true
+	return false
+
+
+func _begin_wind(id: String, side: int, who, amount: float, aim: Vector2, factor: float) -> void:
+	var span := _shout_skill(id)
+	skill_winds.append({
+		"id": id,
+		"side": side,
+		"who": who,
+		"amount": amount,
+		"aim": aim,
+		"factor": factor,
+		"left": span,
+		"span": span,
+		"age": 0.0,
+	})
+	_redraw_cast()
+
+
+func _tick_skill_winds(delta: float) -> void:
+	if skill_winds.is_empty():
+		return
+	if finished:
+		skill_winds.clear()
+		_redraw_cast()
+		return
+	var pending: Array = skill_winds.duplicate()
+	skill_winds.clear()
+	for raw in pending:
+		if finished:
+			break
+		var wind: Dictionary = raw
+		var who = wind.get("who", null)
+		if who == null or not is_instance_valid(who) or not who.alive:
+			continue
+		var age := float(wind.get("age", 0.0)) + delta
+		var left := float(wind.get("left", 0.0)) - delta
+		wind["age"] = age
+		wind["left"] = left
+		if left > 0.0:
+			skill_winds.append(wind)
+			continue
+		_release_skill(wind)
+		if finished:
+			skill_winds.clear()
+			break
+	_redraw_cast()
+
+
+func _release_skill(wind: Dictionary) -> void:
+	if finished:
+		return
+	var who = wind.get("who", null)
+	if who == null or not is_instance_valid(who) or not who.alive:
+		return
+	var id := str(wind.get("id", ""))
+	var amount := float(wind.get("amount", 0.0))
 	Sfx.play("fx_" + id, 1.0, 0.0)
+	if id == "ex":
+		var aim := Vector2.ZERO
+		var aim_v: Variant = wind.get("aim", aim)
+		if aim_v is Vector2:
+			aim = aim_v
+		_cast_explosion_at(who, amount, aim)
+	elif id == "ls":
+		_cast_smash(who, amount)
+	elif id == "fz":
+		_cast_freeze(who, amount)
+	else:
+		who.blaze = 8.0
+		who.blaze_factor = float(wind.get("factor", 1.0))
+
+
+func _redraw_cast() -> void:
+	if fx_marks != null and is_instance_valid(fx_marks):
+		fx_marks.queue_redraw()
 
 
 func _spend_skill(side: int, cost: float) -> bool:
@@ -2807,7 +2912,6 @@ func _cast_explosion_at(who, amount: float, center: Vector2) -> void:
 	_hurt_circle(who, center, radius, amount)
 	_lay_fire_circle(center, radius, 3.0, ember_damage(), who)
 	_note_burst_at(center, radius)
-	_shout_skill("ex")
 
 
 func _lay_fire_circle(center: Vector2, radius: float, seconds: float, amount: float, spare) -> void:
@@ -2844,7 +2948,6 @@ func _cast_smash(who, amount: float) -> void:
 		far_x = span.x
 	var slash_life := SlashVfx.LIFE
 	_note_slash(span.x, span.y, lane_y(road), near_x, far_x, float(who.position.x), float(who.position.y), slash_life)
-	_shout_skill("ls")
 
 
 func _cast_freeze(who, amount: float) -> void:
@@ -2868,7 +2971,6 @@ func _cast_freeze(who, amount: float) -> void:
 		"bodies": _foes_in_front(who),
 		"locked": false,
 	})
-	Sfx.speak("say_fz")
 	Sfx.play("fz_wind", 1.0, -2.0)
 	frost_audio.append("fz_wind")
 	_redraw_fx()
@@ -3361,7 +3463,7 @@ func _stands_in(body, road: int, x0: float, x1: float) -> bool:
 
 
 func _redraw_fx() -> void:
-	var hot := not bursts.is_empty() or not slash_fx.is_empty() or not hazards.is_empty() or not frost_casts.is_empty() or fx_rooted or ex_aiming
+	var hot := not bursts.is_empty() or not slash_fx.is_empty() or not hazards.is_empty() or not frost_casts.is_empty() or fx_rooted or ex_aiming or not skill_winds.is_empty()
 	if not hot:
 		return
 	if fx_glow != null:

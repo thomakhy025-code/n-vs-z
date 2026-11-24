@@ -838,6 +838,88 @@ static func _core_burst(ci: CanvasItem, at: Vector2, radius: float, frame: int) 
 	_star(ci, at, radius * 0.45, Color("ffffff"))
 
 
+static func draw_casts(ci: CanvasItem, winds: Array) -> void:
+	for raw in winds:
+		var wind: Dictionary = raw
+		var who_v: Variant = wind.get("who", null)
+		if who_v == null or not (who_v is Node2D):
+			continue
+		var caster: Node2D = who_v
+		if not is_instance_valid(caster) or not caster.visible:
+			continue
+		var id := str(wind.get("id", ""))
+		var span := maxf(0.001, float(wind.get("span", 1.0)))
+		var age := float(wind.get("age", 0.0))
+		var along := clampf(age / span, 0.0, 1.0)
+		var pulse := 0.62 + 0.38 * sin(age * TAU * 4.0)
+		var feet: Vector2 = caster.position
+		if id == "en":
+			_draw_cast_flames(ci, feet, along, pulse)
+		else:
+			_draw_cast_gather(ci, feet + Vector2(0.0, -46.0), id, along, pulse)
+
+
+static func _draw_cast_gather(ci: CanvasItem, at: Vector2, id: String, along: float, pulse: float) -> void:
+	var wash := Color(1.0, 0.42, 0.08, 0.16)
+	var ring := Color(1.0, 0.48, 0.08, 0.88)
+	var mote := Color(1.0, 0.74, 0.22, 0.95)
+	var count := 8
+	var wide := 3.4
+	if id == "ls":
+		wash = Color(1.0, 0.94, 0.72, 0.14)
+		ring = Color(1.0, 0.9, 0.48, 0.92)
+		mote = Color(1.0, 0.98, 0.9, 0.96)
+		count = 6
+		wide = 2.2
+	elif id == "fz":
+		wash = Color(0.62, 0.84, 1.0, 0.16)
+		ring = Color(0.7, 0.88, 1.0, 0.9)
+		mote = Color(0.92, 0.98, 1.0, 0.96)
+		wide = 2.6
+	var radius := lerpf(62.0, 12.0, along) * (0.9 + 0.1 * pulse)
+	var disc := wash
+	disc.a = wash.a * (0.75 + 0.45 * pulse)
+	if disc.a > 0.28:
+		disc.a = 0.28
+	ci.draw_circle(at, radius * 0.55, disc)
+	var band := ring
+	band.a = 0.4 + 0.45 * pulse
+	ci.draw_arc(at, radius, 0.0, TAU, 28, band, wide, true)
+	if id == "ls":
+		ci.draw_arc(at, radius * 0.72, 0.5, TAU - 0.4, 22, mote, 1.5, true)
+	elif id == "fz":
+		ci.draw_arc(at, radius * 0.64, 0.8, TAU - 0.6, 20, mote, 1.3, true)
+	var n := 0
+	while n < count:
+		var ang := TAU * float(n) / float(count) - along * 3.4
+		var dist := lerpf(radius, 8.0, along * 0.9)
+		var spot := at + Vector2(cos(ang) * dist, sin(ang) * dist * 0.72)
+		var rad := wide * (0.7 + 0.45 * pulse)
+		ci.draw_circle(spot, rad, mote)
+		n += 1
+	var core := mote
+	core.a = 0.18 + 0.55 * along * pulse
+	ci.draw_circle(at, lerpf(11.0, 4.0, along), core)
+
+
+static func _draw_cast_flames(ci: CanvasItem, feet: Vector2, along: float, pulse: float) -> void:
+	var glow := Color(1.0, 0.42, 0.08, 0.1 + 0.1 * pulse)
+	ci.draw_circle(feet + Vector2(0.0, -36.0), 26.0 + along * 10.0, glow)
+	var n := 0
+	while n < 5:
+		var spread := float(n) - 2.0
+		var sway := sin(along * TAU + float(n) * 1.3) * 3.0
+		var x := feet.x + spread * 13.0 + sway
+		var climb := (8.0 + along * 64.0) * (0.72 + 0.28 * pulse)
+		var base := Vector2(x, feet.y - 6.0 - along * 10.0)
+		var hot := Color(1.0, 0.36, 0.06, 0.78)
+		var tip := Color(1.0, 0.86, 0.38, 0.92)
+		ci.draw_circle(base, 6.5, Color(hot.r, hot.g, hot.b, 0.45))
+		ci.draw_circle(base + Vector2(0.0, -climb * 0.45), 4.6, hot)
+		ci.draw_circle(base + Vector2(0.0, -climb), 2.8, tip)
+		n += 1
+
+
 class BakeHost extends Node:
 	var kind: String = ""
 	var vp: SubViewport = null
@@ -957,6 +1039,11 @@ class MarkLayer extends Node2D:
 		if frost_raw is Array:
 			frost_list = frost_raw
 		baker.call("draw_frost", self, frost_list)
+		var wind_raw: Variant = field.get("skill_winds")
+		var wind_list: Array = []
+		if wind_raw is Array:
+			wind_list = wind_raw
+		baker.call("draw_casts", self, wind_list)
 
 class BodyLayer extends Node2D:
 	var field: Node = null
