@@ -60,9 +60,10 @@ func _process(delta: float) -> void:
 	position += step
 	traveled += step.length()
 	if hazard == "fire":
-		trail.append(position)
-		while trail.size() > 8:
-			trail.pop_front()
+		if from_id == "hero":
+			trail.append(position)
+			while trail.size() > 8:
+				trail.pop_front()
 		queue_redraw()
 	if traveled >= max_dist:
 		queue_free()
@@ -149,7 +150,11 @@ func _draw() -> void:
 		dir * (tip + (12.0 if bold else 8.0)),
 		dir * tip - side * (6.0 if bold else 4.0),
 	]), tint)
-	if hazard == "fire":
+	if hazard == "fire" and from_id != "hero":
+		var flick := sin(Time.get_ticks_msec() * 0.02) * 3.0
+		draw_circle(-dir * tail * 0.45 + Vector2(flick, -3.0), 3.2, Color("ffb15a"))
+		draw_circle(-dir * tail * 0.75, 2.2, Color("ff7a2a"))
+	elif hazard == "fire":
 		_draw_fire_trail()
 
 

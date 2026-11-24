@@ -195,6 +195,8 @@ var skill_buttons: Array = []
 var cold_roads: Array = []
 var slash_fx: Array = []
 var bursts: Array = []
+var frost_casts: Array = []
+var frost_audio: Array = []
 var ex_aiming: bool = false
 var ex_aim: Vector2 = Vector2.ZERO
 var fx_glow = null
@@ -713,6 +715,7 @@ func _process(delta: float) -> void:
 			enemy_cd[id] = maxf(0.0, float(enemy_cd[id]) - delta)
 		player_value += player_income * delta
 		_tick_hazards(delta)
+		_tick_frost(delta)
 		_tick_chill(delta)
 		_tick_slashes(delta)
 		_tick_bursts(delta)
@@ -2780,8 +2783,67 @@ func _cast_freeze(who, amount: float) -> void:
 	_hurt_band(who, 0.0, vp.x, road, amount, true, false)
 	_root_allies(who, road, 3.0)
 	_hold_cold(road)
+	var blow := _toward_enemy(int(who.side))
 	lay_zone("ice", road, 0.0, vp.x, lane_y(road), 6.0, 0.0, null, float(who.position.x))
-	_shout_skill("fz")
+	if not hazards.is_empty():
+		var iced: Dictionary = hazards[hazards.size() - 1]
+		iced["blow"] = blow
+		hazards[hazards.size() - 1] = iced
+	frost_casts.append({
+		"age": 0.0,
+		"from_x": float(who.position.x),
+		"from_y": float(who.position.y),
+		"dir": blow,
+		"y": lane_y(road),
+		"vp": vp,
+		"bodies": _foes_in_front(who),
+		"locked": false,
+	})
+	Sfx.speak("say_fz")
+	Sfx.play("fz_wind", 1.0, -2.0)
+	frost_audio.append("fz_wind")
+	_redraw_fx()
+
+
+func _foes_in_front(who) -> Array:
+	var found: Array = []
+	var origin := float(who.position.x)
+	var blow := _toward_enemy(int(who.side))
+	var road := int(who.lane)
+	for body in _bodies():
+		if body == who or not body.alive:
+			continue
+		if int(body.side) == int(who.side):
+			continue
+		if not _on_road(body, road):
+			continue
+		var ahead := (float(body.position.x) - origin) * blow
+		if ahead <= 16.0:
+			continue
+		found.append(body)
+	return found
+
+
+func _tick_frost(delta: float) -> void:
+	if frost_casts.is_empty():
+		return
+	var write := 0
+	for raw in frost_casts:
+		var cast: Dictionary = raw
+		var age: float = float(cast.get("age", 0.0)) + delta
+		cast["age"] = age
+		if not bool(cast.get("locked", false)) and age >= SkillFx.FROST_WIND:
+			cast["locked"] = true
+			Sfx.play("fz_lock", 1.0, -1.0)
+			frost_audio.append("fz_lock")
+		if age >= SkillFx.FROST_SHOW:
+			continue
+		frost_casts[write] = cast
+		write += 1
+	if write < frost_casts.size():
+		frost_casts.resize(write)
+	queue_redraw()
+	_redraw_fx()
 
 
 func _hold_cold(road: int) -> void:
@@ -3228,7 +3290,7 @@ func _stands_in(body, road: int, x0: float, x1: float) -> bool:
 
 
 func _redraw_fx() -> void:
-	var hot := not bursts.is_empty() or not slash_fx.is_empty() or not hazards.is_empty() or fx_rooted or ex_aiming
+	var hot := not bursts.is_empty() or not slash_fx.is_empty() or not hazards.is_empty() or not frost_casts.is_empty() or fx_rooted or ex_aiming
 	if not hot:
 		return
 	if fx_glow != null:
