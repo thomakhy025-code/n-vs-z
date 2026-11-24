@@ -2,7 +2,7 @@ extends RefCounted
 
 # Baked sheet for Enhancement. Explosion, Light smashing, and Freezing
 # are not painted: the bomb is explosion_vfx.gd, the slash is slash_vfx.gd,
-# the ice eruption is ice_vfx.gd. FROST_WIND still times the lock sound.
+# the ice pillars are ice_vfx.gd. FROST_WIND still times the lock sound.
 const FRAMES := 12
 const PAD := 4
 const FROST_WIND := 0.68
