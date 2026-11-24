@@ -2815,12 +2815,12 @@ func _hurt_band(caster, x0: float, x1: float, road: int, amount: float, foes: bo
 		body.take_damage(amount, true, "hero", 400.0)
 
 
-func _root_allies(caster, road: int, seconds: float) -> void:
+func _root_allies(caster, road: int, x0: float, x1: float, seconds: float) -> void:
 	var side := int(caster.side)
 	for body in _bodies():
 		if not body.alive or int(body.side) != side:
 			continue
-		if not _stands_in(body, road, -4.0, vp.x + 4.0):
+		if not _stands_in(body, road, x0, x1):
 			continue
 		if not ("root_left" in body):
 			continue
@@ -2951,30 +2951,81 @@ func _cast_smash(who, amount: float) -> void:
 	_note_slash(span.x, span.y, lane_y(road), near_x, far_x, float(who.position.x), float(who.position.y), slash_life)
 
 
-func _cast_freeze(who, amount: float) -> void:
-	var road := int(who.lane)
-	_hurt_band(who, 0.0, vp.x, road, amount, true, false)
-	_root_allies(who, road, 3.0)
-	_hold_cold(road)
+func _road_length() -> float:
+	return maxf(1.0, absf(enemy_front - player_front))
+
+
+# Forward from the caster, one third of the road between the castle fronts.
+# Stops at the enemy castle front. Nothing is laid behind the caster.
+func _freeze_box(who) -> Vector2:
+	var origin := float(who.position.x)
 	var blow := _toward_enemy(int(who.side))
-	lay_zone("ice", road, 0.0, vp.x, lane_y(road), 6.0, 0.0, null, float(who.position.x))
-	if not hazards.is_empty():
-		var iced: Dictionary = hazards[hazards.size() - 1]
-		iced["blow"] = blow
-		hazards[hazards.size() - 1] = iced
+	var reach := _road_length() / 3.0
+	var front := enemy_front
+	if blow < 0.0:
+		front = player_front
+	var room := (front - origin) * blow
+	var dist := 0.0
+	if room > 0.0:
+		dist = minf(reach, room)
+	var far := origin + blow * dist
+	return Vector2(minf(origin, far), maxf(origin, far))
+
+
+func _in_any_lane(body, x0: float, x1: float) -> bool:
+	var roads := lane_ys.size()
+	if roads < 1:
+		return _stands_in(body, 0, x0, x1)
+	var road := 0
+	while road < roads:
+		if _stands_in(body, road, x0, x1):
+			return true
+		road += 1
+	return false
+
+
+func _hurt_forward(caster, x0: float, x1: float, amount: float) -> void:
+	var side := int(caster.side)
+	for body in _bodies():
+		if body == caster or not body.alive or not body.has_method("take_damage"):
+			continue
+		if int(body.side) == side:
+			continue
+		if not _in_any_lane(body, x0, x1):
+			continue
+		body.take_damage(amount, true, "hero", 400.0)
+
+
+func _cast_freeze(who, amount: float) -> void:
+	var box := _freeze_box(who)
+	var blow := _toward_enemy(int(who.side))
+	var reach := box.y - box.x
+	var third := _road_length() / 3.0
+	var road_ys: Array = []
+	if reach >= 1.0:
+		_hurt_forward(who, box.x, box.y, amount)
+		var road_i := 0
+		var roads := lane_ys.size()
+		while road_i < roads:
+			var y := lane_y(road_i)
+			road_ys.append(y)
+			_root_allies(who, road_i, box.x, box.y, 3.0)
+			_hold_cold(road_i, box.x, box.y)
+			lay_zone("ice", road_i, box.x, box.y, y, 6.0, 0.0, who, float(who.position.x))
+			road_i += 1
+		IceVfx.play(self, float(who.position.x), road_ys, blow, reach, third)
 	frost_casts.append({
 		"age": 0.0,
 		"from_x": float(who.position.x),
 		"from_y": float(who.position.y),
 		"dir": blow,
-		"y": lane_y(road),
+		"y": lane_y(int(who.lane)),
 		"vp": vp,
 		"bodies": _foes_in_front(who),
 		"locked": false,
 	})
 	Sfx.play("fz_wind", 1.0, -2.0)
 	frost_audio.append("fz_wind")
-	IceVfx.play(self, float(who.position.x), lane_y(road), blow, vp.x)
 	_redraw_fx()
 
 
@@ -3019,12 +3070,13 @@ func _tick_frost(delta: float) -> void:
 	_redraw_fx()
 
 
-func _hold_cold(road: int) -> void:
-	for patch in cold_roads:
-		if int(patch.get("lane", -1)) == road:
-			patch["left"] = 6.0
-			return
-	cold_roads.append({"lane": road, "left": 6.0})
+func _hold_cold(road: int, x0: float, x1: float) -> void:
+	cold_roads.append({
+		"lane": road,
+		"left": 6.0,
+		"x0": x0,
+		"x1": x1,
+	})
 
 
 func splash_foes(at: Vector2, road: int, amount: float, side: int, radius: float = SPLASH_REACH) -> void:
@@ -3051,7 +3103,9 @@ func _standing_on_cold(body) -> bool:
 	if body == null or not is_instance_valid(body) or not body.alive:
 		return false
 	for patch in cold_roads:
-		if _on_road(body, int(patch.get("lane", -1))):
+		var x0 := float(patch.get("x0", 0.0))
+		var x1 := float(patch.get("x1", 0.0))
+		if _stands_in(body, int(patch.get("lane", -1)), x0, x1):
 			return true
 	return false
 
