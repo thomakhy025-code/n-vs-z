@@ -35,10 +35,10 @@ const SKILL_COST := 45.0
 # One lock for every hero skill on that side. It falls with soldier cooldowns, so pause holds it.
 const SKILL_LOCK := 10.0
 # PCM frames / 22050 Hz for audio/say_ex, say_ls, say_fz, say_en. Each shout has its own length.
-const SHOUT_EX := 12665.0 / 22050.0
-const SHOUT_LS := 13616.0 / 22050.0
-const SHOUT_FZ := 10221.0 / 22050.0
-const SHOUT_EN := 13588.0 / 22050.0
+const SHOUT_EX := 15875.0 / 22050.0
+const SHOUT_LS := 23372.0 / 22050.0
+const SHOUT_FZ := 13670.0 / 22050.0
+const SHOUT_EN := 15434.0 / 22050.0
 const SPLASH_REACH := 70.0
 
 

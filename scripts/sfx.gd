@@ -8,7 +8,7 @@ var _voice: AudioStreamPlayer
 var _shout: AudioStreamPlayer
 var _mood: String = ""
 var _voice_len: float = 0.0
-const SHOUT_DB := 6.0
+const SHOUT_DB := 12.0
 
 
 func _ready() -> void:
