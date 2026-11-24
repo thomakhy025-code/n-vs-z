@@ -95,6 +95,7 @@ var rank_time: float = 0.0
 var game_name: String = ""
 var favorite: String = ""
 var favorite_skin: String = ""
+var favourites: Array = []
 var best_rank: int = 0
 var rank_rows: Array = []
 var viewing: Dictionary = {}
@@ -1395,6 +1396,12 @@ func _show_select() -> void:
 	detail_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	detail_label.autowrap_mode = TextServer.AUTOWRAP_WORD
 	box.add_child(detail_label)
+	var fav_row := HBoxContainer.new()
+	fav_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	fav_row.add_theme_constant_override("separation", 12)
+	box.add_child(fav_row)
+	fav_row.add_child(_menu_button("Set favourites", Color("e6c36a"), _set_favourites, 220, 18))
+	fav_row.add_child(_menu_button("Favourites", Color("e6c36a"), _apply_favourites, 220, 18))
 	var row := HBoxContainer.new()
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.add_theme_constant_override("separation", 12)
@@ -1574,6 +1581,76 @@ func _prepare_loadout() -> void:
 	loadout = kept
 	if loadout.is_empty() and allowed.has("sword"):
 		loadout.append("sword")
+
+
+func _player_id(id: String) -> bool:
+	if id == "" or id.find(".") >= 0 or id.find(",") >= 0 or id.find(":") >= 0:
+		return false
+	return not Catalog.find_in(roster, id).is_empty()
+
+
+func _read_favourites(raw: String) -> void:
+	var kept: Array = []
+	if raw != "":
+		var pieces: PackedStringArray = raw.split(".", false)
+		for piece in pieces:
+			var id: String = str(piece).strip_edges()
+			if _player_id(id) and not kept.has(id):
+				kept.append(id)
+			if kept.size() >= 6:
+				break
+	favourites = kept
+
+
+func _trim_favourites() -> void:
+	_read_favourites(_pack_favourites())
+
+
+func _pack_favourites() -> String:
+	var parts: PackedStringArray = PackedStringArray()
+	for id in favourites:
+		var key: String = str(id)
+		if _player_id(key) and not parts.has(key):
+			parts.append(key)
+		if parts.size() >= 6:
+			break
+	return ".".join(parts)
+
+
+func _set_favourites() -> void:
+	favourites = []
+	for id in loadout:
+		var key: String = str(id)
+		if _player_id(key) and not favourites.has(key):
+			favourites.append(key)
+		if favourites.size() >= 6:
+			break
+	_save_progress()
+	if detail_label == null:
+		return
+	if favourites.is_empty():
+		detail_label.text = "Favourites cleared."
+	else:
+		detail_label.text = "Favourites saved."
+
+
+func _apply_favourites() -> void:
+	var allowed: Array = _allowed_ids()
+	var cap := _squad_need()
+	var picked: Array = []
+	for id in favourites:
+		var key: String = str(id)
+		if not allowed.has(key) or picked.has(key):
+			continue
+		picked.append(key)
+		if picked.size() >= cap:
+			break
+	if picked.is_empty():
+		if detail_label != null:
+			detail_label.text = "No favourites can join this fight."
+		return
+	loadout = picked
+	_refresh_cards()
 
 
 func _begin_from_select() -> void:
@@ -2003,6 +2080,30 @@ func _pack_upgrades() -> String:
 	return marked
 
 
+# Squad favourites share the upgrades snapshot as fv:id.id. Omit them if they would pass 320 characters.
+func _cloud_upgrades() -> String:
+	var packed := _pack_upgrades()
+	var token := "fv:" + _pack_favourites()
+	var joined := token
+	if packed != "":
+		joined = packed + "," + token
+	if joined.length() > 320:
+		return packed
+	return joined
+
+
+func _cloud_favourite_payload(raw: String) -> Dictionary:
+	var found := false
+	var text := ""
+	var pieces: PackedStringArray = raw.split(",", false)
+	for piece in pieces:
+		var bit: String = str(piece).strip_edges()
+		if bit.begins_with("fv:"):
+			found = true
+			text = bit.substr(3)
+	return {"found": found, "text": text}
+
+
 func _tester_marked(raw: String) -> bool:
 	for piece in raw.split(",", false):
 		if str(piece).strip_edges() == TESTER_TOKEN:
@@ -2318,6 +2419,7 @@ func _load_progress() -> void:
 	auto_at = 0.0
 	upgrades = {}
 	skill_marks = {}
+	favourites = []
 	saber_skin = false
 	saber_worn = "none"
 	sheet_owned = {}
@@ -2364,6 +2466,7 @@ func _load_progress() -> void:
 		game_name = _clean_name(str(cfg.get_value("progress", "game_name", "")))
 		favorite = str(cfg.get_value("progress", "favorite", ""))
 		favorite_skin = str(cfg.get_value("progress", "favorite_skin", ""))
+		_read_favourites(str(cfg.get_value("progress", "favourites", "")))
 		best_rank = clampi(int(cfg.get_value("progress", "best_rank", 0)), 0, 100000)
 		var stored_story: int = int(cfg.get_value("progress", "story_version", 0))
 		story_version = stored_story
@@ -2437,6 +2540,7 @@ func _normalize_progress() -> void:
 	coins = clampi(coins, 0, 20000000)
 	auto_left = clampi(auto_left, 0, AUTO_STOCK)
 	_trim_ranks()
+	_trim_favourites()
 
 
 func _save_progress() -> void:
@@ -2464,6 +2568,7 @@ func _save_progress() -> void:
 	cfg.set_value("progress", "game_name", game_name)
 	cfg.set_value("progress", "favorite", favorite)
 	cfg.set_value("progress", "favorite_skin", favorite_skin)
+	cfg.set_value("progress", "favourites", _pack_favourites())
 	cfg.set_value("progress", "best_rank", best_rank)
 	cfg.set_value("progress", "story_version", story_version)
 	cfg.set_value("progress", "story_seen", _pack_seen(story_seen))
@@ -2485,7 +2590,7 @@ func _snapshot() -> Dictionary:
 		"cleared": cleared,
 		"diamonds": diamonds,
 		"coins": coins,
-		"upgrades": _pack_upgrades(),
+		"upgrades": _cloud_upgrades(),
 		"saber_skin": saber_skin,
 		"saber_worn": saber_worn,
 		"sheet_owned": _pack_keys(sheet_owned),
@@ -2616,6 +2721,9 @@ func _merge_from_cloud(data: Dictionary) -> void:
 		upgrades[rank_id] = maxi(_rank_of(rank_id), int(cloud_ranks[rank_id]))
 	if _tester_marked(upgrade_text):
 		tester = true
+	var fav_pack: Dictionary = _cloud_favourite_payload(upgrade_text)
+	if bool(fav_pack.get("found", false)):
+		_read_favourites(str(fav_pack.get("text", "")))
 	code_paid = code_paid or _flag(data.get("code_paid", false))
 	var cloud_owned := _unpack_keys(str(data.get("sheet_owned", "")))
 	for key in cloud_owned.keys():
