@@ -54,6 +54,12 @@ float cellular(vec2 p) {
 void vertex() {
 	vec2 origin = MODEL_MATRIX[3].xy;
 	puff = fract(sin(dot(origin, vec2(127.1, 311.7))) * 43758.5453);
+	float dist = length(VERTEX);
+	if (dist > 0.5) {
+		vec2 nrm = VERTEX / dist;
+		float n = hash21(nrm * 2.4 + vec2(puff * 8.0, 1.7));
+		VERTEX += nrm * (n - 0.35) * 26.0;
+	}
 }
 
 void fragment() {
@@ -65,7 +71,7 @@ void fragment() {
 	vec2 scroll = uv * 3.4 + vec2(0.0, TIME * 0.22) + puff * 5.5;
 	float n = fbm(scroll);
 	float lump = fbm(vec2(atan(from.y, from.x) * 1.4 + puff * 6.0, dist * 5.0));
-	float rad = 0.24 + n * 0.18 + lump * 0.07;
+	float rad = 0.30 + n * 0.16 + lump * 0.08;
 	float body = 1.0 - smoothstep(rad - 0.05, rad + 0.045, dist);
 	float shade = fbm(uv * 5.0 + vec2(puff * 4.0, TIME * 0.08));
 	vec3 smoke = mix(vec3(0.12, 0.09, 0.07), vec3(0.48, 0.28, 0.14), shade);

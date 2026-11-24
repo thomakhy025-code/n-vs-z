@@ -2738,7 +2738,6 @@ func _cast_explosion_at(who, amount: float, center: Vector2) -> void:
 	_hurt_circle(who, center, radius, amount)
 	_lay_fire_circle(center, radius, 3.0, ember_damage(), who)
 	_note_burst_at(center, radius)
-	poof(center, Color("ff7a28"))
 	_shout_skill("ex")
 
 
