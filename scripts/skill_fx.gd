@@ -1,7 +1,7 @@
 extends RefCounted
 
-# One baked sheet per skill. Every cast of that skill blits a frame from the
-# same texture, so a second explosion does not bake another sheet.
+# One baked sheet per drawn skill. Explosion is a shared particle rig, so a
+# second cast does not bake another texture.
 const FRAMES := 12
 const PAD := 4
 const SLASH_WIND := 0.42
@@ -45,7 +45,7 @@ static func sheet_object(kind: String) -> int:
 
 
 static func warm(host: Node) -> void:
-	var kinds := PackedStringArray(["ex", "ls", "fz", "en"])
+	var kinds := PackedStringArray(["ls", "fz", "en"])
 	for kind in kinds:
 		_request(host, str(kind))
 
@@ -251,20 +251,12 @@ static func _draw_burst(ci: CanvasItem, patch: Dictionary, bloom: bool) -> void:
 	var cx: float = (x0 + x1) * 0.5
 	var cy: float = (y0 + y1) * 0.5
 	var diam: float = minf(maxf(8.0, x1 - x0), maxf(8.0, y1 - y0))
-	var frame: int = 8
-	var fade: float = 1.0
 	if age < 0.62:
 		var fall: float = clampf(age / 0.62, 0.0, 0.999)
-		frame = mini(3, int(fall * 4.0))
-	elif age < 1.08:
-		var boom: float = clampf((age - 0.62) / 0.46, 0.0, 0.999)
-		frame = 4 + mini(3, int(boom * 4.0))
-	else:
-		var tail: float = clampf((age - 1.08) / 2.5, 0.0, 0.999)
-		frame = 8 + mini(3, int(tail * 4.0))
-		if age > 3.25:
-			fade = clampf((3.7 - age) / 0.45, 0.0, 1.0)
-	_blit_square(ci, "ex", frame, cx, cy, diam, Color(1, 1, 1, fade))
+		var stone_frame: int = mini(3, int(fall * 4.0))
+		_draw_meteor_at(ci, stone_frame, cx, cy, diam)
+		return
+	_draw_cracks(ci, cx, cy, diam * 0.5, age - 0.62)
 
 
 static func _blit_square(ci: CanvasItem, kind: String, frame: int, cx: float, cy: float, diam: float, tint: Color) -> void:
@@ -314,6 +306,39 @@ static func _draw_slash(ci: CanvasItem, mark: Dictionary, bloom: bool) -> void:
 		blit(ci, "ls", split_frame, Rect2(cursor, y - tile_h * 0.55, span, tile_h), false, Color(1, 1, 1, 1))
 		cursor += maxf(12.0, tile_w - 6.0)
 		guard += 1
+
+
+static func _draw_meteor_at(ci: CanvasItem, frame: int, cx: float, cy: float, diam: float) -> void:
+	var cell: Vector2 = _cell("ex")
+	var ground := Vector2(cell.x * 0.5, cell.y * 0.62)
+	var fit: float = diam / maxf(1.0, cell.x)
+	ci.draw_set_transform(Vector2(cx, cy) - ground * fit, 0.0, Vector2(fit, fit))
+	_paint_meteor(ci, frame, ground, cell)
+	ci.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
+static func _draw_cracks(ci: CanvasItem, cx: float, cy: float, radius: float, age: float) -> void:
+	var shown: float = clampf(1.0 - age / 1.7, 0.0, 1.0)
+	if shown <= 0.02 or radius < 8.0:
+		return
+	var scorch := Color(0.05, 0.02, 0.015, shown * 0.55)
+	var ember := Color(0.86, 0.28, 0.08, shown * 0.9)
+	var hot := Color(1.0, 0.95, 0.78, shown)
+	ci.draw_circle(Vector2(cx, cy), radius * 0.62, scorch)
+	var ray: int = 0
+	while ray < 9:
+		var ang: float = float(ray) * TAU / 9.0 + 0.17
+		var dir := Vector2(cos(ang), sin(ang))
+		var bend := Vector2(-dir.y, dir.x) * radius * (0.08 + 0.1 * _unit(ray * 5))
+		if ray % 2 == 0:
+			bend = -bend
+		var mid := Vector2(cx, cy) + dir * radius * 0.4 + bend
+		var tip := Vector2(cx, cy) + dir * radius * (0.72 + 0.22 * _unit(ray * 3))
+		_band(ci, Vector2(cx, cy), mid, 6.5, ember)
+		_band(ci, mid, tip, 2.8, ember)
+		_band(ci, Vector2(cx, cy), mid, 2.2, hot)
+		_band(ci, mid, tip, 1.15, hot)
+		ray += 1
 
 
 static func _paint_blast(ci: CanvasItem, frame: int, size: Vector2) -> void:

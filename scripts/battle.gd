@@ -5,6 +5,7 @@ const SmokeVeil = preload("res://scripts/smoke_veil.gd")
 const Painter = preload("res://scripts/painter.gd")
 const FrameBake = preload("res://scripts/frame_bake.gd")
 const SkillFx = preload("res://scripts/skill_fx.gd")
+const ExplosionVfx = preload("res://scripts/explosion_vfx.gd")
 const SceneryScript = preload("res://scripts/scenery.gd")
 const GateScript = preload("res://scripts/gate.gd")
 const UnitScript = preload("res://scripts/battle_unit.gd")
@@ -2929,6 +2930,7 @@ func _note_burst_at(center: Vector2, radius: float) -> void:
 		"life": 3.7,
 		"age": 0.0,
 	})
+	ExplosionVfx.play(self, center, radius)
 	queue_redraw()
 	_redraw_fx()
 
