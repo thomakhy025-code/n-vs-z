@@ -2338,16 +2338,6 @@ func _show_upgrade() -> void:
 	lead.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	lead.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(lead)
-	var prices := GridContainer.new()
-	prices.columns = 2
-	prices.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	prices.add_theme_constant_override("h_separation", 24)
-	prices.add_theme_constant_override("v_separation", 2)
-	for rank in range(1, 20):
-		var price := UiSkin.label("Rank %d · %d coins" % [rank + 1, _rank_cost(rank)], 15, Color("6b3a32"))
-		price.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		prices.add_child(price)
-	box.add_child(prices)
 	var scroll := _vscroll()
 	box.add_child(scroll)
 	var list := VBoxContainer.new()
