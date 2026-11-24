@@ -7,6 +7,7 @@ const FrameBake = preload("res://scripts/frame_bake.gd")
 const SkillFx = preload("res://scripts/skill_fx.gd")
 const ExplosionVfx = preload("res://scripts/explosion_vfx.gd")
 const SlashVfx = preload("res://scripts/slash_vfx.gd")
+const IceVfx = preload("res://scripts/ice_vfx.gd")
 const SceneryScript = preload("res://scripts/scenery.gd")
 const GateScript = preload("res://scripts/gate.gd")
 const UnitScript = preload("res://scripts/battle_unit.gd")
@@ -2973,6 +2974,7 @@ func _cast_freeze(who, amount: float) -> void:
 	})
 	Sfx.play("fz_wind", 1.0, -2.0)
 	frost_audio.append("fz_wind")
+	IceVfx.play(self, float(who.position.x), lane_y(road), blow, vp.x)
 	_redraw_fx()
 
 
