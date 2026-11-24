@@ -12,7 +12,7 @@ signal terms_got(mode: String)
 signal begin_match(left: Array, right: Array, skins: Dictionary)
 signal input_got(x: float, y: float, dragging: bool, sword: bool, shoot: bool)
 signal buy_got(unit_id: String)
-signal skill_got(skill_id: String)
+signal skill_got(skill_id: String, at_x: float, at_y: float)
 signal state_got(packet: Array)
 signal arrow_got(payload: Array)
 signal pause_got
@@ -250,7 +250,7 @@ func _browser_line(line: String) -> void:
 	elif kind == "buy" and role == "host":
 		buy_got.emit(str(msg.get("id", "")))
 	elif kind == "skill" and role == "host":
-		skill_got.emit(str(msg.get("id", "")))
+		skill_got.emit(str(msg.get("id", "")), float(msg.get("x", -99999.0)), float(msg.get("y", -99999.0)))
 	elif kind == "state" and role == "guest":
 		var packet: Variant = msg.get("p", [])
 		if packet is Array:
@@ -318,13 +318,13 @@ func announce_buy(unit_id: String) -> void:
 	ask_buy.rpc_id(1, unit_id)
 
 
-func announce_skill(skill_id: String) -> void:
+func announce_skill(skill_id: String, at_x: float = -99999.0, at_y: float = -99999.0) -> void:
 	if role != "guest":
 		return
 	if _browser:
-		_send({"t": "skill", "id": skill_id})
+		_send({"t": "skill", "id": skill_id, "x": at_x, "y": at_y})
 		return
-	ask_skill.rpc_id(1, skill_id)
+	ask_skill.rpc_id(1, skill_id, at_x, at_y)
 
 
 func announce_arrow(payload: Array) -> void:
@@ -414,10 +414,10 @@ func ask_buy(unit_id: String) -> void:
 
 
 @rpc("any_peer", "reliable")
-func ask_skill(skill_id: String) -> void:
+func ask_skill(skill_id: String, at_x: float = -99999.0, at_y: float = -99999.0) -> void:
 	if not multiplayer.is_server():
 		return
-	skill_got.emit(skill_id)
+	skill_got.emit(skill_id, at_x, at_y)
 
 
 @rpc("authority", "unreliable")

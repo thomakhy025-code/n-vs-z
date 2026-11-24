@@ -195,6 +195,8 @@ var skill_buttons: Array = []
 var cold_roads: Array = []
 var slash_fx: Array = []
 var bursts: Array = []
+var ex_aiming: bool = false
+var ex_aim: Vector2 = Vector2.ZERO
 var fx_glow = null
 var fx_body = null
 var fx_marks = null
@@ -458,6 +460,9 @@ func _release_stick() -> void:
 
 
 func _input(event: InputEvent) -> void:
+	if ex_aiming:
+		_track_explosion(event)
+		return
 	if finished or paused or puppet:
 		return
 	if event is InputEventScreenTouch:
@@ -687,6 +692,10 @@ func _layout_hud() -> void:
 func _process(delta: float) -> void:
 	texts_this_frame = 0
 	battle_time += delta
+	if ex_aiming and (finished or paused):
+		ex_aiming = false
+	if ex_aiming:
+		_redraw_fx()
 	if puppet:
 		_send_hand()
 		_update_hud(delta)
@@ -2153,8 +2162,11 @@ func _on_net_buy(unit_id: String) -> void:
 	summon_foe(unit_id)
 
 
-func _on_net_skill(id: String) -> void:
+func _on_net_skill(id: String, at_x: float = -99999.0, at_y: float = -99999.0) -> void:
 	if puppet:
+		return
+	if id == "ex" and at_x > -9000.0:
+		cast_skill(id, 1, _from_norm(at_x, at_y))
 		return
 	cast_skill(id, 1)
 
@@ -2501,7 +2513,10 @@ func _build_skill_buttons() -> void:
 			cloth = Color("ff7a2a")
 		UiSkin.apply(btn, cloth, 15, _ink(cloth))
 		btn.set_meta("skill_id", id)
-		btn.pressed.connect(_press_skill.bind(id))
+		if id == "ex":
+			btn.button_down.connect(_arm_explosion)
+		else:
+			btn.pressed.connect(_press_skill.bind(id))
 		hud.add_child(btn)
 		skill_buttons.append(btn)
 
@@ -2517,7 +2532,7 @@ func _press_skill(id: String) -> void:
 	cast_skill(id, _local_side())
 
 
-func cast_skill(id: String, side: int) -> bool:
+func cast_skill(id: String, side: int, aim: Vector2 = Vector2(-99999, -99999)) -> bool:
 	if finished or paused or not is_skill(id):
 		return false
 	if not owns_skill(id, side):
@@ -2525,12 +2540,17 @@ func cast_skill(id: String, side: int) -> bool:
 	var who = _hero_for(side)
 	if who == null:
 		return false
+	if id == "ex":
+		if aim.x < -9000.0:
+			return false
+		if not _spend_skill(side, SKILL_COST):
+			return false
+		_cast_explosion_at(who, 400.0 * skill_factor(id, side), aim)
+		return true
 	if not _spend_skill(side, SKILL_COST):
 		return false
 	var factor := skill_factor(id, side)
-	if id == "ex":
-		_cast_explosion(who, 400.0 * factor)
-	elif id == "ls":
+	if id == "ls":
 		_cast_smash(who, 320.0 * factor)
 	elif id == "fz":
 		_cast_freeze(who, 40.0 * factor)
@@ -2634,16 +2654,111 @@ func _root_allies(caster, road: int, seconds: float) -> void:
 		fx_rooted = true
 
 
-func _cast_explosion(who, amount: float) -> void:
-	var span := _ahead_box(who, 0.25)
-	_hurt_band(who, span.x, span.y, -1, amount, true, true)
-	var burn := ember_damage()
-	for road in lane_ys.size():
-		var y := lane_y(road)
-		lay_zone("fire", road, span.x, span.y, y, 3.0, burn, who)
-		poof(Vector2((span.x + span.y) * 0.5, y), Color("ff7a2a"))
-	_note_burst(span.x, span.y)
+func _arm_explosion() -> void:
+	if finished or paused or ex_aiming:
+		return
+	if not owns_skill("ex", _local_side()):
+		return
+	if _hero_for(_local_side()) == null:
+		return
+	if player_value < SKILL_COST:
+		return
+	ex_aiming = true
+	ex_aim = get_viewport().get_mouse_position()
+	_redraw_fx()
+
+
+func _track_explosion(event: InputEvent) -> void:
+	if event is InputEventMouseMotion:
+		var motion: InputEventMouseMotion = event as InputEventMouseMotion
+		ex_aim = motion.position
+		_redraw_fx()
+		return
+	if event is InputEventScreenDrag:
+		var drag: InputEventScreenDrag = event as InputEventScreenDrag
+		ex_aim = drag.position
+		_redraw_fx()
+		return
+	if event is InputEventMouseButton:
+		var press: InputEventMouseButton = event as InputEventMouseButton
+		if press.button_index != MOUSE_BUTTON_LEFT:
+			return
+		if press.pressed:
+			ex_aim = press.position
+			_redraw_fx()
+			return
+		_drop_explosion()
+		return
+	if event is InputEventScreenTouch:
+		var touch: InputEventScreenTouch = event as InputEventScreenTouch
+		ex_aim = touch.position
+		if touch.pressed:
+			_redraw_fx()
+			return
+		_drop_explosion()
+
+
+func _drop_explosion() -> void:
+	if not ex_aiming:
+		return
+	var point := ex_aim
+	ex_aiming = false
+	_redraw_fx()
+	if finished or paused:
+		return
+	if duel and puppet:
+		if player_value < SKILL_COST:
+			return
+		var norm := _to_norm(point)
+		Net.announce_skill("ex", norm.x, norm.y)
+		return
+	cast_skill("ex", _local_side(), point)
+
+
+func _blast_radius() -> float:
+	return _field_length() * 0.125
+
+
+func _hurt_circle(caster, center: Vector2, radius: float, amount: float) -> void:
+	for body in _bodies():
+		if body == caster or not body.alive or not body.has_method("take_damage"):
+			continue
+		var at: Vector2 = body.position
+		if at.distance_to(center) > radius:
+			continue
+		body.take_damage(amount, true, "hero", 400.0)
+
+
+func _cast_explosion_at(who, amount: float, center: Vector2) -> void:
+	var radius := _blast_radius()
+	_hurt_circle(who, center, radius, amount)
+	_lay_fire_circle(center, radius, 3.0, ember_damage(), who)
+	_note_burst_at(center, radius)
+	poof(center, Color("ff7a28"))
 	_shout_skill("ex")
+
+
+func _lay_fire_circle(center: Vector2, radius: float, seconds: float, amount: float, spare) -> void:
+	hazards.append({
+		"kind": "fire",
+		"lane": -1,
+		"round": true,
+		"cx": center.x,
+		"cy": center.y,
+		"radius": radius,
+		"origin": center.x,
+		"from_x": center.x,
+		"x0": center.x - radius,
+		"x1": center.x + radius,
+		"y": center.y,
+		"left": seconds,
+		"age": 0.0,
+		"tick": 0.25,
+		"dmg": amount,
+		"spare": spare,
+	})
+	queue_redraw()
+	_redraw_fx()
 
 
 func _cast_smash(who, amount: float) -> void:
@@ -2655,7 +2770,8 @@ func _cast_smash(who, amount: float) -> void:
 	if _toward_enemy(int(who.side)) < 0.0:
 		near_x = span.y
 		far_x = span.x
-	_note_slash(span.x, span.y, lane_y(road), near_x, far_x)
+	var slash_life := SkillFx.SLASH_WIND + SkillFx.SLASH_STRIKE + SkillFx.SLASH_SPLIT
+	_note_slash(span.x, span.y, lane_y(road), near_x, far_x, float(who.position.x), float(who.position.y), slash_life)
 	_shout_skill("ls")
 
 
@@ -2741,14 +2857,12 @@ func _tick_chill(delta: float) -> void:
 	fx_rooted = any_root
 
 
-func _note_burst(x0: float, x1: float) -> void:
-	var top := lane_y(0) - 86.0
-	var bottom := lane_y(maxi(lane_ys.size() - 1, 0)) + 36.0
+func _note_burst_at(center: Vector2, radius: float) -> void:
 	bursts.append({
-		"x0": x0,
-		"x1": x1,
-		"y0": top,
-		"y1": bottom,
+		"x0": center.x - radius,
+		"x1": center.x + radius,
+		"y0": center.y - radius,
+		"y1": center.y + radius,
 		"left": 3.7,
 		"life": 3.7,
 		"age": 0.0,
@@ -2757,15 +2871,17 @@ func _note_burst(x0: float, x1: float) -> void:
 	_redraw_fx()
 
 
-func _note_slash(x0: float, x1: float, y: float, near_x: float, far_x: float) -> void:
+func _note_slash(x0: float, x1: float, y: float, near_x: float, far_x: float, hx: float, hy: float, life: float) -> void:
 	slash_fx.append({
 		"x0": x0,
 		"x1": x1,
 		"y": y,
 		"near": near_x,
 		"far": far_x,
-		"left": 1.05,
-		"life": 1.05,
+		"hx": hx,
+		"hy": hy,
+		"left": life,
+		"life": life,
 		"age": 0.0,
 	})
 	queue_redraw()
@@ -3058,6 +3174,9 @@ func _tick_hazards(delta: float) -> void:
 
 
 func _scorch(patch: Dictionary) -> void:
+	if bool(patch.get("round", false)):
+		_scorch_round(patch)
+		return
 	var road := int(patch.get("lane", 0))
 	var x0 := float(patch.get("x0", 0.0))
 	var x1 := float(patch.get("x1", 0.0))
@@ -3078,6 +3197,26 @@ func _scorch(patch: Dictionary) -> void:
 		foe.take_damage(amount, true, kind)
 
 
+func _scorch_round(patch: Dictionary) -> void:
+	var amount := float(patch.get("dmg", 0.0))
+	if amount <= 0.0:
+		return
+	var center := Vector2(float(patch.get("cx", 0.0)), float(patch.get("cy", 0.0)))
+	var radius := float(patch.get("radius", 0.0))
+	var spare: Variant = patch.get("spare", null)
+	for body in _bodies():
+		if body == null or not is_instance_valid(body) or not body.alive:
+			continue
+		if spare != null and body == spare:
+			continue
+		if not body.has_method("take_damage"):
+			continue
+		var at: Vector2 = body.position
+		if at.distance_to(center) > radius:
+			continue
+		body.take_damage(amount, true, "fire", 0.0)
+
+
 func _stands_in(body, road: int, x0: float, x1: float) -> bool:
 	if body == null or not is_instance_valid(body) or not body.alive:
 		return false
@@ -3089,7 +3228,7 @@ func _stands_in(body, road: int, x0: float, x1: float) -> bool:
 
 
 func _redraw_fx() -> void:
-	var hot := not bursts.is_empty() or not slash_fx.is_empty() or not hazards.is_empty() or fx_rooted
+	var hot := not bursts.is_empty() or not slash_fx.is_empty() or not hazards.is_empty() or fx_rooted or ex_aiming
 	if not hot:
 		return
 	if fx_glow != null:

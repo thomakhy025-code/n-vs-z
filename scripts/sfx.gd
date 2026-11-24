@@ -7,6 +7,7 @@ var _bed: AudioStreamPlayer
 var _voice: AudioStreamPlayer
 var _mood: String = ""
 var _voice_len: float = 0.0
+const SHOUT_DB := 6.0
 
 
 func _ready() -> void:
@@ -85,7 +86,7 @@ func speak(id: String) -> float:
 	_voice.pitch_scale = 1.0
 	var loud: float = -2.0
 	if id.begins_with("say_"):
-		loud = 0.0
+		loud = SHOUT_DB
 	_voice.volume_db = loud
 	_voice.play()
 	_voice_len = stream.get_length()
