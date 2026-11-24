@@ -1,11 +1,14 @@
 shader_type canvas_item;
-render_mode blend_mix;
+render_mode blend_add;
 
-// Four streak drawings share one atlas, side by side.
-// Particle hue picks the slice. Particle alpha fades the quad.
-// HDR orange is tonemapped because this viewport has no bloom.
+// Four motion-blurred strokes share one atlas. Hue picks the slice.
+// The quad is shifted so the thick end sits on the particle and the
+// tip points along velocity (align Y). HDR (4, 0.8, 0.2) is tonemapped
+// because this viewport has no bloom. Additive so the strokes stay
+// yellow on the dark road.
 
 uniform sampler2D atlas : repeat_disable, filter_linear;
+uniform float base_shift = 90.0;
 
 float hue_of(vec3 c) {
 	float maxc = max(c.r, max(c.g, c.b));
@@ -25,17 +28,19 @@ float hue_of(vec3 c) {
 	return fract(h / 6.0);
 }
 
+void vertex() {
+	VERTEX.y += base_shift;
+}
+
 void fragment() {
 	float slice = clamp(floor(hue_of(COLOR.rgb) * 4.0), 0.0, 3.0);
 	vec2 uv = vec2(clamp(UV.x, 0.001, 0.999) * 0.25 + slice * 0.25, UV.y);
 	float mark = texture(atlas, uv).a;
 	float fade = clamp(COLOR.a, 0.0, 1.0);
-	vec3 hdr = vec3(4.0, 0.85, 0.22);
-	vec3 hot = hdr / (1.0 + hdr);
-	float core = pow(clamp(mark, 0.0, 1.0), 0.55);
-	vec3 rgb = mix(hot, vec3(1.0, 0.97, 0.9), core);
+	float spine = pow(clamp(mark, 0.0, 1.0), 2.4);
+	vec3 rgb = mix(vec3(1.0, 0.42, 0.05), vec3(1.0, 0.92, 0.55), spine);
 	float alpha = mark * fade;
-	if (alpha < 0.04) {
+	if (alpha < 0.03) {
 		discard;
 	}
 	COLOR = vec4(rgb, alpha);

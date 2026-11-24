@@ -1,12 +1,14 @@
 shader_type canvas_item;
 render_mode blend_mix;
 
-// Le Lu's cloud: a sphere pushed along its normals by scrolling noise,
-// with smoothstep fire and dissolve driven by the particle color.
-// Red is the explosion amount (0 keeps the fire, 1 cuts it).
-// Alpha is the dissolve edge (0 stays opaque, 1 eats the smoke).
-// The 20x emission is folded into a white-hot core because this
-// compatibility viewport has no bloom buffer.
+// Le Lu's cloud, flattened for a 2D quad (the tutorial displaces a sphere).
+// Red is the explosion amount: 0 keeps the fire, 1 leaves smoke.
+// Alpha is the dissolve: 0 stays opaque, 1 eats the puff.
+// Emission (1, 0.3, 0.1) * 20 is tonemapped. This viewport has no bloom,
+// so the hottest part of each puff is pushed to white in the shader.
+// white_boost is higher on the core bank so the heart stays white-hot.
+
+uniform float white_boost = 0.12;
 
 varying float puff;
 
@@ -28,9 +30,9 @@ float value_noise(vec2 p) {
 float fbm(vec2 p) {
 	float sum = 0.0;
 	float amp = 0.5;
-	for (int i = 0; i < 4; i++) {
+	for (int i = 0; i < 3; i++) {
 		sum += amp * value_noise(p);
-		p = p * 2.03 + vec2(1.7, 9.2);
+		p = p * 2.05 + vec2(1.7, 9.2);
 		amp *= 0.5;
 	}
 	return sum;
@@ -54,40 +56,35 @@ float cellular(vec2 p) {
 void vertex() {
 	vec2 origin = MODEL_MATRIX[3].xy;
 	puff = fract(sin(dot(origin, vec2(127.1, 311.7))) * 43758.5453);
-	float dist = length(VERTEX);
-	if (dist > 0.5) {
-		vec2 nrm = VERTEX / dist;
-		float n = hash21(nrm * 2.4 + vec2(puff * 8.0, 1.7));
-		VERTEX += nrm * (n - 0.35) * 26.0;
-	}
 }
 
 void fragment() {
-	float fire_edge = clamp(COLOR.r, 0.0, 1.0);
+	float cut = clamp(COLOR.r, 0.0, 1.0);
 	float dissolve = clamp(COLOR.a, 0.0, 1.0);
 	vec2 uv = UV;
 	vec2 from = uv - vec2(0.5);
 	float dist = length(from);
-	vec2 scroll = uv * 3.4 + vec2(0.0, TIME * 0.22) + puff * 5.5;
-	float n = fbm(scroll);
-	float lump = fbm(vec2(atan(from.y, from.x) * 1.4 + puff * 6.0, dist * 5.0));
-	float rad = 0.30 + n * 0.16 + lump * 0.08;
-	float body = 1.0 - smoothstep(rad - 0.05, rad + 0.045, dist);
-	float shade = fbm(uv * 5.0 + vec2(puff * 4.0, TIME * 0.08));
-	vec3 smoke = mix(vec3(0.12, 0.09, 0.07), vec3(0.48, 0.28, 0.14), shade);
-	float cell = cellular(uv * 5.5 + vec2(TIME * 0.16, TIME * 0.05) + puff * 3.0);
-	float fire = smoothstep(fire_edge, fire_edge + 0.28, mix(0.2, 1.0, 1.0 - cell));
-	float radial = 1.0 - smoothstep(rad * 0.15, rad * 0.95, dist);
-	vec3 emission = vec3(1.0, 0.30, 0.10) * 20.0;
-	vec3 hot = vec3(1.0, 0.46, 0.1);
-	float core = radial * fire;
-	vec3 rgb = mix(smoke, hot, fire * 0.92);
-	rgb = mix(rgb, emission / (1.0 + emission), core);
-	rgb = mix(rgb, vec3(1.0, 0.96, 0.82), core * radial);
-	float veil = fbm(uv * 3.2 + vec2(2.2, puff * 6.0));
-	float remain = smoothstep(dissolve, dissolve + 0.22, veil);
+	float ang = atan(from.y, from.x);
+	float lobe = fbm(vec2(ang * 1.5 + puff * 8.0, dist * 2.2));
+	float lump = fbm(vec2(ang * 3.2 - puff * 5.0, dist * 4.8 + 1.7));
+	float rad = 0.22 + lobe * 0.14 + lump * 0.07;
+	float body = 1.0 - smoothstep(rad - 0.01, rad + 0.07, dist);
+	float cell = cellular(uv * 2.7 + vec2(TIME * 0.1, TIME * 0.03) + puff * 2.6);
+	float flames = smoothstep(cut, cut + 0.16, mix(0.34, 1.0, 1.0 - cell));
+	flames *= 1.0 - smoothstep(rad - 0.04, rad + 0.05, dist);
+	float radial = 1.0 - smoothstep(0.0, rad * 0.9, dist);
+	float heat = flames * radial;
+	vec3 fire = vec3(1.0, 0.38, 0.04);
+	fire = mix(fire, vec3(1.0, 0.58, 0.08), smoothstep(0.2, 0.75, radial));
+	float hot_core = smoothstep(0.55, 0.95, heat + white_boost * 0.5);
+	fire = mix(fire, vec3(1.0, 0.96, 0.86), hot_core);
+	float shade = fbm(uv * 3.2 + vec2(puff * 3.0, TIME * 0.05));
+	vec3 smoke = mix(vec3(0.05, 0.04, 0.035), vec3(0.22, 0.13, 0.08), shade);
+	vec3 rgb = mix(smoke, fire, clamp(flames, 0.0, 1.0));
+	float veil = fbm(uv * 2.2 + vec2(2.1, puff * 6.0));
+	float remain = smoothstep(dissolve, dissolve + 0.18, veil);
 	float alpha = body * remain;
-	if (alpha < 0.03) {
+	if (alpha < 0.035) {
 		discard;
 	}
 	COLOR = vec4(rgb, alpha);
