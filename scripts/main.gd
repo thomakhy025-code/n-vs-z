@@ -69,6 +69,7 @@ var held_now: int = 0
 var hold_dirty: bool = false
 var hold_wait: float = 0.0
 var upgrades: Dictionary = {}
+var upgrade_reset_hold: int = 0
 var skill_marks: Dictionary = {}
 var skill_follow: Callable = Callable()
 var last_clear_time: float = 0.0
@@ -108,6 +109,8 @@ const AUTO_STOCK := 50
 const AUTO_RETURN := 5
 const AUTO_WAIT := 1800.0
 const SKIN_COST := 200
+const RESET_DIAMONDS := 500
+const RESET_LABEL := "Reset upgrades · 500 diamonds"
 const VIP_CODE := "tomissogood0205"
 const VIP_DIAMONDS := 100000000
 const TESTER_CODE := "tomissogood0205"
@@ -2054,6 +2057,87 @@ func _rank_of(id: String) -> int:
 func _rank_cost(rank: int) -> int:
 	return 50 * rank * rank
 
+# Coin refund is 50 * step * step for each rank bought on this page.
+# Fighters, the castle, and income were never free. A skill unlock is a
+# milestone at rank 1, not a coin step. Later milestone picks are not stored
+# per skill, so those free raises fill the lowest ranks first, one layer at
+# a time. Only the coin steps above that layer are refunded.
+func _claimed_marks() -> int:
+	var count := 0
+	var step := 10
+	while step <= 70:
+		if skill_marks.has(step):
+			count += 1
+		step += 10
+	return count
+
+
+func _skill_free_steps() -> Dictionary:
+	var free: Dictionary = {}
+	var order: Array = ["ex", "ls", "fz", "en"]
+	var owned := 0
+	var fill := 0
+	var id := ""
+	while fill < order.size():
+		id = str(order[fill])
+		fill += 1
+		if upgrades.has(id):
+			free[id] = 0
+			owned += 1
+	var pool := _claimed_marks() - owned
+	if pool < 0:
+		pool = 0
+	if free.is_empty() or pool <= 0:
+		return free
+	var have := 0
+	var key := ""
+	var scan := 0
+	var placed := false
+	var layer := 0
+	while pool > 0 and layer < 19:
+		placed = false
+		scan = 0
+		while scan < order.size():
+			key = str(order[scan])
+			scan += 1
+			if not free.has(key):
+				continue
+			have = int(free[key])
+			if have != layer or have >= _rank_of(key) - 1:
+				continue
+			free[key] = have + 1
+			pool -= 1
+			placed = true
+		if not placed:
+			layer += 1
+	return free
+
+
+func _curve_spent(rank: int, free_steps: int) -> int:
+	var spent := 0
+	var step := 1 + free_steps
+	var top := rank
+	if top > 20:
+		top = 20
+	if step < 1:
+		step = 1
+	while step < top:
+		spent += _rank_cost(step)
+		step += 1
+	return spent
+
+
+func _upgrade_refund() -> int:
+	var free_map := _skill_free_steps()
+	var total := 0
+	for rank_id in _upgrade_ids():
+		var key := str(rank_id)
+		var free := 0
+		if BattleScript.is_skill(key):
+			free = int(free_map.get(key, 0))
+		total += _curve_spent(_rank_of(key), free)
+	return total
+
 
 func _pack_ranks() -> String:
 	var parts: PackedStringArray = PackedStringArray()
@@ -2249,7 +2333,7 @@ func _show_upgrade() -> void:
 	purse.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	purse.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(purse)
-	var lead := UiSkin.label("Each fighter rank adds 5% blood and damage. Castle blood rises by 200 a time. Value rises by 0.1 each second. Rank 20 is the last. Skills you own rank the same way. Every row pays the coins below.", 15, Color("6b3a32"))
+	var lead := UiSkin.label("Each fighter rank adds 5% blood and damage. Castle blood rises by 200 a time. Value rises by 0.1 each second. Rank 20 is the last. Skills you own rank the same way. Each rank row pays the coins below.", 15, Color("6b3a32"))
 	lead.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lead.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	lead.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -2273,6 +2357,8 @@ func _show_upgrade() -> void:
 	scroll.add_child(list)
 	for id in _upgrade_ids():
 		list.add_child(_upgrade_row(str(id)))
+	list.add_child(_make_reset_row())
+	scroll.get_v_scroll_bar().value_changed.connect(_on_upgrade_scrolled)
 	var back := _menu_button("Back", Color("e6c36a"), _show_menu)
 	back.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	box.add_child(back)
@@ -2351,12 +2437,16 @@ func _paint_upgrade_row(row: HBoxContainer) -> void:
 func _paint_upgrade_page() -> bool:
 	var purse := find_child("UpgradeCoins", true, false) as Label
 	var list := find_child("UpgradeList", true, false) as VBoxContainer
-	if purse == null or list == null:
+	if purse == null or list == null or list.get_node_or_null("UpgradeReset") == null:
 		return false
 	purse.text = "Coins  %d" % coins
 	for child in list.get_children():
-		if child is HBoxContainer:
+		if child is HBoxContainer and str(child.name) != "UpgradeReset":
 			_paint_upgrade_row(child)
+	var reset_row := list.get_node_or_null("UpgradeReset") as HBoxContainer
+	if reset_row == null:
+		return false
+	_paint_reset_row(reset_row)
 	return true
 
 
@@ -2366,7 +2456,8 @@ func _keep_upgrade_place() -> void:
 	if scroller != null:
 		kept = scroller.scroll_vertical
 	var list := find_child("UpgradeList", true, false) as VBoxContainer
-	if list != null and list.get_child_count() == _upgrade_ids().size() and _paint_upgrade_page():
+	var rows := _upgrade_ids().size() + 1
+	if list != null and list.get_node_or_null("UpgradeReset") != null and list.get_child_count() == rows and _paint_upgrade_page():
 		return
 	_show_upgrade()
 	var fresh := _find_scroll(self)
@@ -2392,6 +2483,179 @@ func _buy_rank(id: String) -> void:
 	upgrades[id] = rank + 1
 	_save_progress()
 	_keep_upgrade_place()
+
+
+
+func _make_reset_row() -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.name = "UpgradeReset"
+	row.set_meta("reset_armed", false)
+	row.set_meta("reset_kind", "idle")
+	row.set_meta("reset_back", 0)
+	row.set_meta("reset_scroll", -1)
+	row.add_theme_constant_override("separation", 12)
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var words := VBoxContainer.new()
+	words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	words.add_theme_constant_override("separation", 0)
+	var title := UiSkin.label("Reset upgrades", 16, Color("1c140e"))
+	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	words.add_child(title)
+	var note := UiSkin.label("", 15, Color("8d2f28"))
+	note.name = "ResetNote"
+	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	note.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	note.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	words.add_child(note)
+	row.add_child(words)
+	var button := ResetPayButton.new()
+	button.name = "ResetPay"
+	button.text = RESET_LABEL
+	var color := Color("c44536")
+	UiSkin.apply(button, color, 16, Color("f3e6c8"))
+	var font := ThemeDB.fallback_font
+	var text_size: Vector2 = font.get_string_size(button.text, HORIZONTAL_ALIGNMENT_LEFT, -1, 16)
+	button.custom_minimum_size = Vector2(maxf(280.0, text_size.x + 40.0), 52)
+	button.size_flags_horizontal = Control.SIZE_SHRINK_END
+	button.pressed.connect(func() -> void:
+		Sfx.play("click", 1.0, -6.0)
+		_press_upgrade_reset()
+	)
+	row.add_child(button)
+	_paint_reset_row(row)
+	return row
+
+
+func _reset_row() -> HBoxContainer:
+	return _live_reset(self)
+
+
+func _live_reset(node: Node) -> HBoxContainer:
+	if node.is_queued_for_deletion():
+		return null
+	if node.name == "UpgradeReset" and node is HBoxContainer:
+		return node as HBoxContainer
+	var found: HBoxContainer = null
+	for child in node.get_children():
+		found = _live_reset(child)
+		if found != null:
+			return found
+	return null
+
+
+func _paint_reset_row(row: HBoxContainer) -> void:
+	var note := row.find_child("ResetNote", true, false) as Label
+	if note == null:
+		return
+	if bool(row.get_meta("reset_armed", false)):
+		note.text = "This will return %d coins and set every rank to 1." % _upgrade_refund()
+		return
+	var kind: String = str(row.get_meta("reset_kind", "idle"))
+	if kind == "poor":
+		note.text = "You need 500 diamonds."
+		return
+	if kind == "done":
+		var back: int = int(row.get_meta("reset_back", 0))
+		note.text = "%d coins came back." % back
+		return
+	note.text = "Returns the coins spent on ranks and sets every rank to 1."
+
+
+func _on_upgrade_scrolled(_value: float) -> void:
+	if upgrade_reset_hold > 0 or screen != "upgrade":
+		return
+	var row := _reset_row()
+	if row == null or not bool(row.get_meta("reset_armed", false)):
+		return
+	var armed_at: int = int(row.get_meta("reset_scroll", -1))
+	if armed_at < 0:
+		return
+	var scroller := _find_scroll(self)
+	if scroller == null or scroller.scroll_vertical == armed_at:
+		return
+	_disarm_upgrade_reset()
+
+
+func _latch_reset_scroll() -> void:
+	var row := _reset_row()
+	if row == null or not bool(row.get_meta("reset_armed", false)):
+		return
+	var scroller := _find_scroll(self)
+	var at := 0
+	if scroller != null:
+		at = scroller.scroll_vertical
+	row.set_meta("reset_scroll", at)
+
+
+func _arm_upgrade_reset(row: HBoxContainer) -> void:
+	row.set_meta("reset_scroll", -1)
+	_mark_reset(row, true, "armed", 0)
+	var tree := get_tree()
+	if tree == null:
+		return
+	if tree.process_frame.is_connected(_latch_reset_scroll):
+		return
+	tree.process_frame.connect(_latch_reset_scroll, CONNECT_ONE_SHOT)
+
+
+func _mark_reset(row: HBoxContainer, armed_now: bool, kind_now: String, back_now: int) -> void:
+	upgrade_reset_hold += 1
+	row.set_meta("reset_armed", armed_now)
+	row.set_meta("reset_kind", kind_now)
+	row.set_meta("reset_back", back_now)
+	_paint_reset_row(row)
+	upgrade_reset_hold -= 1
+	if upgrade_reset_hold < 0:
+		upgrade_reset_hold = 0
+
+
+func _disarm_upgrade_reset() -> void:
+	if upgrade_reset_hold > 0:
+		return
+	var row := _reset_row()
+	if row == null or not bool(row.get_meta("reset_armed", false)):
+		return
+	row.set_meta("reset_scroll", -1)
+	_mark_reset(row, false, "idle", 0)
+
+
+func _press_upgrade_reset() -> void:
+	var row := _reset_row()
+	if row == null:
+		return
+	if diamonds < RESET_DIAMONDS:
+		_mark_reset(row, false, "poor", 0)
+		return
+	if not bool(row.get_meta("reset_armed", false)):
+		_arm_upgrade_reset(row)
+		return
+	_commit_upgrade_reset(row)
+
+
+func _commit_upgrade_reset(row: HBoxContainer) -> void:
+	var refund := _upgrade_refund()
+	diamonds -= RESET_DIAMONDS
+	var room := 20000000 - coins
+	if room < 0:
+		room = 0
+	var back := refund
+	if back > room:
+		back = room
+	coins += back
+	_clear_upgrade_ranks()
+	_mark_reset(row, false, "done", back)
+	_save_progress()
+	_keep_upgrade_place()
+
+
+func _clear_upgrade_ranks() -> void:
+	var kept: Dictionary = {}
+	for skill_id in ["ex", "ls", "fz", "en"]:
+		var owned_id := str(skill_id)
+		if upgrades.has(owned_id):
+			kept[owned_id] = 1
+	upgrades = kept
 
 
 func _duel_terms_line() -> String:
@@ -3960,6 +4224,20 @@ func _menu_button(text: String, color: Color, action: Callable, wide: float = 28
 		action.call()
 	)
 	return button
+
+
+class ResetPayButton:
+	extends Button
+
+	func _notification(what: int) -> void:
+		if what != NOTIFICATION_SCROLL_BEGIN:
+			return
+		var host: Node = get_parent()
+		while host != null:
+			if host.has_method("_disarm_upgrade_reset") and not host.is_queued_for_deletion():
+				host.call("_disarm_upgrade_reset")
+				return
+			host = host.get_parent()
 
 
 class LockButton:
