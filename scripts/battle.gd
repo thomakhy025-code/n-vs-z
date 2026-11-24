@@ -6,6 +6,7 @@ const Painter = preload("res://scripts/painter.gd")
 const FrameBake = preload("res://scripts/frame_bake.gd")
 const SkillFx = preload("res://scripts/skill_fx.gd")
 const ExplosionVfx = preload("res://scripts/explosion_vfx.gd")
+const SlashVfx = preload("res://scripts/slash_vfx.gd")
 const SceneryScript = preload("res://scripts/scenery.gd")
 const GateScript = preload("res://scripts/gate.gd")
 const UnitScript = preload("res://scripts/battle_unit.gd")
@@ -2841,7 +2842,7 @@ func _cast_smash(who, amount: float) -> void:
 	if _toward_enemy(int(who.side)) < 0.0:
 		near_x = span.y
 		far_x = span.x
-	var slash_life := SkillFx.SLASH_WIND + SkillFx.SLASH_STRIKE + SkillFx.SLASH_SPLIT
+	var slash_life := SlashVfx.LIFE
 	_note_slash(span.x, span.y, lane_y(road), near_x, far_x, float(who.position.x), float(who.position.y), slash_life)
 	_shout_skill("ls")
 
@@ -3015,6 +3016,7 @@ func _note_slash(x0: float, x1: float, y: float, near_x: float, far_x: float, hx
 		"life": life,
 		"age": 0.0,
 	})
+	SlashVfx.play(self, near_x, far_x, y)
 	queue_redraw()
 	_redraw_fx()
 
