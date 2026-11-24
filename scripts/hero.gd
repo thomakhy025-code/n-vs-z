@@ -548,9 +548,6 @@ func _sync_aura() -> void:
 		_aura.z_index = -1
 		_aura.show_behind_parent = true
 		_aura.region_enabled = true
-		var mat := CanvasItemMaterial.new()
-		mat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
-		_aura.material = mat
 		add_child(_aura)
 	_aura.visible = true
 	if _aura.texture != tex:
@@ -558,7 +555,7 @@ func _sync_aura() -> void:
 	var frame: int = posmod(int(Time.get_ticks_msec() / 70), SkillFx.FRAMES)
 	_aura.region_rect = SkillFx.region("en", frame)
 	_aura.position = Vector2(0.0, -36.0)
-	_aura.scale = Vector2(1.32, 1.32)
+	_aura.scale = Vector2(1.62, 1.62)
 
 
 func _draw_slash() -> void:
