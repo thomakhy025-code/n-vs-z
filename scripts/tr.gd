@@ -13,6 +13,7 @@ static var _built: bool = false
 const MAP := {
 	"Sword Soldier": "劍士",
 	"Sword": "劍",
+	"Archer": "弓箭手",
 	"Shield-Bearer": "盾衛",
 	"Shield": "盾",
 	"Saber": "彎刀",
