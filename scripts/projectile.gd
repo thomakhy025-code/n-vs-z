@@ -73,9 +73,12 @@ func _ready() -> void:
 			var flame: Sprite2D = Sprite2D.new()
 			flame.centered = true
 			flame.texture = EnhanceFire.flame_tex
-			flame.material = EnhanceFire.sword_draw
+			flame.region_enabled = true
+			flame.region_filter_clip_enabled = true
+			flame.region_rect = EnhanceFire.frame_rect(0, 2)
+			flame.offset = Vector2(0.0, -float(EnhanceFire.CELL_H) * 0.5)
+			flame.material = EnhanceFire.add_mat
 			flame.visible = false
-			flame.rotation = PI
 			flame.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 			add_child(flame)
 			_flames.append(flame)
@@ -199,8 +202,11 @@ func _sync_fire() -> void:
 			continue
 		var spot: Vector2 = trail[i] - position
 		var fade: float = float(i + 1) / float(maxi(count, 1))
+		var pulse: float = 0.65 + fade * 0.55
+		var frame: int = int(Time.get_ticks_msec() / 90) + i
 		flame.visible = true
 		flame.position = spot
-		flame.scale = Vector2(0.22, 0.36) * (0.65 + fade * 0.55)
-		flame.modulate = Color(1.0, 0.72, 0.28, 0.45 + fade * 0.4)
+		flame.region_rect = EnhanceFire.frame_rect(0, frame % EnhanceFire.FRAMES)
+		flame.scale = Vector2(0.34 * pulse, 0.48 * pulse)
+		flame.modulate = Color(1.0, 1.0, 1.0, 0.45 + fade * 0.45)
 		i += 1

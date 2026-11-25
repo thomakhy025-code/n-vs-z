@@ -2,7 +2,7 @@ extends RefCounted
 
 const Stamp = preload("res://scripts/stamp_bake.gd")
 
-# Enhancement burn is enhance_fire.gd, not a painted sheet. The shout
+# Enhancement burn is the shared flame sheet in enhance_fire.gd. The shout
 # still gathers with _draw_cast_flames until the burn starts. Explosion,
 # Light smashing, and Freezing are not painted here: the bomb is
 # explosion_vfx.gd, the slash is slash_vfx.gd, the ice pillars are
