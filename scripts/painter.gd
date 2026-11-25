@@ -3,6 +3,7 @@ extends RefCounted
 static var _tilt: float = 0.0
 static var saber_navy: bool = false
 static var sheet_on: Dictionary = {}
+static var paints: int = 0
 
 
 static func as_monster(look: Dictionary) -> Dictionary:
@@ -1135,6 +1136,7 @@ static func _hero_arrow(ci: CanvasItem, nock: Vector2, head: Vector2, steel: Col
 
 
 static func paint_local(ci: CanvasItem, look: Dictionary, pose: Dictionary) -> void:
+	paints += 1
 	var phase := str(pose.get("phase", "idle"))
 	var t := float(pose.get("t", 0.0))
 	var clock := float(pose.get("clock", 0.0))

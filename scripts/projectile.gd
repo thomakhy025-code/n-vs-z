@@ -1,6 +1,7 @@
 extends Node2D
 
 const SkillFx = preload("res://scripts/skill_fx.gd")
+const Stamp = preload("res://scripts/stamp_bake.gd")
 
 var velocity: Vector2 = Vector2.RIGHT
 var damage: float = 0.0
@@ -21,6 +22,10 @@ var hazard: String = ""
 var hazard_dmg: float = 0.0
 var splash: float = 0.0
 var trail: Array[Vector2] = []
+var _shaft: Sprite2D
+var _flick_a: Sprite2D
+var _flick_b: Sprite2D
+var _embers: Array[Sprite2D] = []
 
 
 func setup(from: Vector2, aim: Vector2, amount: float, side: int, color: Color, reach: float, road: int, field, heavy: bool = false, may_hit_gate: bool = true, seek_cross: bool = false, shot_from: String = "", hazard_kind: String = "", hazard_amount: float = 0.0, splash_reach: float = 0.0) -> void:
@@ -46,11 +51,35 @@ func setup(from: Vector2, aim: Vector2, amount: float, side: int, color: Color, 
 		delta = Vector2(1.0 if aim.x >= from.x else -1.0, 0.0)
 	velocity = delta.normalized() * (760.0 if heavy else 640.0)
 	z_index = 560 if heavy else 520
-	queue_redraw()
 
 
 func _ready() -> void:
-	queue_redraw()
+	Stamp.ensure()
+	_shaft = Sprite2D.new()
+	_shaft.centered = true
+	_shaft.texture = Stamp.arrow_bold if bold else Stamp.arrow_tex
+	_shaft.offset = Stamp.arrow_offset(bold)
+	_shaft.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	_shaft.modulate = tint
+	var dir := velocity.normalized()
+	if dir == Vector2.ZERO:
+		dir = Vector2.RIGHT
+	_shaft.rotation = dir.angle()
+	add_child(_shaft)
+	if hazard == "fire" and from_id != "hero":
+		_flick_a = _dot()
+		_flick_b = _dot()
+	elif hazard == "fire":
+		var ember_i := 0
+		while ember_i < 8:
+			var ember := Sprite2D.new()
+			ember.centered = false
+			ember.region_enabled = true
+			ember.visible = false
+			ember.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+			add_child(ember)
+			_embers.append(ember)
+			ember_i += 1
 
 
 func _process(delta: float) -> void:
@@ -64,7 +93,7 @@ func _process(delta: float) -> void:
 			trail.append(position)
 			while trail.size() > 8:
 				trail.pop_front()
-		queue_redraw()
+		_sync_fire()
 	if traveled >= max_dist:
 		queue_free()
 		return
@@ -134,37 +163,49 @@ func _end() -> void:
 	queue_free()
 
 
-func _draw() -> void:
+func _dot() -> Sprite2D:
+	var sprite := Sprite2D.new()
+	sprite.texture = Stamp.disc_tex
+	sprite.centered = true
+	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	add_child(sprite)
+	return sprite
+
+
+func _sync_fire() -> void:
 	var dir := velocity.normalized()
 	if dir == Vector2.ZERO:
 		dir = Vector2.RIGHT
-	var tail := 34.0 if bold else 14.0
-	var tip := 18.0 if bold else 8.0
-	var width := 8.0 if bold else 3.0
-	if bold:
-		draw_line(-dir * tail, dir * tip, Color(tint.r, tint.g, tint.b, 0.35), width + 10.0)
-	draw_line(-dir * tail, dir * tip, tint, width)
-	var side := Vector2(-dir.y, dir.x)
-	draw_colored_polygon(PackedVector2Array([
-		dir * tip + side * (6.0 if bold else 4.0),
-		dir * (tip + (12.0 if bold else 8.0)),
-		dir * tip - side * (6.0 if bold else 4.0),
-	]), tint)
-	if hazard == "fire" and from_id != "hero":
+	if _flick_a != null:
+		var tail := 14.0
 		var flick := sin(Time.get_ticks_msec() * 0.02) * 3.0
-		draw_circle(-dir * tail * 0.45 + Vector2(flick, -3.0), 3.2, Color("ffb15a"))
-		draw_circle(-dir * tail * 0.75, 2.2, Color("ff7a2a"))
-	elif hazard == "fire":
-		_draw_fire_trail()
-
-
-func _draw_fire_trail() -> void:
+		_flick_a.position = -dir * tail * 0.45 + Vector2(flick, -3.0)
+		_flick_a.scale = Vector2.ONE * (3.2 / Stamp.disc_r)
+		_flick_a.modulate = Color("ffb15a")
+		_flick_b.position = -dir * tail * 0.75
+		_flick_b.scale = Vector2.ONE * (2.2 / Stamp.disc_r)
+		_flick_b.modulate = Color("ff7a2a")
+		return
+	var tex: Texture2D = SkillFx.texture("en")
 	var count: int = trail.size()
 	var i: int = 0
-	while i < count:
+	while i < _embers.size():
+		var ember: Sprite2D = _embers[i]
+		if tex == null or i >= count:
+			ember.visible = false
+			i += 1
+			continue
 		var spot: Vector2 = trail[i] - position
 		var fade: float = float(i + 1) / float(count)
 		var frame: int = i % SkillFx.FRAMES
 		var wide: float = 38.0 + fade * 30.0
-		SkillFx.blit(self, "en", frame, Rect2(spot.x - wide * 0.5, spot.y - wide * 1.05, wide, wide * 1.35), false, Color(1, 1, 1, 0.85 + fade * 0.15))
+		ember.visible = true
+		if ember.texture != tex:
+			ember.texture = tex
+		ember.region_rect = SkillFx.region("en", frame)
+		var cell: Vector2 = ember.region_rect.size
+		ember.position = Vector2(spot.x - wide * 0.5, spot.y - wide * 1.05)
+		ember.modulate = Color(1, 1, 1, 0.85 + fade * 0.15)
+		if cell.x > 0.0 and cell.y > 0.0:
+			ember.scale = Vector2(wide / cell.x, wide * 1.35 / cell.y)
 		i += 1

@@ -1,5 +1,7 @@
 extends Node2D
 
+const Stamp = preload("res://scripts/stamp_bake.gd")
+
 var side: int = 0
 var hp: float = 2000.0
 var max_hp: float = 2000.0
@@ -16,6 +18,15 @@ var break_age: float = 0.0
 var shattered: bool = false
 var piece_count: int = 0
 var spread_marks: int = 0
+var _shift: Node2D
+var _body: Node2D
+var _meter: Node2D
+var _flame: Sprite2D
+var _crack_root: Node2D
+var _crack_sprites: Array[Sprite2D] = []
+var _body_key: String = ""
+var _meter_key: String = ""
+var _picture: bool = false
 
 
 func setup(field, which_side: int, where: Vector2, front: float) -> void:
@@ -68,40 +79,167 @@ func _note_hit() -> void:
 	crack_marks = marks
 
 
+func refresh() -> void:
+	_body_key = ""
+	_meter_key = ""
+	_refresh()
+
+
 func _process(delta: float) -> void:
 	flicker += delta
-	var dirty := side == 1 and not shattered
 	if hit_shake > 0.0:
 		hit_shake = maxf(0.0, hit_shake - delta * 3.1)
-		dirty = true
 	if crack_flash > 0.0:
 		crack_flash = maxf(0.0, crack_flash - delta * 2.2)
-		dirty = true
 	if breaking and not shattered:
 		break_age += delta
 		spread_marks = mini(6, int(floor(break_age / 0.07)) + 1)
-		dirty = true
 		if break_age >= 0.82:
 			_spawn_pieces()
-	if dirty:
-		queue_redraw()
+	_refresh()
 
 
-func _draw() -> void:
-	if shattered:
+func _refresh() -> void:
+	_ensure_picture()
+	if _shift == null:
 		return
+	if shattered:
+		_shift.visible = false
+		if _meter != null:
+			_meter.visible = false
+		return
+	_shift.visible = true
 	var kick := 0.0
 	if hit_shake > 0.0:
 		kick = sin(hit_shake * 46.0) * 5.5 * hit_shake
-	draw_set_transform(Vector2(kick, 0.0), 0.0, Vector2.ONE)
-	for raw in _parts():
-		var part: Dictionary = raw
-		_paint(part)
+	_shift.position = Vector2(kick, 0.0)
 	var span := _span()
-	_draw_damage_cracks(span)
+	var look := _look_name()
+	var hurt := "ok"
+	if hp / maxf(1.0, max_hp) < 0.35:
+		hurt = "hurt"
+	var body_key := "%s|%s|%.2f|%.2f" % [look, hurt, span.x, span.y]
+	if body_key != _body_key:
+		_body_key = body_key
+		if _body != null:
+			_body.queue_redraw()
+	_sync_flame(span)
+	_sync_cracks(span)
+	var meter_key := "%s|%d" % [look, int(round(hp))]
+	if meter_key != _meter_key:
+		_meter_key = meter_key
+		if _meter != null:
+			_meter.queue_redraw()
+
+
+func _ensure_picture() -> void:
+	if _picture:
+		return
+	_picture = true
+	Stamp.ensure()
+	_shift = Node2D.new()
+	add_child(_shift)
+	_flame = Sprite2D.new()
+	_flame.texture = Stamp.disc_tex
+	_flame.centered = true
+	_flame.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	_flame.visible = false
+	_flame.z_index = 0
+	_shift.add_child(_flame)
+	_body = CastleBody.new()
+	_body.set("gate", self)
+	_body.z_index = 1
+	_shift.add_child(_body)
+	_crack_root = Node2D.new()
+	_crack_root.z_index = 3
+	_shift.add_child(_crack_root)
+	_meter = CastleMeter.new()
+	_meter.set("gate", self)
+	_meter.z_index = 5
+	_shift.add_child(_meter)
+
+
+func _look_name() -> String:
+	if side == 0 or clan_gate:
+		return "player"
+	if _human_army():
+		return "army"
+	return "enemy"
+
+
+func _sync_flame(span: Vector2) -> void:
+	if _flame == null:
+		return
+	if _look_name() != "enemy":
+		_flame.visible = false
+		return
+	var flame := 0.65 + 0.35 * sin(flicker * 9.0)
+	var rad := 10.0 + flame * 3.0
+	var flame_y := (span.x + span.y) * 0.5
+	_flame.visible = true
+	_flame.position = Vector2(0.0, flame_y)
+	_flame.scale = Vector2.ONE * (rad / Stamp.disc_r)
+	_flame.modulate = Color(0.65, 0.9, 0.35, 0.85)
+
+
+func _sync_cracks(span: Vector2) -> void:
+	var used := 0
+	var lines: Array = _damage_lines(span)
+	var count := lines.size()
+	for i in count:
+		var line: Array = lines[i]
+		var ink := Color(0.07, 0.05, 0.04, 0.84)
+		var width := 2.2
+		if i == count - 1 and crack_flash > 0.0:
+			ink = Color(0.94, 0.86, 0.68, 0.5 + 0.45 * crack_flash)
+			width = 2.8
+		_show_line(used, line[0], line[1], width, ink)
+		used += 1
 	if breaking:
-		_draw_spread_cracks(span)
-	_draw_meter(span)
+		var seams: Array = _break_seams(span)
+		var seam_i := 0
+		while seam_i < seams.size():
+			var seam: Array = seams[seam_i]
+			var u := clampf((break_age - float(seam_i) * 0.07) / 0.28, 0.0, 1.0)
+			if u > 0.0:
+				var seam_a: Vector2 = seam[0]
+				var seam_b: Vector2 = seam[1]
+				var tip := seam_a.lerp(seam_b, u)
+				_show_line(used, seam_a, tip, 2.7, Color(0.06, 0.04, 0.03, 0.94))
+				used += 1
+				_show_line(used, seam_a, tip, 1.15, Color(0.9, 0.82, 0.62, 0.38))
+				used += 1
+			seam_i += 1
+	while used < _crack_sprites.size():
+		_crack_sprites[used].visible = false
+		used += 1
+
+
+func _show_line(index: int, a: Vector2, b: Vector2, width: float, ink: Color) -> void:
+	var sprite := _line_sprite(index)
+	var delta := b - a
+	var length := delta.length()
+	if length < 0.4:
+		sprite.visible = false
+		return
+	sprite.visible = true
+	sprite.position = a
+	sprite.rotation = delta.angle()
+	sprite.scale = Vector2(length, width)
+	sprite.modulate = ink
+
+
+func _line_sprite(index: int) -> Sprite2D:
+	while _crack_sprites.size() <= index:
+		var sprite := Sprite2D.new()
+		sprite.texture = Stamp.pixel
+		sprite.centered = false
+		sprite.offset = Vector2(0.0, -0.5)
+		sprite.visible = false
+		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		_crack_root.add_child(sprite)
+		_crack_sprites.append(sprite)
+	return _crack_sprites[index]
 
 
 func _spawn_pieces() -> void:
@@ -166,23 +304,25 @@ func _chips() -> Array:
 	return out
 
 
-func _paint(part: Dictionary) -> void:
+func _paint(ci: CanvasItem, part: Dictionary) -> void:
 	var kind := str(part.get("kind", ""))
+	if kind == "circle" and float(part.get("r", 0.0)) >= 8.0:
+		return
 	var ink: Color = part["color"]
 	if kind == "rect":
 		var box: Rect2 = part["rect"]
-		draw_rect(box, ink)
+		ci.draw_rect(box, ink)
 	elif kind == "poly":
 		var pts: PackedVector2Array = part["pts"]
 		if pts.size() >= 3:
-			draw_colored_polygon(pts, ink)
+			ci.draw_colored_polygon(pts, ink)
 	elif kind == "circle":
 		var spot: Vector2 = part["at"]
-		draw_circle(spot, float(part.get("r", 1.0)), ink)
+		ci.draw_circle(spot, float(part.get("r", 1.0)), ink)
 	elif kind == "line":
 		var line_a: Vector2 = part["a"]
 		var line_b: Vector2 = part["b"]
-		draw_line(line_a, line_b, ink, float(part.get("w", 2.0)))
+		ci.draw_line(line_a, line_b, ink, float(part.get("w", 2.0)))
 
 
 func _rect(box: Rect2, ink: Color) -> Dictionary:
@@ -278,16 +418,17 @@ func _enemy_parts(ratio: float, span: Vector2) -> Array:
 	]
 
 
-func _draw_meter(span: Vector2) -> void:
+func _paint_meter(ci: CanvasItem) -> void:
+	var span := _span()
 	var ratio := clampf(hp / maxf(1.0, max_hp), 0.0, 1.0)
 	var bar_y := span.x - 22.0
-	draw_rect(Rect2(-34, bar_y, 68, 8), Color(0, 0, 0, 0.65))
+	ci.draw_rect(Rect2(-34, bar_y, 68, 8), Color(0, 0, 0, 0.65))
 	var fill := Color("7dce6a") if ratio > 0.35 else Color("e24b3b")
-	draw_rect(Rect2(-34, bar_y, 68.0 * ratio, 8), fill)
+	ci.draw_rect(Rect2(-34, bar_y, 68.0 * ratio, 8), fill)
 	var font: Font = ThemeDB.fallback_font
 	if font != null:
 		var title := "CLAN" if side == 0 or clan_gate else ("ARMY" if _human_army() else "CURSE")
-		draw_string(font, Vector2(-22, bar_y - 6.0), title, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color("f3e6c8"))
+		ci.draw_string(font, Vector2(-22, bar_y - 6.0), title, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color("f3e6c8"))
 
 
 func _draw_damage_cracks(span: Vector2) -> void:
@@ -489,24 +630,44 @@ class CastleChip:
 	var age: float = 0.0
 
 	func load_part(part: Dictionary, origin: Vector2) -> void:
+		var baker = preload("res://scripts/stamp_bake.gd")
+		baker.ensure()
 		shape = str(part.get("kind", "rect"))
 		var ink: Color = part["color"]
 		fill = ink
 		var shift := -origin
+		var sprite := Sprite2D.new()
+		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		sprite.centered = false
 		if shape == "rect":
 			var src: Rect2 = part["rect"]
 			src.position += shift
 			box = src
+			sprite.texture = baker.pixel
+			sprite.position = box.position
+			sprite.scale = box.size
+			sprite.modulate = fill
 		elif shape == "poly":
 			var pts: PackedVector2Array = part["pts"]
 			var moved := PackedVector2Array()
 			for point in pts:
 				moved.append(point + shift)
 			poly = moved
+			var baked: Dictionary = baker.bake_poly(poly, fill)
+			var baked_tex: Texture2D = baked["tex"]
+			sprite.texture = baked_tex
+			sprite.position = baked["origin"]
 		elif shape == "circle":
 			var at: Vector2 = part["at"]
 			spot = at + shift
 			rad = float(part.get("r", 1.0))
+			sprite.texture = baker.disc_tex
+			sprite.centered = true
+			sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+			sprite.position = spot
+			sprite.scale = Vector2.ONE * (rad / baker.disc_r)
+			sprite.modulate = fill
+		add_child(sprite)
 
 	func _process(delta: float) -> void:
 		age += delta
@@ -515,13 +676,31 @@ class CastleChip:
 		rotation += spin * delta
 		if age > 2.3:
 			set_process(false)
-		queue_redraw()
+
+
+class CastleBody:
+	extends Node2D
+
+	var gate: Node2D = null
 
 	func _draw() -> void:
-		if shape == "rect":
-			draw_rect(box, fill)
-		elif shape == "poly":
-			if poly.size() >= 3:
-				draw_colored_polygon(poly, fill)
-		elif shape == "circle":
-			draw_circle(spot, rad, fill)
+		if gate == null:
+			return
+		var found: Variant = gate.call("_parts")
+		if not (found is Array):
+			return
+		var parts: Array = found
+		for raw in parts:
+			var part: Dictionary = raw
+			gate.call("_paint", self, part)
+
+
+class CastleMeter:
+	extends Node2D
+
+	var gate: Node2D = null
+
+	func _draw() -> void:
+		if gate == null:
+			return
+		gate.call("_paint_meter", self)

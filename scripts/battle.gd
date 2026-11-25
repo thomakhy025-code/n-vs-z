@@ -4,6 +4,7 @@ const Catalog = preload("res://scripts/unit_catalog.gd")
 const SmokeVeil = preload("res://scripts/smoke_veil.gd")
 const Painter = preload("res://scripts/painter.gd")
 const FrameBake = preload("res://scripts/frame_bake.gd")
+const Stamp = preload("res://scripts/stamp_bake.gd")
 const SkillFx = preload("res://scripts/skill_fx.gd")
 const ExplosionVfx = preload("res://scripts/explosion_vfx.gd")
 const SlashVfx = preload("res://scripts/slash_vfx.gd")
@@ -273,7 +274,7 @@ func begin_duel(local_ids: Array, other_ids: Array, side: int, runs_world: bool,
 		enemy_cd[str(entry["id"])] = 0.0
 	if enemy_gate != null:
 		enemy_gate.clan_gate = true
-		enemy_gate.queue_redraw()
+		enemy_gate.refresh()
 	foe = HeroScript.new()
 	foe.side = 1
 	foe.setup(self)
@@ -330,6 +331,8 @@ func _build_world() -> void:
 	fx.z_index = 120
 	add_child(fx)
 	SkillFx.warm(self)
+	Stamp.ensure()
+	SlashVfx.warm(self)
 	var glow = SkillFx.GlowLayer.new()
 	glow.field = self
 	glow.z_index = 500

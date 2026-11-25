@@ -27,6 +27,10 @@ static var spark_draw: ShaderMaterial
 static var edge_draw: ShaderMaterial
 static var spark_tex: Texture2D
 static var blade_tex: Texture2D
+static var crescent: Texture2D
+static var crescent_ready: bool = false
+static var crescent_failed: bool = false
+static var sheet_mat: ShaderMaterial
 static var live: Array = []
 
 var age: float = 0.0
@@ -43,12 +47,26 @@ var blade: Sprite2D
 var blade_mat: ShaderMaterial
 var edge: SlashEdge
 var sparks: GPUParticles2D
+var using_sheet: bool = false
+
+
+static func warm(host: Node) -> void:
+	if host == null:
+		return
+	_bank()
+	if crescent_ready or crescent_failed:
+		return
+	if host.get_node_or_null("CrescentBake") != null:
+		return
+	var node := CrescentBake.new()
+	node.name = "CrescentBake"
+	host.add_child(node)
 
 
 static func play(host: Node, near_x: float, far_x: float, y: float) -> void:
 	if host == null:
 		return
-	_bank()
+	warm(host)
 	var stale: Array = []
 	for listed in live:
 		if not is_instance_valid(listed):
@@ -148,25 +166,35 @@ func _place(travel: float) -> void:
 	var head: float = _head_x(travel)
 	var fade: float = _blade_fade()
 	var grow: float = clampf(0.92 + 0.08 * minf(age / 0.05, 1.0), 0.92, 1.0)
+	if not using_sheet and crescent != null:
+		_use_sheet()
 	if blade != null:
 		blade.visible = fade > 0.012
 		var sx: float = blow * grow * BLADE_W / TEX
 		var sy: float = grow * BLADE_H / TEX
+		if using_sheet and blade.texture != null:
+			sx = blow * grow * BLADE_W / float(blade.texture.get_width())
+			sy = grow * BLADE_H / float(blade.texture.get_height())
 		blade.scale = Vector2(sx, sy)
 		var foot_u: float = FOOT_PLANE.x
 		var foot_v: float = FOOT_PLANE.y * BLADE_W / BLADE_H
 		var foot_x: float = (foot_u - 0.5) * BLADE_W * grow * blow
 		var foot_y: float = (foot_v - 0.5) * BLADE_H * grow
 		blade.position = Vector2(head - foot_x, road_y - foot_y)
-		if blade_mat != null:
+		if using_sheet:
+			blade.modulate = Color(1, 1, 1, fade)
+		elif blade_mat != null:
 			blade_mat.set_shader_parameter("fade", fade)
 			blade_mat.set_shader_parameter("flash", _flash())
 			blade_mat.set_shader_parameter("rush", _rush())
 	if edge != null:
-		edge.visible = fade > 0.012
-		edge.pts = _edge_points(head, grow)
-		edge.fade = fade
-		edge.queue_redraw()
+		if using_sheet:
+			edge.visible = false
+		else:
+			edge.visible = fade > 0.012
+			edge.pts = _edge_points(head, grow)
+			edge.fade = fade
+			edge.queue_redraw()
 	if sparks != null:
 		sparks.position = Vector2(head, road_y - 2.0)
 
@@ -211,25 +239,27 @@ func _draw_crack(head: float) -> void:
 		return
 	var pulse: float = 0.9 + 0.1 * sin(age * 10.0)
 	var glow: float = hot * pulse
+	var Stamp = preload("res://scripts/stamp_bake.gd")
+	Stamp.ensure()
 	if glow > 0.03:
-		_paint_line(shown, 34.0, Color(1.0, 0.42, 0.04, 0.5 * glow))
+		Stamp.stroke(self, shown, 34.0, Color(1.0, 0.42, 0.04, 0.5 * glow))
 	if split_a > 0.04:
-		_fill(_ribbon(shown, 9.0), Color(0.01, 0.004, 0.002, 0.94 * split_a))
+		Stamp.stroke(self, shown, 18.0, Color(0.01, 0.004, 0.002, 0.94 * split_a))
 	if glow > 0.03:
-		_paint_line(shown, 8.0, Color(1.0, 0.45, 0.04, glow))
-		_paint_line(shown, 3.8, Color(1.0, 0.86, 0.28, glow))
-		_paint_line(shown, 1.6, Color(1.0, 0.98, 0.9, glow))
+		Stamp.stroke(self, shown, 8.0, Color(1.0, 0.45, 0.04, glow))
+		Stamp.stroke(self, shown, 3.8, Color(1.0, 0.86, 0.28, glow))
+		Stamp.stroke(self, shown, 1.6, Color(1.0, 0.98, 0.9, glow))
 	if glow < 0.45:
 		return
 	var index: int = 0
 	while index < forks.size():
 		var fork: PackedVector2Array = forks[index]
 		if fork.size() >= 2 and _passed(fork[0], head):
-			_paint_line(fork, 9.0, Color(1.0, 0.48, 0.06, 0.48 * glow))
+			Stamp.stroke(self, fork, 9.0, Color(1.0, 0.48, 0.06, 0.48 * glow))
 			if split_a > 0.05:
-				_fill(_ribbon(fork, 3.4), Color(0.012, 0.005, 0.002, 0.9 * split_a))
-			_paint_line(fork, 2.8, Color(1.0, 0.78, 0.18, glow))
-			_paint_line(fork, 1.15, Color(1.0, 0.97, 0.88, glow))
+				Stamp.stroke(self, fork, 6.8, Color(0.012, 0.005, 0.002, 0.9 * split_a))
+			Stamp.stroke(self, fork, 2.8, Color(1.0, 0.78, 0.18, glow))
+			Stamp.stroke(self, fork, 1.15, Color(1.0, 0.97, 0.88, glow))
 		index += 1
 
 
@@ -250,8 +280,10 @@ func _puff(at: Vector2, lived: float, life: float, r0: float, r1: float) -> void
 	var fade: float = (1.0 - u) * (1.0 - u)
 	var rad: float = lerpf(r0, r1, u)
 	var center := Vector2(at.x, at.y - lived * 10.0)
-	draw_circle(center, rad, Color(0.55, 0.48, 0.38, 0.5 * fade))
-	draw_circle(center + Vector2(0.0, -1.5), rad * 0.48, Color(0.82, 0.76, 0.66, 0.42 * fade))
+	var Stamp = preload("res://scripts/stamp_bake.gd")
+	Stamp.ensure()
+	Stamp.disc(self, center, rad, Color(0.55, 0.48, 0.38, 0.5 * fade))
+	Stamp.disc(self, center + Vector2(0.0, -1.5), rad * 0.48, Color(0.82, 0.76, 0.66, 0.42 * fade))
 
 
 func _drop_dust(travel: float) -> void:
@@ -424,17 +456,31 @@ func _build_edge() -> void:
 
 func _build_blade() -> void:
 	blade = Sprite2D.new()
-	blade.texture = blade_tex
 	blade.centered = true
 	blade.z_index = 2
 	blade.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-	blade_mat = ShaderMaterial.new()
-	blade_mat.shader = BLADE_SHADER
-	blade_mat.set_shader_parameter("fade", 1.0)
-	blade_mat.set_shader_parameter("flash", 1.0)
-	blade_mat.set_shader_parameter("rush", 1.0)
-	blade.material = blade_mat
+	blade.texture = blade_tex
+	_use_sheet()
 	add_child(blade)
+
+
+func _use_sheet() -> void:
+	if blade == null or crescent == null or sheet_mat == null:
+		if blade != null and blade.material == null:
+			blade_mat = ShaderMaterial.new()
+			blade_mat.shader = BLADE_SHADER
+			blade_mat.set_shader_parameter("fade", 1.0)
+			blade_mat.set_shader_parameter("flash", 1.0)
+			blade_mat.set_shader_parameter("rush", 1.0)
+			blade.material = blade_mat
+			blade.texture = blade_tex
+		return
+	blade.texture = crescent
+	blade.material = sheet_mat
+	blade_mat = null
+	using_sheet = true
+	if edge != null:
+		edge.visible = false
 
 
 func _build_sparks() -> void:
@@ -486,6 +532,10 @@ static func _bank() -> void:
 	spark_motion.scale_max = 1.7
 	spark_motion.color = Color(1, 1, 1, 1)
 	spark_motion.color_ramp = _spark_ramp()
+	var sheet_shader := Shader.new()
+	sheet_shader.code = "shader_type canvas_item;\nrender_mode blend_add;\nvoid fragment() {\n\tvec4 tex = texture(TEXTURE, UV);\n\tif (dot(tex.rgb, vec3(1.0)) < 0.004) {\n\t\tdiscard;\n\t}\n\tCOLOR = vec4(tex.rgb * COLOR.a, 1.0);\n}\n"
+	sheet_mat = ShaderMaterial.new()
+	sheet_mat.shader = sheet_shader
 
 
 static func _spark_ramp() -> GradientTexture1D:
@@ -517,3 +567,113 @@ class SlashEdge extends Node2D:
 			return
 		draw_polyline(pts, Color(1.0, 0.72, 0.14, fade), 13.0, true)
 		draw_polyline(pts, Color(1.0, 1.0, 0.97, fade), 4.2, true)
+
+
+class CrescentBake extends Node:
+	var vp: SubViewport
+	var step: int = 0
+	var tries: int = 0
+
+	func _ready() -> void:
+		var baker = load("res://scripts/slash_vfx.gd")
+		vp = SubViewport.new()
+		vp.disable_3d = true
+		vp.transparent_bg = true
+		vp.use_hdr_2d = false
+		vp.handle_input_locally = false
+		vp.gui_disable_input = true
+		vp.msaa_2d = Viewport.MSAA_DISABLED
+		vp.render_target_update_mode = SubViewport.UPDATE_DISABLED
+		vp.size = Vector2i(420, 360)
+		add_child(vp)
+		var root := Node2D.new()
+		vp.add_child(root)
+		var blade := Sprite2D.new()
+		blade.texture = baker.blade_tex
+		blade.centered = true
+		blade.position = Vector2(210.0, 180.0)
+		blade.scale = Vector2(420.0 / 8.0, 360.0 / 8.0)
+		blade.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+		var blade_mat := ShaderMaterial.new()
+		blade_mat.shader = load("res://shaders/slash_blade.gdshader")
+		blade_mat.set_shader_parameter("fade", 1.0)
+		blade_mat.set_shader_parameter("flash", 1.4)
+		blade_mat.set_shader_parameter("rush", 1.0)
+		blade.material = blade_mat
+		root.add_child(blade)
+		var edge := SlashEdge.new()
+		edge.fade = 1.0
+		edge.pts = _edge_pts()
+		edge.material = baker.edge_draw
+		edge.z_index = 2
+		root.add_child(edge)
+
+	func _process(_delta: float) -> void:
+		if vp == null:
+			return
+		step += 1
+		if step == 1:
+			vp.render_target_update_mode = SubViewport.UPDATE_ONCE
+			return
+		var baker = load("res://scripts/slash_vfx.gd")
+		if DisplayServer.get_name() == "headless":
+			_store(baker, Image.create(420, 360, false, Image.FORMAT_RGBA8), 0)
+			queue_free()
+			return
+		var view_tex := vp.get_texture()
+		var img: Image = Image.create(1, 1, false, Image.FORMAT_RGBA8)
+		if view_tex != null:
+			var grabbed := view_tex.get_image()
+			if grabbed != null:
+				img = grabbed
+		var seen := _opaque(img)
+		if seen == 0 and tries < 4:
+			tries += 1
+			vp.render_target_update_mode = SubViewport.UPDATE_ONCE
+			return
+		_store(baker, img, seen)
+		queue_free()
+
+	func _store(baker, img: Image, seen: int) -> void:
+		if seen == 0 and DisplayServer.get_name() != "headless":
+			baker.crescent_failed = true
+			baker.crescent = null
+			baker.crescent_ready = false
+			return
+		if seen > 0:
+			img.fix_alpha_edges()
+		baker.crescent = ImageTexture.create_from_image(img)
+		baker.crescent_ready = true
+		baker.crescent_failed = false
+
+	func _edge_pts() -> PackedVector2Array:
+		var tip := Vector2(0.72, 0.10)
+		var belly := Vector2(0.40, 0.42)
+		var foot := Vector2(0.80, 0.78)
+		var foot_u: float = foot.x
+		var foot_v: float = foot.y * 420.0 / 360.0
+		var foot_px := Vector2(210.0 + (foot_u - 0.5) * 420.0, 180.0 + (foot_v - 0.5) * 360.0)
+		var pts := PackedVector2Array()
+		var steps: int = 32
+		var index: int = 0
+		while index <= steps:
+			var t: float = float(index) / float(steps)
+			var u: float = 1.0 - t
+			var p: Vector2 = tip * u * u + belly * 2.0 * u * t + foot * t * t
+			pts.append(foot_px + Vector2((p.x - foot.x) * 420.0, (p.y - foot.y) * 420.0))
+			index += 1
+		return pts
+
+	func _opaque(img: Image) -> int:
+		var count: int = 0
+		var w: int = img.get_width()
+		var h: int = img.get_height()
+		var y: int = 0
+		while y < h:
+			var x: int = 0
+			while x < w:
+				if img.get_pixel(x, y).a > 0.04 or img.get_pixel(x, y).r > 0.04:
+					count += 1
+				x += 6
+			y += 6
+		return count

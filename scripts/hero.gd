@@ -3,6 +3,8 @@ extends Node2D
 const Buff = preload("res://scripts/level_buff.gd")
 const Painter = preload("res://scripts/painter.gd")
 const SkillFx = preload("res://scripts/skill_fx.gd")
+const FrameBake = preload("res://scripts/frame_bake.gd")
+const Stamp = preload("res://scripts/stamp_bake.gd")
 
 var battle = null
 var side: int = 0
@@ -64,7 +66,25 @@ var blaze: float = 0.0
 var blaze_clock: float = 0.0
 var blaze_factor: float = 1.0
 var _aura: Sprite2D = null
+var _body: Sprite2D = null
+var _flash_mat: ShaderMaterial = null
+var _sheet: Texture2D = null
+var _sheet_key: String = ""
+var _slot: int = -1
+var _wash: float = -1.0
+var _bar: Sprite2D = null
+var _bar_fill: Sprite2D = null
+var _mark: Sprite2D = null
+var _gem: Sprite2D = null
+var _arc_a: Sprite2D = null
+var _arc_b: Sprite2D = null
+var _muzzle_glow: Sprite2D = null
+var _muzzle_core: Sprite2D = null
+var _bone: Sprite2D = null
+var _numb: Sprite2D = null
+var _puffs: Array[Sprite2D] = []
 const RESPAWN: float = 6.0
+const HERO_SCALE: float = 1.42
 
 
 func setup(field) -> void:
@@ -89,6 +109,7 @@ func setup(field) -> void:
 	hp = max_hp
 	sword_damage = 44.0 * factor
 	shoot_damage = 36.0 * factor
+	_build_picture()
 
 
 func set_bounds(a: float, b: float, top: float, bottom: float) -> void:
@@ -194,7 +215,7 @@ func _process(delta: float) -> void:
 		if act <= 0.0:
 			winding = false
 		_sync_aura()
-		queue_redraw()
+		_sync_picture()
 		return
 	if not alive:
 		visible = false
@@ -204,10 +225,11 @@ func _process(delta: float) -> void:
 		if down_timer <= 0.0:
 			_revive()
 		_sync_aura()
+		_sync_picture()
 		return
 	if battle.finished or battle.paused:
 		_sync_aura()
-		queue_redraw()
+		_sync_picture()
 		return
 	_tick_blaze(delta)
 	_sync_aura()
@@ -217,7 +239,7 @@ func _process(delta: float) -> void:
 		act = 0.0
 		stepping = false
 		strike_sent = true
-		queue_redraw()
+		_sync_picture()
 		return
 	_move(delta)
 	_combat(delta)
@@ -227,7 +249,7 @@ func _process(delta: float) -> void:
 		modulate.a = 0.45 if int(invuln * 14.0) % 2 == 0 else 1.0
 	else:
 		modulate.a = 1.0
-	queue_redraw()
+	_sync_picture()
 
 
 func _move(delta: float) -> void:
@@ -511,27 +533,273 @@ func _pose() -> Dictionary:
 	return pose
 
 
-func _draw() -> void:
-	var bob := 0.0
-	if stepping:
-		bob = sin(bob_time * 8.0) * 1.5
-	draw_set_transform(Vector2(0, bob), 0, Vector2(facing * 1.42, 1.42))
-	Painter.paint_local(self, look, _pose())
-	draw_set_transform(Vector2.ZERO, 0, Vector2.ONE)
-	if slash > 0.0:
-		_draw_slash()
-	if muzzle > 0.0:
-		_draw_muzzle()
-	draw_line(Vector2(-8, -78), Vector2(8, -78), Color("c44536"), 3.0)
-	if not alive:
+func _build_picture() -> void:
+	if _body != null:
 		return
-	var ratio := clampf(hp / maxf(1.0, max_hp), 0.0, 1.0)
-	draw_rect(Rect2(-26, -88, 52, 6), Color(0, 0, 0, 0.7))
-	draw_rect(Rect2(-26, -88, 52.0 * ratio, 6), Color("f2d38a") if ratio > 0.35 else Color("e24b3b"))
-	if level_stacks > 0:
-		draw_circle(Vector2(32, -85), 3.5, Color("e6c36a"))
-	if bone_t > 0.0 or numb > 0.0:
-		Painter.paint_ailment(self, bone_t, numb, bob_time)
+	Stamp.ensure()
+	_body = Sprite2D.new()
+	_body.centered = false
+	_body.offset = FrameBake.offset()
+	_body.region_enabled = true
+	_body.region_filter_clip_enabled = true
+	_body.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	_body.region_rect = FrameBake.region(0)
+	_flash_mat = FrameBake.flash_material()
+	_body.material = _flash_mat
+	add_child(_body)
+	_mark = _px(Vector2(-8, -78), Vector2(16, 3), Color("c44536"))
+	_bar = _px(Vector2(-26, -88), Vector2(52, 6), Color(0, 0, 0, 0.7))
+	_bar_fill = _px(Vector2(-26, -88), Vector2(52, 6), Color("f2d38a"))
+	_gem = Sprite2D.new()
+	_gem.texture = Stamp.disc_tex
+	_gem.centered = true
+	_gem.position = Vector2(32, -85)
+	_gem.scale = Vector2.ONE * (3.5 / Stamp.disc_r)
+	_gem.modulate = Color("e6c36a")
+	_gem.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	_gem.visible = false
+	add_child(_gem)
+	_arc_a = _arc_sprite(Stamp.arc_outer)
+	_arc_b = _arc_sprite(Stamp.arc_inner)
+	_muzzle_glow = _disc_sprite()
+	_muzzle_core = _disc_sprite()
+	_bone = _mark_sprite(Stamp.bone_tex, Stamp.bone_offset)
+	_numb = _mark_sprite(Stamp.numb_tex, Stamp.numb_offset)
+	var puff_i := 0
+	while puff_i < 8:
+		var puff := Sprite2D.new()
+		puff.centered = false
+		puff.region_enabled = true
+		puff.visible = false
+		puff.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+		puff.z_index = 2
+		add_child(puff)
+		_puffs.append(puff)
+		puff_i += 1
+
+
+func _px(at: Vector2, size: Vector2, tint: Color) -> Sprite2D:
+	var sprite := Sprite2D.new()
+	sprite.texture = Stamp.pixel
+	sprite.centered = false
+	sprite.position = at
+	sprite.scale = size
+	sprite.modulate = tint
+	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	add_child(sprite)
+	return sprite
+
+
+func _arc_sprite(tex: Texture2D) -> Sprite2D:
+	var sprite := Sprite2D.new()
+	sprite.texture = tex
+	sprite.centered = true
+	sprite.visible = false
+	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	sprite.z_index = 3
+	add_child(sprite)
+	return sprite
+
+
+func _disc_sprite() -> Sprite2D:
+	var sprite := Sprite2D.new()
+	sprite.texture = Stamp.disc_tex
+	sprite.centered = true
+	sprite.visible = false
+	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	sprite.z_index = 3
+	add_child(sprite)
+	return sprite
+
+
+func _mark_sprite(tex: Texture2D, offset: Vector2) -> Sprite2D:
+	var sprite := Sprite2D.new()
+	sprite.texture = tex
+	sprite.centered = true
+	sprite.offset = offset
+	sprite.visible = false
+	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	sprite.z_index = 4
+	add_child(sprite)
+	return sprite
+
+
+func _sync_picture() -> void:
+	_sync_body()
+	_sync_overlays()
+
+
+func _sheet_look() -> Dictionary:
+	if act_tool == "bow" and act > 0.0:
+		var row: Dictionary = look.duplicate()
+		row["weapon"] = "bow"
+		return row
+	return look
+
+
+func _hero_slot() -> int:
+	if act > 0.0 and alive:
+		var wind := 1.0 - clampf(act, 0.0, 1.0)
+		var beat := mini(3, int(wind * 4.0))
+		return 4 + beat
+	if stepping and alive:
+		var stride := fposmod(bob_time * 8.0, TAU) / TAU
+		return clampi(int(stride * 4.0), 0, 3)
+	return 0
+
+
+func _sync_body() -> void:
+	if _body == null:
+		return
+	var sheet_look: Dictionary = _sheet_look()
+	var key := FrameBake.make_key(sheet_look, 0)
+	if key != _sheet_key:
+		_sheet = null
+		_body.texture = null
+		_sheet_key = key
+		_slot = -1
+	if _sheet == null:
+		var tex := FrameBake.request(self, key, sheet_look, 0)
+		if tex != null:
+			_sheet = tex
+			_body.texture = tex
+			_slot = -1
+	var slot := _hero_slot()
+	if _sheet != null and slot != _slot:
+		_slot = slot
+		_body.region_rect = FrameBake.region(slot)
+	var bob := 0.0
+	if stepping and alive:
+		bob = sin(bob_time * 8.0) * 1.5
+	var pos := Vector2(0.0, bob)
+	if _body.position != pos:
+		_body.position = pos
+	var face := HERO_SCALE
+	if facing < 0.0:
+		face = -HERO_SCALE
+	var scl := Vector2(face, HERO_SCALE)
+	if _body.scale != scl:
+		_body.scale = scl
+	var tint := Color(1.0, 1.0, 1.0, 1.0)
+	if alive and (hurt > 0.0 or numb > 0.0):
+		tint = Color(1.0, 0.58, 0.54, 1.0)
+	if _body.modulate != tint:
+		_body.modulate = tint
+	var wash := 0.0
+	if flash > 0.04:
+		wash = clampf(flash * 4.0, 0.0, 0.72)
+	if _flash_mat != null and absf(wash - _wash) > 0.03:
+		_wash = wash
+		_flash_mat.set_shader_parameter("wash", wash)
+
+
+func _sync_overlays() -> void:
+	var living := alive
+	if _mark != null:
+		_mark.visible = living
+	if _bar != null:
+		_bar.visible = living
+	if _bar_fill != null:
+		_bar_fill.visible = living
+		if living:
+			var ratio := clampf(hp / maxf(1.0, max_hp), 0.0, 1.0)
+			_bar_fill.scale = Vector2(52.0 * ratio, 6.0)
+			var fill := Color("f2d38a") if ratio > 0.35 else Color("e24b3b")
+			if _bar_fill.modulate != fill:
+				_bar_fill.modulate = fill
+	if _gem != null:
+		_gem.visible = living and level_stacks > 0
+	_sync_slash()
+	_sync_muzzle()
+	_sync_ailment()
+
+
+func _sync_slash() -> void:
+	var show := slash > 0.0 and alive
+	var alpha := clampf(slash / 0.28, 0.0, 1.0)
+	var at := Vector2(facing * 22.0, -22.0)
+	var flip := -1.0 if facing < 0.0 else 1.0
+	_place_arc(_arc_a, show, at, flip, Color(1, 0.94, 0.72, alpha))
+	_place_arc(_arc_b, show, at, flip, Color(0.86, 0.22, 0.16, alpha))
+	var puff_i := 0
+	while puff_i < _puffs.size():
+		var puff: Sprite2D = _puffs[puff_i]
+		var lit := show and blaze > 0.0
+		if not lit:
+			puff.visible = false
+			puff_i += 1
+			continue
+		var along: float = 1.0 - clampf(slash / 0.28, 0.0, 1.0)
+		var t: float = float(puff_i) / 7.0
+		if t > along + 0.02:
+			puff.visible = false
+			puff_i += 1
+			continue
+		var tex: Texture2D = SkillFx.texture("en")
+		if tex == null:
+			puff.visible = false
+			puff_i += 1
+			continue
+		puff.visible = true
+		if puff.texture != tex:
+			puff.texture = tex
+		var frame: int = puff_i % SkillFx.FRAMES
+		puff.region_rect = SkillFx.region("en", frame)
+		var px: float = facing * (16.0 + t * 96.0)
+		var py: float = -8.0 - sin(t * PI) * 40.0
+		var cell: Vector2 = puff.region_rect.size
+		puff.position = Vector2(px - 34.0, py - 46.0)
+		if cell.x > 0.0 and cell.y > 0.0:
+			puff.scale = Vector2(68.0 / cell.x, 84.0 / cell.y)
+		puff_i += 1
+
+
+func _place_arc(sprite: Sprite2D, show: bool, at: Vector2, flip: float, tint: Color) -> void:
+	if sprite == null:
+		return
+	sprite.visible = show
+	if not show:
+		return
+	sprite.position = at
+	sprite.scale = Vector2(flip, 1.0)
+	sprite.modulate = tint
+
+
+func _sync_muzzle() -> void:
+	var show := muzzle > 0.0 and alive
+	if _muzzle_glow != null:
+		_muzzle_glow.visible = show
+	if _muzzle_core != null:
+		_muzzle_core.visible = show
+	if not show:
+		return
+	var alpha := clampf(muzzle / 0.2, 0.0, 1.0)
+	var at := Vector2(facing * 34.0, -16.0)
+	var rad: float = 8.0 + alpha * 14.0
+	if _muzzle_glow != null:
+		_muzzle_glow.position = at
+		_muzzle_glow.scale = Vector2.ONE * (rad / Stamp.disc_r)
+		_muzzle_glow.modulate = Color(1, 0.95, 0.7, alpha * 0.9)
+	if _muzzle_core != null:
+		_muzzle_core.position = at
+		_muzzle_core.scale = Vector2.ONE * (4.0 / Stamp.disc_r)
+		_muzzle_core.modulate = Color("fff6c8")
+
+
+func _sync_ailment() -> void:
+	var chalk_on := bone_t > 0.0 and alive
+	var numb_on := numb > 0.0 and alive
+	if _bone != null:
+		_bone.visible = chalk_on
+		if chalk_on:
+			var blink: float = 0.2 + 0.8 * absf(sin(bob_time * 16.0))
+			var chalk_a: float = clampf(bone_t / 0.9, 0.0, 1.0) * blink
+			_bone.modulate = Color(0.96, 0.94, 0.88, chalk_a)
+	if _numb != null:
+		_numb.visible = numb_on
+		if numb_on:
+			var ring_a: float = 0.28 + 0.22 * sin(bob_time * 6.0)
+			_numb.modulate = Color(0.62, 0.9, 0.7, ring_a)
 
 
 func _sync_aura() -> void:
@@ -556,36 +824,3 @@ func _sync_aura() -> void:
 	_aura.region_rect = SkillFx.region("en", frame)
 	_aura.position = Vector2(0.0, -36.0)
 	_aura.scale = Vector2(1.62, 1.62)
-
-
-func _draw_slash() -> void:
-	var alpha := clampf(slash / 0.28, 0.0, 1.0)
-	var center := Vector2(facing * 22.0, -22.0)
-	var start := -1.2
-	var finish := 1.15
-	if facing < 0.0:
-		start = PI - 1.15
-		finish = PI + 1.2
-	draw_arc(center, 58.0, start, finish, 18, Color(1, 0.94, 0.72, alpha), 10.0)
-	draw_arc(center, 42.0, start, finish, 14, Color(0.86, 0.22, 0.16, alpha), 5.0)
-	if blaze <= 0.0:
-		return
-	var along: float = 1.0 - clampf(slash / 0.28, 0.0, 1.0)
-	var puff: int = 0
-	while puff < 8:
-		var t: float = float(puff) / 7.0
-		if t > along + 0.02:
-			puff += 1
-			continue
-		var px: float = facing * (16.0 + t * 96.0)
-		var py: float = -8.0 - sin(t * PI) * 40.0
-		var frame: int = puff % SkillFx.FRAMES
-		SkillFx.blit(self, "en", frame, Rect2(px - 34.0, py - 46.0, 68.0, 84.0), false, Color(1, 1, 1, 1))
-		puff += 1
-
-
-func _draw_muzzle() -> void:
-	var alpha := clampf(muzzle / 0.2, 0.0, 1.0)
-	var at := Vector2(facing * 34.0, -16.0)
-	draw_circle(at, 8.0 + alpha * 14.0, Color(1, 0.95, 0.7, alpha * 0.9))
-	draw_circle(at, 4.0, Color("fff6c8"))

@@ -9,6 +9,7 @@ extends Node2D
 # Copyright (c) 2026 00GameDevs (@00vchannel)
 # Ported and adapted for this battle under the MIT License.
 
+const Stamp = preload("res://scripts/stamp_bake.gd")
 const CRYSTAL_SHADER: Shader = preload("res://shaders/ice_crystal.gdshader")
 const SHEET_SHADER: Shader = preload("res://shaders/ice_sheet.gdshader")
 const GLINT_SHADER: Shader = preload("res://shaders/ice_glint.gdshader")
@@ -109,6 +110,7 @@ static func play(host: Node, from_x: float, road_ys: Array, blow_dir: float, rea
 
 
 func setup(blow_dir: float, reach: float, full_reach: float, road_ys: Array) -> void:
+	_bank()
 	blow = 1.0
 	if blow_dir < 0.0:
 		blow = -1.0
@@ -118,9 +120,6 @@ func setup(blow_dir: float, reach: float, full_reach: float, road_ys: Array) -> 
 	if full_reach > 1.0 and span > full_reach:
 		span = full_reach
 	rand_state = SEED
-	crystal_mat = ShaderMaterial.new()
-	crystal_mat.shader = CRYSTAL_SHADER
-	crystal_mat.set_shader_parameter("rim_gain", 1.15)
 	var road_i: int = 0
 	while road_i < road_ys.size():
 		_build_road(road_i, float(road_ys[road_i]))
@@ -413,8 +412,10 @@ func _burst_spire(sp: Dictionary, force: float) -> void:
 		if at.y > ceiling:
 			at.y = ceiling
 		var px_s: float = chip_s * UNIT_PX
+		var chip_sprite: Sprite2D = _mesh_sprite(Stamp.chip, Stamp.chip_offset, 14 + int(sp["road"]) * 40, false)
 		shards.append({
 			"on": true,
+			"sprite": chip_sprite,
 			"x": at.x,
 			"y": at.y,
 			"vx": (blow * vz_w + vx_w * 0.85) * UNIT_PX,
@@ -444,13 +445,10 @@ func _present() -> void:
 		_place_rune(road["rune"], road_y)
 		_place_mists(road["mists"], road_y)
 		_place_sparks(road["sparks"], road_y)
-		var ink: Node = road["ink"]
-		if ink != null and is_instance_valid(ink):
-			ink.queue_redraw()
-		var burst: Node = road["burst"]
-		if burst != null and is_instance_valid(burst):
-			burst.queue_redraw()
+		_place_pillars(road)
+		_place_shock(road)
 		r += 1
+	_place_shards()
 
 
 func _place_frost(node: Variant, road_y: float) -> void:
@@ -534,6 +532,78 @@ func _place_sparks(sparks: Array, road_y: float) -> void:
 				sprite.scale = Vector2(px / tex_n, px / tex_n)
 				sprite.modulate = Color(1.0, 1.0, 1.0, fade)
 		k += 1
+
+
+func _place_pillars(road: Dictionary) -> void:
+	var spires: Array = road["spires"]
+	var pillars: Array = road["pillars"]
+	var count: int = mini(spires.size(), pillars.size())
+	var s: int = 0
+	while s < count:
+		var sp: Dictionary = spires[s]
+		var raw_sprite: Variant = pillars[s]
+		if not (raw_sprite is Sprite2D):
+			s += 1
+			continue
+		var sprite: Sprite2D = raw_sprite
+		var show: bool = show_spires and float(sp["sy"]) > 0.04 and float(sp["sxz"]) > 0.04
+		var xf: Transform2D = Transform2D()
+		if show:
+			xf = _pillar(sp)
+			if absf(xf.y.y) < 6.0:
+				show = false
+		sprite.visible = show
+		if show:
+			Stamp.apply_mesh(sprite, xf, Stamp.crystal_px)
+			var lift: float = flash * 0.55
+			sprite.modulate = Color(1.0 + lift, 1.0 + lift * 0.35, 1.0 + lift * 0.55, 1.0)
+		s += 1
+
+
+func _place_shock(road: Dictionary) -> void:
+	var raw_shock: Variant = road.get("shock", null)
+	if not (raw_shock is Sprite2D):
+		return
+	var sprite: Sprite2D = raw_shock
+	var show: bool = shock_alpha >= 0.02 and Stamp.shock != null
+	sprite.visible = show
+	if not show:
+		return
+	var radius_px: float = shock_radius * (span / MAX_LEN)
+	sprite.position = Vector2(blow * 0.48 * span, float(road["y"]))
+	sprite.rotation = 0.0
+	var sc: float = radius_px / maxf(Stamp.shock_ref, 1.0)
+	sprite.scale = Vector2(sc, sc)
+	sprite.modulate = Color(1.0, 1.0, 1.0, shock_alpha)
+
+
+func _place_shards() -> void:
+	var n: int = 0
+	while n < shards.size():
+		var sh: Dictionary = shards[n]
+		var raw_sprite: Variant = sh.get("sprite", null)
+		if not (raw_sprite is Sprite2D):
+			n += 1
+			continue
+		var sprite: Sprite2D = raw_sprite
+		var show: bool = bool(sh["on"])
+		var shrink: float = 1.0
+		if show:
+			var life: float = float(sh["life"])
+			var limit: float = maxf(float(sh["max"]), 0.001)
+			var ratio: float = life / limit
+			if ratio > 0.65:
+				shrink = maxf(0.001, 1.0 - (ratio - 0.65) / 0.35)
+			if shrink <= 0.02:
+				show = false
+		sprite.visible = show
+		if show:
+			var fit: Vector2 = Vector2(float(sh["sx"]) * shrink, float(sh["sy"]) * shrink)
+			var xf_s: Transform2D = Transform2D(float(sh["rot"]), fit, 0.0, Vector2(float(sh["x"]), float(sh["y"])))
+			Stamp.apply_mesh(sprite, xf_s, Stamp.chip_px)
+			var lift: float = flash * 0.55
+			sprite.modulate = Color(1.0 + lift, 1.0 + lift * 0.35, 1.0 + lift * 0.55, 1.0)
+		n += 1
 
 
 func paint_crystals(sheet: CanvasItem, road_i: int) -> void:
@@ -723,8 +793,8 @@ func _build_road(road_i: int, road_y: float) -> void:
 	var band: int = road_i * 40
 	var frost: Sprite2D = _sprite(frost_tex, sheet_mat, band)
 	var rune: Sprite2D = _sprite(rune_tex, glint_mat, band + 1)
-	var ink: IceSheet = _sheet(road_i, band + 10, false)
-	var burst: IceSheet = _sheet(road_i, band + 24, true)
+	var pillars: Array = []
+	var shock: Sprite2D = _mesh_sprite(Stamp.shock, Stamp.shock_offset, band + 24, true)
 	var spires: Array = []
 	var i: int = 0
 	while i < SPIRES:
@@ -760,6 +830,7 @@ func _build_road(road_i: int, road_y: float) -> void:
 		else:
 			roll = (_unit() - 0.5) * deg_to_rad(8.0)
 		var spin: float = _unit() * TAU
+		pillars.append(_mesh_sprite(Stamp.crystal, Stamp.crystal_offset, band + 12, false))
 		spires.append({
 			"road": road_i,
 			"road_y": road_y,
@@ -833,12 +904,26 @@ func _build_road(road_i: int, road_y: float) -> void:
 		"y": road_y,
 		"frost": frost,
 		"rune": rune,
-		"ink": ink,
-		"burst": burst,
+		"pillars": pillars,
+		"shock": shock,
 		"spires": spires,
 		"mists": mists,
 		"sparks": sparks,
 	})
+
+
+func _mesh_sprite(tex: Texture2D, tex_offset: Vector2, z: int, glow: bool) -> Sprite2D:
+	var sprite: Sprite2D = Sprite2D.new()
+	sprite.texture = tex
+	sprite.centered = true
+	sprite.offset = tex_offset
+	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	sprite.z_index = z
+	sprite.visible = false
+	if glow:
+		sprite.material = Stamp.glow_material()
+	add_child(sprite)
+	return sprite
 
 
 func _sprite(tex: Texture2D, mat: Material, z: int) -> Sprite2D:
@@ -885,6 +970,8 @@ static func _bank() -> void:
 		return
 	banked = true
 	_meshes()
+	Stamp.ensure()
+	Stamp.bake_ice(spike_pts, spike_out, chip_pts, chip_out)
 	frost_tex = _tex(_make_frost(160, 320))
 	rune_tex = _tex(_make_rune(192))
 	mist_tex = _tex(_make_mist(96))

@@ -3,6 +3,7 @@ extends Node2D
 const Buff = preload("res://scripts/level_buff.gd")
 const Painter = preload("res://scripts/painter.gd")
 const FrameBake = preload("res://scripts/frame_bake.gd")
+const Stamp = preload("res://scripts/stamp_bake.gd")
 
 const BERSERK_TOP := -22.0
 const BERSERK_BOTTOM := 20.0
@@ -1649,7 +1650,7 @@ func draw_bars(ci: Node2D) -> void:
 	_draw_heal_glow(ci)
 	_draw_cast_fx(ci)
 	if bone_t > 0.0 or numb > 0.0:
-		Painter.paint_ailment(ci, bone_t, numb, bob_time)
+		Stamp.paint_ailment(ci, bone_t, numb, bob_time)
 	if role == "drum" or role == "aria":
 		var note_ink := Color("f4efe4")
 		if role == "aria":

@@ -1,5 +1,7 @@
 extends Node2D
 
+const Stamp = preload("res://scripts/stamp_bake.gd")
+
 var battle = null
 var _was_drawing: bool = false
 
@@ -25,7 +27,8 @@ func _draw() -> void:
 			wobble = battle.battle_time
 		var drift := sin(wobble * 1.4 + at.x * 0.02) * 8.0
 		var rise := cos(wobble * 0.8 + at.y * 0.015) * 5.0
-		draw_circle(at + Vector2(drift, -10.0 + rise), 42.0, Color(0.62, 0.66, 0.68, 0.55 * fade))
-		draw_circle(at + Vector2(-16.0 - drift * 0.6, -36.0 + rise), 30.0, Color(0.78, 0.8, 0.82, 0.42 * fade))
-		draw_circle(at + Vector2(18.0 + drift * 0.4, -28.0 - rise * 0.5), 26.0, Color(0.9, 0.91, 0.9, 0.38 * fade))
-		draw_circle(at + Vector2(drift * 0.3, -58.0 - rise), 22.0, Color(0.84, 0.86, 0.86, 0.34 * fade))
+		Stamp.ensure()
+		Stamp.disc(self, at + Vector2(drift, -10.0 + rise), 42.0, Color(0.62, 0.66, 0.68, 0.55 * fade))
+		Stamp.disc(self, at + Vector2(-16.0 - drift * 0.6, -36.0 + rise), 30.0, Color(0.78, 0.8, 0.82, 0.42 * fade))
+		Stamp.disc(self, at + Vector2(18.0 + drift * 0.4, -28.0 - rise * 0.5), 26.0, Color(0.9, 0.91, 0.9, 0.38 * fade))
+		Stamp.disc(self, at + Vector2(drift * 0.3, -58.0 - rise), 22.0, Color(0.84, 0.86, 0.86, 0.34 * fade))

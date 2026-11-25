@@ -1,5 +1,7 @@
 extends RefCounted
 
+const Stamp = preload("res://scripts/stamp_bake.gd")
+
 # Baked sheet for Enhancement. Explosion, Light smashing, and Freezing
 # are not painted: the bomb is explosion_vfx.gd, the slash is slash_vfx.gd,
 # the ice pillars are ice_vfx.gd. FROST_WIND still times the lock sound.
@@ -85,15 +87,8 @@ static func draw_glow(ci: CanvasItem, bursts: Array, _slashes: Array, hazards: A
 
 
 static func draw_aim(ci: CanvasItem, at: Vector2, radius: float) -> void:
-	if radius < 4.0:
-		return
-	var wash := Color("c44536")
-	wash.a = 0.34
-	ci.draw_circle(at, radius, wash)
-	ci.draw_arc(at, radius, 0.0, TAU, 72, Color("1c140e"), 11.0, true)
-	ci.draw_arc(at, maxf(4.0, radius - 9.0), 0.0, TAU, 72, Color("e6c36a"), 5.0, true)
-	ci.draw_circle(at, 7.0, Color("1c140e"))
-	ci.draw_circle(at, 3.2, Color("fff6c8"))
+	Stamp.ensure()
+	Stamp.aim(ci, at, radius)
 
 
 static func draw_world(ci: CanvasItem, bursts: Array, _slashes: Array) -> void:
@@ -366,18 +361,9 @@ static func _unit(seed: int) -> float:
 		n = -n
 	n = (n * 1103515245 + 12345) % 2147483647
 	return float(n % 10000) / 10000.0
-static func _flame(ci: CanvasItem, base: Vector2, tall: float, half: float, hot: Color, core: Color) -> void:
-	var tip: Vector2 = base + Vector2(half * 0.15, -tall)
-	_fill_ink(ci, PackedVector2Array([
-		base + Vector2(-half, 0.0),
-		base + Vector2(half, 0.0),
-		tip,
-	]), hot)
-	_poly(ci, PackedVector2Array([
-		base + Vector2(-half * 0.34, -tall * 0.22),
-		base + Vector2(half * 0.28, -tall * 0.22),
-		tip + Vector2(0.0, tall * 0.4),
-	]), core)
+static func _flame(ci: CanvasItem, base: Vector2, tall: float, _half: float, hot: Color, _core: Color) -> void:
+	Stamp.ensure()
+	Stamp.paint_flame(ci, base, tall, hot.to_html(false) == "e07a28")
 
 
 static func _curve(ci: CanvasItem, a: Vector2, b: Vector2, c: Vector2, width: float, color: Color, segs: int, t0: float, t1: float) -> void:
@@ -537,35 +523,39 @@ static func _draw_cast_gather(ci: CanvasItem, at: Vector2, id: String, along: fl
 		ring = Color(0.7, 0.88, 1.0, 0.9)
 		mote = Color(0.92, 0.98, 1.0, 0.96)
 		wide = 2.6
+	Stamp.ensure()
 	var radius := lerpf(62.0, 12.0, along) * (0.9 + 0.1 * pulse)
 	var disc := wash
 	disc.a = wash.a * (0.75 + 0.45 * pulse)
 	if disc.a > 0.28:
 		disc.a = 0.28
-	ci.draw_circle(at, radius * 0.55, disc)
+	Stamp.disc(ci, at, radius * 0.55, disc)
 	var band := ring
 	band.a = 0.4 + 0.45 * pulse
-	ci.draw_arc(at, radius, 0.0, TAU, 28, band, wide, true)
-	if id == "ls":
-		ci.draw_arc(at, radius * 0.72, 0.5, TAU - 0.4, 22, mote, 1.5, true)
-	elif id == "fz":
-		ci.draw_arc(at, radius * 0.64, 0.8, TAU - 0.6, 20, mote, 1.3, true)
+	Stamp.ring(ci, at, radius, band)
+	if id == "ls" and Stamp.arc_ls != null:
+		var ls_side: float = radius * 0.72 / 40.0 * float(Stamp.arc_ls.get_width())
+		ci.draw_texture_rect(Stamp.arc_ls, Rect2(at.x - ls_side * 0.5, at.y - ls_side * 0.5, ls_side, ls_side), false, mote)
+	elif id == "fz" and Stamp.arc_fz != null:
+		var fz_side: float = radius * 0.64 / 40.0 * float(Stamp.arc_fz.get_width())
+		ci.draw_texture_rect(Stamp.arc_fz, Rect2(at.x - fz_side * 0.5, at.y - fz_side * 0.5, fz_side, fz_side), false, mote)
 	var n := 0
 	while n < count:
 		var ang := TAU * float(n) / float(count) - along * 3.4
 		var dist := lerpf(radius, 8.0, along * 0.9)
 		var spot := at + Vector2(cos(ang) * dist, sin(ang) * dist * 0.72)
 		var rad := wide * (0.7 + 0.45 * pulse)
-		ci.draw_circle(spot, rad, mote)
+		Stamp.disc(ci, spot, rad, mote)
 		n += 1
 	var core := mote
 	core.a = 0.18 + 0.55 * along * pulse
-	ci.draw_circle(at, lerpf(11.0, 4.0, along), core)
+	Stamp.disc(ci, at, lerpf(11.0, 4.0, along), core)
 
 
 static func _draw_cast_flames(ci: CanvasItem, feet: Vector2, along: float, pulse: float) -> void:
+	Stamp.ensure()
 	var glow := Color(1.0, 0.42, 0.08, 0.1 + 0.1 * pulse)
-	ci.draw_circle(feet + Vector2(0.0, -36.0), 26.0 + along * 10.0, glow)
+	Stamp.disc(ci, feet + Vector2(0.0, -36.0), 26.0 + along * 10.0, glow)
 	var n := 0
 	while n < 5:
 		var spread := float(n) - 2.0
@@ -575,9 +565,9 @@ static func _draw_cast_flames(ci: CanvasItem, feet: Vector2, along: float, pulse
 		var base := Vector2(x, feet.y - 6.0 - along * 10.0)
 		var hot := Color(1.0, 0.36, 0.06, 0.78)
 		var tip := Color(1.0, 0.86, 0.38, 0.92)
-		ci.draw_circle(base, 6.5, Color(hot.r, hot.g, hot.b, 0.45))
-		ci.draw_circle(base + Vector2(0.0, -climb * 0.45), 4.6, hot)
-		ci.draw_circle(base + Vector2(0.0, -climb), 2.8, tip)
+		Stamp.disc(ci, base, 6.5, Color(hot.r, hot.g, hot.b, 0.45))
+		Stamp.disc(ci, base + Vector2(0.0, -climb * 0.45), 4.6, hot)
+		Stamp.disc(ci, base + Vector2(0.0, -climb), 2.8, tip)
 		n += 1
 
 
