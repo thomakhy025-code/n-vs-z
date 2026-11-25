@@ -11,6 +11,7 @@ const MangaScript = preload("res://scripts/manga.gd")
 const DuelGift = preload("res://scripts/duel_gift.gd")
 const Early = preload("res://scripts/early_roster.gd")
 const DemoScript = preload("res://scripts/unlock_demo.gd")
+const SkillReward = preload("res://scripts/skill_reward.gd")
 const DragScroll = preload("res://scripts/drag_scroll.gd")
 
 const SAVE_PATH := "user://progress.cfg"
@@ -2389,7 +2390,8 @@ func _claim_skill(id: String) -> void:
 	if not BattleScript.is_skill(id) or _pending_mark() <= 0:
 		return
 	var mark := _pending_mark()
-	if not upgrades.has(id):
+	var fresh := not upgrades.has(id)
+	if fresh:
 		upgrades[id] = 1
 	else:
 		var rank := _rank_of(id)
@@ -2399,6 +2401,21 @@ func _claim_skill(id: String) -> void:
 	_save_progress()
 	var follow := skill_follow
 	skill_follow = Callable()
+	if fresh:
+		_show_skill_reward(id, follow)
+		return
+	_continue_skill(follow)
+
+
+func _show_skill_reward(id: String, follow: Callable) -> void:
+	var reward = SkillReward.new()
+	reward.skill_id = id
+	reward.skill_title = BattleScript.skill_name(id)
+	reward.finished.connect(_continue_skill.bind(follow), CONNECT_ONE_SHOT)
+	add_child(reward)
+
+
+func _continue_skill(follow: Callable) -> void:
 	if follow.is_valid():
 		follow.call()
 	elif screen == "skill":
