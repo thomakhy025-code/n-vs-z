@@ -425,9 +425,9 @@ func _paint_meter(ci: CanvasItem) -> void:
 	ci.draw_rect(Rect2(-34, bar_y, 68, 8), Color(0, 0, 0, 0.65))
 	var fill := Color("7dce6a") if ratio > 0.35 else Color("e24b3b")
 	ci.draw_rect(Rect2(-34, bar_y, 68.0 * ratio, 8), fill)
-	var font: Font = ThemeDB.fallback_font
+	var font: Font = Tr.font()
 	if font != null:
-		var title := "CLAN" if side == 0 or clan_gate else ("ARMY" if _human_army() else "CURSE")
+		var title := Tr.t("CLAN" if side == 0 or clan_gate else ("ARMY" if _human_army() else "CURSE"))
 		ci.draw_string(font, Vector2(-22, bar_y - 6.0), title, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color("f3e6c8"))
 
 

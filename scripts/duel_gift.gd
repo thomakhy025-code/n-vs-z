@@ -210,15 +210,15 @@ func _burst(at: Vector2, turn_u: float, cheer: float, fade: float) -> void:
 
 
 func _words(_box_at: Vector2, gift_u: float, turn_u: float, cheer: float, fade: float) -> void:
-	var font := ThemeDB.fallback_font
+	var font := Tr.font()
 	if font == null:
 		return
 	var spot := Vector2(size.x * 0.2, size.y * 0.16)
-	_plate(font, "Congratulations", spot, 36, gift_u * fade, Color("fff4d2"))
+	_plate(font, Tr.t("Congratulations"), spot, 36, gift_u * fade, Color("fff4d2"))
 	if turn_u <= 0.15:
 		return
 	var gold := Color("f3e6c8").lerp(Color("e6c36a"), cheer)
-	_plate(font, "1 vs 1 is open", Vector2(size.x * 0.46, size.y * 0.3), 28, clampf(turn_u, 0.0, 1.0) * fade, gold)
+	_plate(font, Tr.t("1 vs 1 is open"), Vector2(size.x * 0.46, size.y * 0.3), 28, clampf(turn_u, 0.0, 1.0) * fade, gold)
 
 
 func _plate(font: Font, text: String, anchor: Vector2, px: int, alpha: float, ink: Color) -> void:

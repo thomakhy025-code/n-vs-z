@@ -226,12 +226,12 @@ func _arc(tex: Texture2D, radius: float, spin: float, tint: Color, at: Vector2, 
 
 
 func _title(anchor: Vector2, fade: float) -> void:
-	var font: Font = ThemeDB.fallback_font
+	var font: Font = Tr.font()
 	if font == null:
 		return
-	var shown := skill_title
+	var shown := Tr.t(skill_title)
 	if shown == "":
-		shown = "Skill"
+		shown = Tr.t("Skill")
 	var arrive := clampf(age / 0.2, 0.0, 1.0) * fade
 	if arrive <= 0.02:
 		return
@@ -241,7 +241,7 @@ func _title(anchor: Vector2, fade: float) -> void:
 	while name_size.x > wide - 72.0 and name_px > 36:
 		name_px -= 2
 		name_size = font.get_string_size(shown, HORIZONTAL_ALIGNMENT_LEFT, -1, name_px)
-	var caption := "Unlocked"
+	var caption := Tr.t("Unlocked")
 	var cap_px := 28
 	var cap_size := font.get_string_size(caption, HORIZONTAL_ALIGNMENT_LEFT, -1, cap_px)
 	var plate_w := maxf(name_size.x, cap_size.x) + 64.0

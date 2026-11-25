@@ -45,16 +45,19 @@ func _draw() -> void:
 	var wall := box.x * 0.76
 	draw_rect(Rect2(wall, ground - 168.0, 92.0, 168.0), Color("3a2c24"))
 	draw_rect(Rect2(wall - 16.0, ground - 196.0, 124.0, 34.0), Color("2a211c"))
-	var font := ThemeDB.fallback_font
+	var font := Tr.font()
 	if font != null:
-		draw_string(font, Vector2(40, 48), Early.name_of(kind), HORIZONTAL_ALIGNMENT_LEFT, box.x - 80.0, 32, Color("f3e6c8"))
-		var y := box.y - 96.0
-		for piece in Early.line(kind).split(". ", false):
-			var shown := str(piece)
-			if not shown.ends_with("."):
-				shown += "."
-			draw_string(font, Vector2(40, y), shown, HORIZONTAL_ALIGNMENT_LEFT, box.x - 80.0, 20, Color("f4efe4"))
-			y += 26.0
+		draw_string(font, Vector2(40, 48), Tr.t(Early.name_of(kind)), HORIZONTAL_ALIGNMENT_LEFT, box.x - 80.0, 32, Color("f3e6c8"))
+		if Tr.lang == "zh":
+			draw_multiline_string(font, Vector2(40, box.y - 148.0), Tr.t(Early.line(kind)), HORIZONTAL_ALIGNMENT_LEFT, box.x - 80.0, 20, 4, Color("f4efe4"))
+		else:
+			var y := box.y - 96.0
+			for piece in Early.line(kind).split(". ", false):
+				var shown := str(piece)
+				if not shown.ends_with("."):
+					shown += "."
+				draw_string(font, Vector2(40, y), shown, HORIZONTAL_ALIGNMENT_LEFT, box.x - 80.0, 20, Color("f4efe4"))
+				y += 26.0
 	if kind == "howler":
 		_draw_howler(box, ground, wall)
 	else:
@@ -93,9 +96,9 @@ func _draw_howler(box: Vector2, ground: float, wall: float) -> void:
 	_actor(Painter.look("sword"), _pose(sword_phase, sword_t, clock), Vector2(sword_x, ground), 1.0, 2.7)
 	_actor(Painter.look("howler"), _pose(howler_phase, 0.6, clock, howler_hang), howler_at, -1.0, 2.5)
 	if clock >= 1.35 and clock < 2.05:
-		var font := ThemeDB.fallback_font
+		var font := Tr.font()
 		if font != null:
-			draw_string(font, Vector2(sword_x - 20.0, ground - 150.0), "miss", HORIZONTAL_ALIGNMENT_LEFT, 120.0, 22, Color("f0d2a0"))
+			draw_string(font, Vector2(sword_x - 20.0, ground - 150.0), Tr.t("miss"), HORIZONTAL_ALIGNMENT_LEFT, 120.0, 22, Color("f0d2a0"))
 	if clock >= 2.9:
 		var archer_at := Vector2(box.x * 0.16, ground)
 		var shot := "idle"
@@ -104,9 +107,9 @@ func _draw_howler(box: Vector2, ground: float, wall: float) -> void:
 			shot = "act"
 			shot_t = clampf((clock - 3.35) / 0.8, 0.0, 1.0)
 		_actor(Painter.look("archer"), _pose(shot, shot_t, clock), archer_at, 1.0, 2.7)
-		var font2 := ThemeDB.fallback_font
+		var font2 := Tr.font()
 		if font2 != null:
-			draw_string(font2, Vector2(archer_at.x - 28.0, ground - 150.0), "Archer", HORIZONTAL_ALIGNMENT_LEFT, 140.0, 18, Color("d7ecd8"))
+			draw_string(font2, Vector2(archer_at.x - 28.0, ground - 150.0), Tr.t("Archer"), HORIZONTAL_ALIGNMENT_LEFT, 140.0, 18, Color("d7ecd8"))
 		if clock >= 3.7 and clock <= 4.45:
 			var fly := clampf((clock - 3.7) / 0.55, 0.0, 1.0)
 			var from := archer_at + Vector2(36.0, -48.0)

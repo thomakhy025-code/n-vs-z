@@ -24,8 +24,9 @@ func _process(delta: float) -> void:
 
 
 func _draw() -> void:
-	var font: Font = ThemeDB.fallback_font
+	var font: Font = Tr.font()
 	if font == null:
 		return
-	draw_string(font, Vector2(-16, 1), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color(0, 0, 0, 0.85))
-	draw_string(font, Vector2(-17, 0), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, color)
+	var shown := Tr.t(text)
+	draw_string(font, Vector2(-16, 1), shown, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color(0, 0, 0, 0.85))
+	draw_string(font, Vector2(-17, 0), shown, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, color)

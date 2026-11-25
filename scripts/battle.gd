@@ -287,9 +287,9 @@ func begin_duel(local_ids: Array, other_ids: Array, side: int, runs_world: bool,
 	foe.driven = local_side == 0 and not duel_probe
 	controlled = foe if local_side == 1 else hero
 	if level_label != null:
-		level_label.text = "1 vs 1"
+		level_label.text = Tr.t("1 vs 1")
 	if hint != null:
-		hint.text = "The stick moves your hero. The match runs until a gate falls."
+		hint.text = Tr.t("The stick moves your hero. The match runs until a gate falls.")
 	_bind_duel_signals()
 	if duel_probe:
 		Engine.time_scale = 8.0
@@ -415,21 +415,25 @@ func _build_hud() -> void:
 	player_track.set_meta("bar", true)
 	if not duel:
 		pause_btn = Button.new()
-		pause_btn.text = "Pause"
+		pause_btn.text = Tr.t("Pause")
+		pause_btn.set_meta("en", "Pause")
 		pause_btn.focus_mode = Control.FOCUS_NONE
 		UiSkin.apply(pause_btn, Color("f3e6c8"), 16)
 		pause_btn.pressed.connect(_toggle_pause)
 		note_board.add_child(pause_btn)
 		home_btn = Button.new()
-		home_btn.text = "Home"
+		home_btn.text = Tr.t("Home")
+		home_btn.set_meta("en", "Home")
 		home_btn.focus_mode = Control.FOCUS_NONE
 		UiSkin.apply(home_btn, Color("e6c36a"), 16)
 		home_btn.pressed.connect(_go_home)
 		note_board.add_child(home_btn)
 	sword_btn = Button.new()
-	sword_btn.text = "SWORD"
+	sword_btn.text = Tr.t("SWORD")
+	sword_btn.set_meta("en", "SWORD")
 	shoot_btn = Button.new()
-	shoot_btn.text = "SHOOT"
+	shoot_btn.text = Tr.t("SHOOT")
+	shoot_btn.set_meta("en", "SHOOT")
 	UiSkin.apply(sword_btn, Color("c44536"), 28, Color("f3e6c8"))
 	UiSkin.apply(shoot_btn, Color("343e78"), 28, Color("f3e6c8"))
 	sword_btn.button_down.connect(func() -> void: sword_hold = true)
@@ -441,7 +445,7 @@ func _build_hud() -> void:
 	for entry_id in loadout:
 		var entry: Dictionary = Catalog.find_in(player_roster, str(entry_id))
 		var btn := Button.new()
-		btn.text = "%s\n%d" % [entry["short"], int(entry["cost"])]
+		btn.text = Tr.t("%s\n%d" % [entry["short"], int(entry["cost"])])
 		var cloth: Color = Painter.look(str(entry["paint"]))["cloth"]
 		UiSkin.apply(btn, cloth, 16, _ink(cloth))
 		btn.set_meta("slot_short", str(entry["short"]))
@@ -1029,8 +1033,9 @@ func _note_side_full() -> void:
 	if down_label != null:
 		var watched = controlled if controlled != null else hero
 		if watched == null or watched.alive:
-			if down_label.text != "Field is full":
-				down_label.text = "Field is full"
+			var full_text := Tr.t("Field is full")
+			if down_label.text != full_text:
+				down_label.text = full_text
 	_paint_slots()
 
 
@@ -1052,13 +1057,13 @@ func _paint_slots() -> void:
 		var shown := ""
 		var tint := Color.WHITE
 		if cd > 0.0:
-			shown = "%s\n%.1fs" % [short_name, cd]
+			shown = Tr.t("%s\n%.1fs" % [short_name, cd])
 			tint = Color(0.62, 0.62, 0.68)
 		elif at_cap:
-			shown = "%s\nFULL" % short_name
+			shown = Tr.t("%s\nFULL" % short_name)
 			tint = Color(0.85, 0.55, 0.45)
 		else:
-			shown = "%s\n%d" % [short_name, cost]
+			shown = Tr.t("%s\n%d" % [short_name, cost])
 			if player_value < float(cost):
 				tint = Color(0.75, 0.62, 0.58)
 		if btn.text != shown:
@@ -1136,7 +1141,7 @@ func _coin_board_text() -> String:
 		var raw = host.get("coins")
 		if raw != null:
 			purse = int(raw)
-	var text := "Coins  %d" % purse
+	var text := Tr.t("Coins  %d" % purse)
 	if duel or host == null or not host.has_method("hold_hud"):
 		return text
 	var rate := str(host.hold_hud(level_no))
@@ -1676,7 +1681,7 @@ func _begin_trial() -> void:
 			trial_left += 1
 	float_text(Vector2(enemy_front - 40.0, lane_y(1) - 78.0), "NINE", Color("7dce6a"))
 	if hint != null:
-		hint.text = "Their gate is open. Kill the nine."
+		hint.text = Tr.t("Their gate is open. Kill the nine.")
 
 
 func _summon_boss() -> void:
@@ -1693,7 +1698,7 @@ func _summon_boss() -> void:
 	_spawn(entry, 1)
 	float_text(Vector2(enemy_front - 30.0, lane_y(1) - 78.0), "GENERAL", Color("e6c36a"))
 	if hint != null:
-		hint.text = "The general walks. The level ends when the general dies."
+		hint.text = Tr.t("The general walks. The level ends when the general dies.")
 
 
 func _finish_battle(defender_side: int, from_gate: bool = false) -> void:
@@ -1804,26 +1809,26 @@ func _present_end(defender_side: int) -> void:
 	if duel:
 		won = defender_side != local_side
 	var title := "Their gate breaks" if won else "Your gate has fallen"
-	var body := "Your gate broke. Call them again, or choose who you bring."
+	var body := Tr.t("Your gate broke. Call them again, or choose who you bring.")
 	if str(rules.get("faction", "")) == "monster" and won and not duel:
 		title = "The cursed gate breaks"
 	if duel:
 		title = "Their gate falls" if won else "Your gate has fallen"
-		body = "The other clan is broken." if won else "Your gate broke. Fight the same six, or choose again."
+		body = Tr.t("The other clan is broken.") if won else Tr.t("Your gate broke. Fight the same six, or choose again.")
 	elif won:
 		var lesson := str(rules.get("lesson", ""))
 		if lesson != "":
 			var learned := Catalog.find_in(player_roster, lesson)
 			title = "The clan learns"
-			body = "%s can be called now." % str(learned.get("name", "A new soldier"))
+			body = Tr.t("%s can be called now." % str(learned.get("name", "A new soldier")))
 		elif boss_up:
 			title = "The general falls"
-			body = "The soldiers fall back."
+			body = Tr.t("The soldiers fall back.")
 		elif level_no >= Levels.count():
 			title = "The war"
-			body = "Monsters and soldiers fight each other. The road stops on the cliff."
+			body = Tr.t("Monsters and soldiers fight each other. The road stops on the cliff.")
 		else:
-			body = "The road is clear."
+			body = Tr.t("The road is clear.")
 		var host := get_parent()
 		if host != null and host.has_method("coin_line"):
 			var paid := str(host.coin_line())
@@ -1831,7 +1836,7 @@ func _present_end(defender_side: int) -> void:
 				body += " " + paid
 		if level_no < Levels.count():
 			var nxt: Dictionary = Levels.level(level_no + 1)
-			body += " Level %d, %s, is open." % [int(nxt["index"]), str(nxt["name"])]
+			body += Tr.t(" Level %d, %s, is open." % [int(nxt["index"]), str(nxt["name"])])
 	elif not duel:
 		var payer := get_parent()
 		if payer != null and payer.has_method("held_line"):
@@ -1969,7 +1974,8 @@ func _overlay(title: String, body: String, buttons: Array, lines: PackedStringAr
 	scroll.add_child(copy)
 	for spec in buttons:
 		var btn := Button.new()
-		btn.text = str(spec["text"])
+		btn.text = Tr.t(str(spec["text"]))
+		btn.set_meta("en", str(spec["text"]))
 		btn.custom_minimum_size = Vector2(280, 48)
 		btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		UiSkin.apply(btn, spec["color"], 20, _ink(spec["color"]))
@@ -1984,13 +1990,14 @@ func _update_hud(delta: float) -> void:
 		return
 	var player_ratio: float = float(player_gate.hp) / float(player_gate.max_hp)
 	var enemy_ratio: float = float(enemy_gate.hp) / float(enemy_gate.max_hp)
-	var player_hp_text := "Clan gate  %d" % int(round(player_gate.hp))
-	var enemy_hp_text := "Cursed gate  %d" % int(round(enemy_gate.hp))
+	var player_hp_text := Tr.t("Clan gate  %d" % int(round(player_gate.hp)))
+	var enemy_hp_text := Tr.t("Cursed gate  %d" % int(round(enemy_gate.hp)))
 	if duel:
-		player_hp_text = "Left clan  %d" % int(round(player_gate.hp))
-		enemy_hp_text = "Right clan  %d" % int(round(enemy_gate.hp))
-		if level_label != null and level_label.text != "1 vs 1":
-			level_label.text = "1 vs 1"
+		player_hp_text = Tr.t("Left clan  %d" % int(round(player_gate.hp)))
+		enemy_hp_text = Tr.t("Right clan  %d" % int(round(enemy_gate.hp)))
+		var duel_title := Tr.t("1 vs 1")
+		if level_label != null and level_label.text != duel_title:
+			level_label.text = duel_title
 	if player_hp_label.text != player_hp_text:
 		player_hp_label.text = player_hp_text
 	if enemy_hp_label.text != enemy_hp_text:
@@ -1999,7 +2006,7 @@ func _update_hud(delta: float) -> void:
 	if hp_hot != _hud_hp_hot:
 		_hud_hp_hot = hp_hot
 		player_hp_label.add_theme_color_override("font_color", Color("ffb4a8") if hp_hot else Color("f3e6c8"))
-	var value_text := "Value  %d    ·    %s" % [int(floor(player_value)), income_line(_shown_income())]
+	var value_text := Tr.t("Value  %d    ·    %s" % [int(floor(player_value)), income_line(_shown_income())])
 	if value_label.text != value_text:
 		value_label.text = value_text
 	if coin_label != null:
@@ -2007,7 +2014,7 @@ func _update_hud(delta: float) -> void:
 		if coin_label.text != coin_text:
 			coin_label.text = coin_text
 	if level_label != null and not duel:
-		var level_text := "Level %d  ·  %s" % [level_no, str(rules["name"])]
+		var level_text := Tr.t("Level %d  ·  %s" % [level_no, str(rules["name"])])
 		if level_label.text != level_text:
 			level_label.text = level_text
 		if _hud_level_size != 18:
@@ -2028,11 +2035,11 @@ func _update_hud(delta: float) -> void:
 	var watched = controlled if controlled != null else hero
 	var down_text := ""
 	if duel and paused and not finished:
-		down_text = "Paused"
+		down_text = Tr.t("Paused")
 	elif watched != null and not watched.alive:
-		down_text = "Hero returns in %.1f" % maxf(watched.down_timer, 0.0)
+		down_text = Tr.t("Hero returns in %.1f" % maxf(watched.down_timer, 0.0))
 	elif full_note > 0.0:
-		down_text = "Field is full"
+		down_text = Tr.t("Field is full")
 	if down_label.text != down_text:
 		down_label.text = down_text
 	if full_note > 0.0:
@@ -2533,7 +2540,7 @@ func _build_skill_buttons() -> void:
 		if not owns_skill(id, side):
 			continue
 		var btn := Button.new()
-		btn.text = skill_name(id)
+		btn.text = Tr.t(skill_name(id))
 		btn.focus_mode = Control.FOCUS_NONE
 		btn.clip_text = true
 		btn.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -2595,9 +2602,9 @@ func _paint_skills() -> void:
 		if not is_instance_valid(skill_btn):
 			continue
 		var skill_id := str(skill_btn.get_meta("skill_id", ""))
-		var shown := skill_name(skill_id)
+		var shown := Tr.t(skill_name(skill_id))
 		if cooling:
-			shown = "%s\n%.1fs" % [shown, shown_left]
+			shown = Tr.t("%s\n%.1fs" % [skill_name(skill_id), shown_left])
 		if skill_btn.text != shown:
 			skill_btn.text = shown
 		if skill_btn.disabled != cooling:

@@ -35,7 +35,7 @@ static func apply(btn: Button, bg: Color, font_px: int, ink: Color = Color("1c14
 
 static func label(text: String, size: int, color: Color) -> Label:
 	var node := Label.new()
-	node.text = text
+	node.text = Tr.t(text)
 	node.add_theme_font_size_override("font_size", size)
 	node.add_theme_color_override("font_color", color)
 	return node

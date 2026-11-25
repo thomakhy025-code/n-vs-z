@@ -1107,34 +1107,34 @@ func _speed(rect: Rect2) -> void:
 func _speech(rect: Rect2, speech: String) -> void:
 	if speech == "":
 		return
-	var shown := _typed(speech)
+	var shown := _typed(Tr.t(speech))
 	var box := Rect2(rect.position.x + 24.0, rect.position.y + 18.0, minf(420.0, rect.size.x * 0.46), 72.0)
 	draw_rect(box, Color("fff8ea"))
 	draw_rect(Rect2(box.position, Vector2(box.size.x, 3.0)), INK)
 	draw_rect(Rect2(box.position, Vector2(3.0, box.size.y)), INK)
 	draw_rect(Rect2(Vector2(box.position.x, box.end.y - 3.0), Vector2(box.size.x, 3.0)), INK)
 	draw_rect(Rect2(Vector2(box.end.x - 3.0, box.position.y), Vector2(3.0, box.size.y)), INK)
-	var font := ThemeDB.fallback_font
+	var font := Tr.font()
 	if font == null:
 		return
 	draw_string(font, box.position + Vector2(14.0, 40.0), shown, HORIZONTAL_ALIGNMENT_LEFT, box.size.x - 28.0, 22, INK)
 
 
 func _caption(view: Vector2, caption: String) -> void:
-	var font := ThemeDB.fallback_font
+	var font := Tr.font()
 	if font == null:
 		return
-	var shown := _typed(caption)
+	var shown := _typed(Tr.t(caption))
 	var top := view.y - 118.0
 	draw_multiline_string(font, Vector2(40.0, top), shown, HORIZONTAL_ALIGNMENT_LEFT, view.x - 80.0, 22, 28, Color("f3e6c8"))
 
 
 func _hint(view: Vector2) -> void:
-	var font := ThemeDB.fallback_font
+	var font := Tr.font()
 	if font == null:
 		return
 	var last := index + 1 >= panels.size()
-	var word := "Continue" if last else "Tap"
+	var word := Tr.t("Continue" if last else "Tap")
 	draw_string(font, Vector2(view.x - 180.0, view.y - 28.0), word, HORIZONTAL_ALIGNMENT_RIGHT, 150.0, 16, Color("e6c36a"))
 
 

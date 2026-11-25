@@ -57,6 +57,7 @@ var duel_celebrated: bool = false
 var duel_celebrate: bool = false
 var story_version: int = Story.VERSION
 var story_seen: Dictionary = {}
+var saved_lang: String = "en"
 var early_fresh: bool = false
 var intros: Dictionary = {}
 var story_layer: CanvasLayer = null
@@ -541,12 +542,13 @@ func _show_menu() -> void:
 	panel.add_theme_stylebox_override("panel", UiSkin.panel(Color("1a1614"), Color("e6c36a"), 22, 4))
 	root.add_child(panel)
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 6)
+	box.add_theme_constant_override("separation", 4)
 	panel.add_child(box)
-	var title := UiSkin.label("Home", 40, Color("f3e6c8"))
+	var title := UiSkin.label("Home", 32, Color("f3e6c8"))
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(title)
+	box.add_child(_lang_row())
 	var night := UiSkin.label("The clan gate, after dark.", 16, Color("e7c07a"))
 	night.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	night.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -604,6 +606,45 @@ func _show_menu() -> void:
 		box.add_child(_menu_button("Code", Color("c4a574"), _show_code, 420, 18))
 	box.add_child(_screen_quit_row())
 	_begin_duel_gift(root)
+
+
+func _lang_row() -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 12)
+	var en_on := Tr.lang != "zh"
+	var en := _menu_button("English", Color("e6c36a") if en_on else Color("f3e6c8"), func() -> void: _choose_lang("en"), 204, 16)
+	en.custom_minimum_size = Vector2(204, 40)
+	en.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var zh := _menu_button("繁體中文", Color("e6c36a") if not en_on else Color("f3e6c8"), func() -> void: _choose_lang("zh"), 204, 16)
+	zh.custom_minimum_size = Vector2(204, 40)
+	zh.add_theme_font_override("font", Tr.cjk())
+	zh.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(en)
+	row.add_child(zh)
+	return row
+
+
+func _choose_lang(code: String) -> void:
+	var next := "en"
+	if code == "zh":
+		next = "zh"
+	if Tr.lang == next:
+		return
+	Tr.set_lang(next)
+	saved_lang = next
+	_apply_lang_font()
+	_save_progress()
+	_show_menu()
+
+
+func _apply_lang_font() -> void:
+	if Tr.lang == "zh":
+		var face := Tr.cjk()
+		if face != null:
+			add_theme_font_override("font", face)
+	else:
+		remove_theme_font_override("font")
 
 
 func _home_pair(left_text: String, left_color: Color, left_call: Callable, right_text: String, right_color: Color, right_call: Callable) -> HBoxContainer:
@@ -732,7 +773,7 @@ func _show_code() -> void:
 	note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	note.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	if _web_touch():
-		hint.text = "Tap the white box, type letters and numbers, then press Redeem."
+		hint.text = Tr.t("Tap the white box, type letters and numbers, then press Redeem.")
 		var gap := Control.new()
 		gap.custom_minimum_size = Vector2(0, 64)
 		gap.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -751,7 +792,7 @@ func _show_code() -> void:
 		_open_web_code()
 		return
 	var field := LineEdit.new()
-	field.placeholder_text = "Code"
+	field.placeholder_text = Tr.t("Code")
 	field.max_length = 32
 	field.alignment = HORIZONTAL_ALIGNMENT_CENTER
 	field.custom_minimum_size = Vector2(0, 52)
@@ -796,10 +837,15 @@ func _web_touch() -> bool:
 	return int(touch) == 1
 
 
+func _web_phrase(script: String, word: String) -> String:
+	var shown := Tr.t(word).replace("'", "").replace("\\", "")
+	return script.replace("'" + word + "'", "'" + shown + "'")
+
+
 func _open_web_code() -> void:
 	if not OS.has_feature("web"):
 		return
-	JavaScriptBridge.eval(WEB_CODE_OPEN, true)
+	JavaScriptBridge.eval(_web_phrase(WEB_CODE_OPEN, "Code"), true)
 
 
 func _close_web_code() -> void:
@@ -812,7 +858,7 @@ func _close_web_code() -> void:
 func _open_web_name() -> void:
 	if not OS.has_feature("web"):
 		return
-	JavaScriptBridge.eval(WEB_NAME_OPEN, true)
+	JavaScriptBridge.eval(_web_phrase(WEB_NAME_OPEN, "Name"), true)
 
 
 func _close_web_name() -> void:
@@ -876,7 +922,7 @@ func _accept_tester(note: Label) -> bool:
 		if _accept_vip(VIP_CODE, note):
 			gift_line = note.text
 	_save_progress()
-	note.text = "This save is a tester. 1 vs 1 is open."
+	note.text = Tr.t("This save is a tester. 1 vs 1 is open.")
 	if gift_line != "":
 		note.text += " " + gift_line
 	note.add_theme_color_override("font_color", Color("1c140e"))
@@ -887,17 +933,17 @@ func _accept_tester(note: Label) -> bool:
 
 func _accept_vip(typed: String, note: Label) -> bool:
 	if typed != VIP_CODE:
-		note.text = "That code does not pay."
+		note.text = Tr.t("That code does not pay.")
 		note.add_theme_color_override("font_color", Color("8a2e28"))
 		return false
 	if code_paid:
-		note.text = "That code is already used."
+		note.text = Tr.t("That code is already used.")
 		note.add_theme_color_override("font_color", Color("8a2e28"))
 		return false
 	code_paid = true
 	diamonds += VIP_DIAMONDS
 	_save_progress()
-	note.text = "◆  %d diamonds added." % VIP_DIAMONDS
+	note.text = Tr.t("◆  %d diamonds added." % VIP_DIAMONDS)
 	note.add_theme_color_override("font_color", Color("1c140e"))
 	if OS.has_feature("web"):
 		JavaScriptBridge.eval("var el=document.getElementById('nvsz-code');if(el){el.value='';}window.__nvCode='';", true)
@@ -1131,9 +1177,9 @@ func _show_foes() -> void:
 		_refresh_auto()
 		var stake := _pay_of(chosen_level)
 		var source := "from your last clear" if level_pay.has(chosen_level) else "of this level"
-		var note := "%d left. One press pays the %d coins %s." % [auto_left, stake, source]
+		var note := Tr.t("%d left. One press pays the %d coins %s." % [auto_left, stake, source])
 		if auto_left < AUTO_STOCK:
-			note += " " + _auto_wait_text()
+			note += " " + Tr.t(_auto_wait_text())
 		var hint := UiSkin.label(note, 16, Color("2c2118"))
 		hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -1274,20 +1320,20 @@ func _foe_detail_text(entry: Dictionary, kind: String) -> String:
 	var reach := float(entry.get("reach", 0.0))
 	var speed := float(entry.get("speed", 0.0))
 	var lines: PackedStringArray = PackedStringArray()
-	lines.append("Blood  %d" % int(entry.get("hp", 0)))
-	lines.append("Damage  %d" % int(entry.get("damage", 0)))
-	lines.append("Attacking distance  %s · %s. How close a foe must be before this one steps in." % [_num(distance), _reach_words(distance)])
-	lines.append("Attacking range  %s · %s. How far the blow itself lands." % [_num(reach), _reach_words(reach)])
-	lines.append("Speed  %s · %s" % [_num(speed), _speed_word(speed)])
-	lines.append("Time between strikes  %ss" % _num(float(entry.get("interval", 0.0))))
+	lines.append(Tr.t("Blood  %d" % int(entry.get("hp", 0))))
+	lines.append(Tr.t("Damage  %d" % int(entry.get("damage", 0))))
+	lines.append(Tr.t("Attacking distance  %s · %s. How close a foe must be before this one steps in." % [_num(distance), _reach_words(distance)]))
+	lines.append(Tr.t("Attacking range  %s · %s. How far the blow itself lands." % [_num(reach), _reach_words(reach)]))
+	lines.append(Tr.t("Speed  %s · %s" % [_num(speed), _speed_word(speed)]))
+	lines.append(Tr.t("Time between strikes  %ss" % _num(float(entry.get("interval", 0.0)))))
 	var foe_id := str(entry.get("id", ""))
 	if kind == "road" and foe_id != "ling":
-		lines.append("The other gate spends %d value, then waits %ss." % [int(entry.get("cost", 0)), _num(float(entry.get("cooldown", 0.0)))])
+		lines.append(Tr.t("The other gate spends %d value, then waits %ss." % [int(entry.get("cost", 0)), _num(float(entry.get("cooldown", 0.0)))]))
 	if int(entry.get("bounty", 0)) > 0 and kind != "boss":
-		lines.append("Beating one pays %d value." % int(entry.get("bounty", 0)))
+		lines.append(Tr.t("Beating one pays %d value." % int(entry.get("bounty", 0))))
 	lines.append("")
-	lines.append("Special skill")
-	lines.append(_foe_skill(entry, kind))
+	lines.append(Tr.t("Special skill"))
+	lines.append(Tr.t(_foe_skill(entry, kind)))
 	return "\n".join(lines)
 
 
@@ -1376,7 +1422,7 @@ func _foe_skill(entry: Dictionary, kind: String) -> String:
 			return "Strikes one fighter on its own road."
 
 
-func _open_page(heading: String) -> VBoxContainer:
+func _open_page(heading: String, as_written: bool = false) -> VBoxContainer:
 	_clear_screens()
 	var root := Control.new()
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -1407,7 +1453,11 @@ func _open_page(heading: String) -> VBoxContainer:
 	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	box.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	panel.add_child(box)
-	var title := UiSkin.label(heading, 32, Color("1c140e"))
+	var shown := heading
+	if not as_written:
+		shown = Tr.t(heading)
+	var title := UiSkin.label("", 32, Color("1c140e"))
+	title.text = shown
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(title)
@@ -1594,28 +1644,28 @@ func _refresh_cards() -> void:
 		card_panels[id].add_theme_stylebox_override("panel", UiSkin.panel(bg, border, 12, 5 if selected else 3))
 	if count_label != null:
 		if _squad_need() == 6:
-			count_label.text = "Chosen %d / 6" % loadout.size()
+			count_label.text = Tr.t("Chosen %d / 6" % loadout.size())
 		else:
-			count_label.text = "Chosen %d" % loadout.size()
+			count_label.text = Tr.t("Chosen %d" % loadout.size())
 		if _squad_ok() and not loadout.is_empty():
 			count_label.text += "  ·  " + _loadout_names()
 	if detail_label != null:
 		if last_id == "":
-			detail_label.text = "Tap a soldier to read what they do. Tap a chosen soldier again to remove them."
+			detail_label.text = Tr.t("Tap a soldier to read what they do. Tap a chosen soldier again to remove them.")
 		else:
 			var entry := Catalog.find_in(roster, last_id)
-			detail_label.text = str(entry["detail"])
+			detail_label.text = Tr.t(str(entry["detail"]))
 	if start_button != null:
 		start_button.disabled = not _squad_ok()
 	if picking_duel and duel_sent and count_label != null:
-		count_label.text = "Waiting for the other ninja."
+		count_label.text = Tr.t("Waiting for the other ninja.")
 
 
 func _loadout_names() -> String:
 	var names: PackedStringArray = PackedStringArray()
 	for id in loadout:
 		var entry := Catalog.find_in(roster, str(id))
-		names.append(str(entry["short"]))
+		names.append(Tr.t(str(entry["short"])))
 	return "  ".join(names)
 
 
@@ -1714,9 +1764,9 @@ func _set_favourites() -> void:
 	if detail_label == null:
 		return
 	if favourites.is_empty():
-		detail_label.text = "Favourites cleared."
+		detail_label.text = Tr.t("Favourites cleared.")
 	else:
-		detail_label.text = "Favourites saved."
+		detail_label.text = Tr.t("Favourites saved.")
 
 
 func _apply_favourites() -> void:
@@ -1732,7 +1782,7 @@ func _apply_favourites() -> void:
 			break
 	if picked.is_empty():
 		if detail_label != null:
-			detail_label.text = "No favourites can join this fight."
+			detail_label.text = Tr.t("No favourites can join this fight.")
 		return
 	loadout = picked
 	_refresh_cards()
@@ -2101,24 +2151,24 @@ func hold_hud(level_index: int) -> String:
 	var shown := str(int(rate))
 	if not is_equal_approx(rate, float(int(rate))):
 		shown = "%.1f" % rate
-	var text := "+%s coins each second" % shown
+	var text := Tr.t("+%s coins each second" % shown)
 	if held_now > 0:
-		text += " · held %d" % held_now
+		text += Tr.t(" · held %d" % held_now)
 	return text
 
 
 func held_line() -> String:
 	if held_now <= 0:
 		return ""
-	return "Held +%d coins before the gate fell." % held_now
+	return Tr.t("Held +%d coins before the gate fell." % held_now)
 
 
 func coin_line() -> String:
 	var line := ""
 	if last_clear_coins > 0:
-		line = "Time %s. %s. +%d coins." % [_format_time(last_clear_time), last_clear_band, last_clear_coins]
+		line = Tr.t("Time %s. %s. +%d coins." % [_format_time(last_clear_time), last_clear_band, last_clear_coins])
 	if held_now > 0:
-		var held := "Held +%d coins while the gate stood." % held_now
+		var held := Tr.t("Held +%d coins while the gate stood." % held_now)
 		if line == "":
 			return held
 		return line + " " + held
@@ -2529,18 +2579,18 @@ func _paint_upgrade_row(row: HBoxContainer) -> void:
 	var price := row.find_child("RankPrice", true, false) as Label
 	var button := row.find_child("RankPay", true, false) as Button
 	if title != null:
-		title.text = _rank_heading(who, id, rank)
+		title.text = Tr.t(_rank_heading(who, id, rank))
 	var cost := 0
 	var pay := "Rank 20. Nothing left to pay."
 	if rank < 20:
 		cost = _rank_cost(rank)
 		pay = "Rank %d costs %d coins" % [rank + 1, cost]
 	if price != null:
-		price.text = pay
+		price.text = Tr.t(pay)
 	if button == null:
 		return
 	button.disabled = rank >= 20 or coins < cost
-	button.text = "Full" if rank >= 20 else "%d coins" % cost
+	button.text = Tr.t("Full") if rank >= 20 else Tr.t("%d coins" % cost)
 
 
 func _paint_upgrade_page() -> bool:
@@ -2548,7 +2598,7 @@ func _paint_upgrade_page() -> bool:
 	var list := find_child("UpgradeList", true, false) as VBoxContainer
 	if purse == null or list == null or list.get_node_or_null("UpgradeReset") == null:
 		return false
-	purse.text = "Coins  %d" % coins
+	purse.text = Tr.t("Coins  %d" % coins)
 	for child in list.get_children():
 		if child is HBoxContainer and str(child.name) != "UpgradeReset":
 			_paint_upgrade_row(child)
@@ -2625,12 +2675,16 @@ func _make_reset_row() -> VBoxContainer:
 	row.add_child(words)
 	var button := ResetPayButton.new()
 	button.name = "ResetPay"
-	button.text = RESET_LABEL
+	button.text = Tr.t(RESET_LABEL)
+	button.set_meta("en", RESET_LABEL)
 	var color := Color("c44536")
 	UiSkin.apply(button, color, 16, Color("f3e6c8"))
-	var font := ThemeDB.fallback_font
-	var text_size: Vector2 = font.get_string_size(button.text, HORIZONTAL_ALIGNMENT_LEFT, -1, 16)
-	button.custom_minimum_size = Vector2(maxf(280.0, text_size.x + 40.0), 52)
+	var font := Tr.font()
+	var wide := 280.0
+	if font != null:
+		var text_size: Vector2 = font.get_string_size(button.text, HORIZONTAL_ALIGNMENT_LEFT, -1, 16)
+		wide = maxf(280.0, text_size.x + 40.0)
+	button.custom_minimum_size = Vector2(wide, 52)
 	button.size_flags_horizontal = Control.SIZE_SHRINK_END
 	button.pressed.connect(func() -> void:
 		Sfx.play("click", 1.0, -6.0)
@@ -2687,19 +2741,19 @@ func _paint_reset_row(row: VBoxContainer) -> void:
 			confirm.visible = false
 		var kind: String = str(row.get_meta("reset_kind", "idle"))
 		if kind == "poor":
-			note.text = "You need 500 diamonds."
+			note.text = Tr.t("You need 500 diamonds.")
 			return
 		if kind == "done":
 			var back: int = int(row.get_meta("reset_back", 0))
-			note.text = "%d coins came back." % back
+			note.text = Tr.t("%d coins came back." % back)
 			return
-		note.text = "Returns the coins spent on ranks and sets every rank to 1."
+		note.text = Tr.t("Returns the coins spent on ranks and sets every rank to 1.")
 		return
 	var back_coins: int = _upgrade_refund()
-	note.text = "This will return %d coins and set every rank to 1." % back_coins
+	note.text = Tr.t("This will return %d coins and set every rank to 1." % back_coins)
 	if confirm == null:
 		return
-	confirm.text = "Confirm reset · 500 diamonds\n%d coins come back. Every rank returns to 1." % back_coins
+	confirm.text = Tr.t("Confirm reset · 500 diamonds\n%d coins come back. Every rank returns to 1." % back_coins)
 	confirm.visible = true
 
 
@@ -2915,6 +2969,8 @@ func _load_progress() -> void:
 		var stored_story: int = int(cfg.get_value("progress", "story_version", 0))
 		story_version = stored_story
 		story_seen = _unpack_seen(str(cfg.get_value("progress", "story_seen", "")))
+		var lang_code := str(cfg.get_value("progress", "lang", "en"))
+		saved_lang = "zh" if lang_code == "zh" else "en"
 		intros = _unpack_intros(str(cfg.get_value("progress", "intros", "")))
 		for key in story_seen.keys():
 			var seen_id := str(key)
@@ -2947,6 +3003,9 @@ func _load_progress() -> void:
 	_apply_skins()
 	if paid or _navy_dirty or migrated or duel_mark or (early_fresh and not _harness()):
 		_save_progress()
+	if not _harness():
+		Tr.set_lang(saved_lang)
+		_apply_lang_font()
 
 
 func _normalize_progress() -> void:
@@ -3017,6 +3076,10 @@ func _save_progress() -> void:
 	cfg.set_value("progress", "best_rank", best_rank)
 	cfg.set_value("progress", "story_version", story_version)
 	cfg.set_value("progress", "story_seen", _pack_seen(story_seen))
+	var lang_out := saved_lang
+	if not _harness():
+		lang_out = Tr.lang
+	cfg.set_value("progress", "lang", lang_out)
 	if not _harness():
 		Early.ensure()
 	if Early.unlocks.has("walker"):
@@ -3065,7 +3128,7 @@ func _account_line() -> String:
 			who = Cloud.email
 		if who == "":
 			who = "Google"
-		return "Saved to Google · " + who
+		return Tr.t("Saved to Google · ") + who
 	return "Playing as guest. Progress stays on this device."
 
 
@@ -3244,7 +3307,7 @@ func _show_name() -> void:
 	box.add_child(note)
 	name_note = note
 	if _web_touch():
-		hint.text = "Tap the white box, type 2 to 16 letters and numbers, then press Set name."
+		hint.text = Tr.t("Tap the white box, type 2 to 16 letters and numbers, then press Set name.")
 		var gap := Control.new()
 		gap.custom_minimum_size = Vector2(0, 64)
 		gap.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -3259,7 +3322,7 @@ func _show_name() -> void:
 		box.add_child(again)
 	else:
 		var field := LineEdit.new()
-		field.placeholder_text = "Name"
+		field.placeholder_text = Tr.t("Name")
 		field.max_length = 16
 		field.custom_minimum_size = Vector2(420, 52)
 		field.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
@@ -3293,7 +3356,7 @@ func _keep_name_text(text: String, field: LineEdit) -> void:
 func _commit_name(raw: String, note: Label) -> void:
 	var clean := _clean_name(raw)
 	if clean.length() < 2:
-		note.text = "Use 2 to 16 letters and numbers."
+		note.text = Tr.t("Use 2 to 16 letters and numbers.")
 		return
 	game_name = clean
 	if cleared > rank_cleared:
@@ -3368,8 +3431,8 @@ func _paint_rank(fetch: bool) -> void:
 			var tag := _rank_tag(_whole(row.get("best_rank", 0), 0))
 			var line := "%d   %s" % [place, str(row.get("name", ""))]
 			if tag != "":
-				line += "   " + tag
-			line += "\n%s   %s" % [_road_name(_whole(row.get("cleared", 0), 0)), _format_time(_seconds(row.get("clear_time", 0.0)))]
+				line += "   " + Tr.t(tag)
+			line += "\n" + Tr.t(_road_name(_whole(row.get("cleared", 0), 0))) + "   " + Tr.t(_format_time(_seconds(row.get("clear_time", 0.0))))
 			var entry := _menu_button(line, Color("f3e6c8"), _open_ranked.bind(row.duplicate(true)), 420, 16)
 			entry.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			entry.clip_text = false
@@ -3413,23 +3476,25 @@ func _show_profile(row: Dictionary, from_rank: bool) -> void:
 	screen = "profile"
 	var title := _clean_name(str(viewing.get("name", "")))
 	if title == "":
-		title = "Profile"
+		title = Tr.t("Profile")
 	if own:
-		title += "   ·   Hero rank %d" % _rank_of("hero")
-	var box := _open_page(title)
+		title += Tr.t("   ·   Hero rank %d" % _rank_of("hero"))
+	var box := _open_page(title, true)
 	var tag := _rank_tag(_whole(viewing.get("best_rank", 0), 0))
 	var place := _whole(viewing.get("place", 0), 0)
-	var line := tag
+	var line := ""
+	if tag != "":
+		line = Tr.t(tag)
 	if place > 0:
-		var place_text: String = "Place %d" % place
+		var place_text: String = Tr.t("Place %d" % place)
 		line = place_text if line == "" else line + "   " + place_text
 	elif line == "":
-		line = "Not ranked yet"
+		line = Tr.t("Not ranked yet")
 	var rank_label := UiSkin.label(line, 22, Color("6b3a32"))
 	rank_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	rank_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(rank_label)
-	var road := UiSkin.label(_road_name(_whole(viewing.get("cleared", 0), 0)) + "   " + _format_time(_seconds(viewing.get("clear_time", 0.0))), 16, Color("1c140e"))
+	var road := UiSkin.label(Tr.t(_road_name(_whole(viewing.get("cleared", 0), 0))) + "   " + Tr.t(_format_time(_seconds(viewing.get("clear_time", 0.0)))), 16, Color("1c140e"))
 	road.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	road.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(road)
@@ -3813,7 +3878,8 @@ func _screen_quit_row() -> HBoxContainer:
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.add_theme_constant_override("separation", 12)
 	var full := Button.new()
-	full.text = "Full screen"
+	full.text = Tr.t("Full screen")
+	full.set_meta("en", "Full screen")
 	full.disabled = false
 	full.mouse_filter = Control.MOUSE_FILTER_STOP
 	full.custom_minimum_size = Vector2(204, 52)
@@ -3957,7 +4023,7 @@ func _join_duel() -> void:
 func _on_lobby() -> void:
 	if screen != "duel" or duel_status == null or not is_instance_valid(duel_status):
 		return
-	duel_status.text = Net.status
+	duel_status.text = Tr.t(Net.status)
 	if duel_code != null and is_instance_valid(duel_code) and Net.code != "" and duel_code.text != Net.code:
 		duel_code.text = Net.code
 		duel_code.release_focus()
@@ -3994,7 +4060,7 @@ func _ready_duel() -> void:
 	if start_button != null:
 		start_button.disabled = true
 	if count_label != null:
-		count_label.text = "Waiting for the other ninja."
+		count_label.text = Tr.t("Waiting for the other ninja.")
 	Net.announce_loadout(loadout.duplicate(), _worn_ids(), saber_worn == "navy", _pack_ranks(), duel_mode)
 
 
@@ -4313,8 +4379,10 @@ func _control_meta(node: Node, key: String) -> Control:
 
 
 func _button_named(node: Node, text: String) -> Button:
-	if node is Button and (node as Button).text == text:
-		return node as Button
+	if node is Button:
+		var button := node as Button
+		if button.text == text or str(button.get_meta("en", "")) == text:
+			return button
 	for child in node.get_children():
 		var found := _button_named(child, text)
 		if found != null:
@@ -4379,7 +4447,8 @@ func _duel_button() -> Button:
 	var open := _duel_is_open()
 	var showing := open and not _duel_gift_pending()
 	var button := LockButton.new()
-	button.text = "1 vs 1"
+	button.text = Tr.t("1 vs 1")
+	button.set_meta("en", "1 vs 1")
 	button.locked = not showing
 	button.custom_minimum_size = Vector2(420, 52)
 	var color := Color("7d9a6a") if showing else Color("d9d0c3")
@@ -4397,7 +4466,8 @@ func _duel_button() -> Button:
 
 func _menu_button(text: String, color: Color, action: Callable, wide: float = 280.0, font_px: int = 22) -> Button:
 	var button := Button.new()
-	button.text = text
+	button.text = Tr.t(text)
+	button.set_meta("en", text)
 	button.custom_minimum_size = Vector2(wide, 52)
 	var lum := color.r * 0.3 + color.g * 0.59 + color.b * 0.11
 	UiSkin.apply(button, color, font_px, Color("1c140e") if lum > 0.62 else Color("f3e6c8"))
@@ -4530,8 +4600,9 @@ class HomeYard:
 		var plaque := Rect2(foot.x - 54.0, foot.y - 28.0, 108.0, 36.0)
 		draw_rect(plaque, Color("1a1614"))
 		draw_rect(Rect2(plaque.position.x, plaque.position.y, plaque.size.x, 3.0), Color("e6c36a"))
-		var font := ThemeDB.fallback_font
-		draw_string(font, plaque.position + Vector2(10.0, 25.0), "◆  %d" % diamonds, HORIZONTAL_ALIGNMENT_LEFT, 90.0, 18, Color("f4e2b0"))
+		var font := Tr.font()
+		if font != null:
+			draw_string(font, plaque.position + Vector2(10.0, 25.0), Tr.t("◆  %d" % diamonds), HORIZONTAL_ALIGNMENT_LEFT, 90.0, 18, Color("f4e2b0"))
 
 	func _window(at: Vector2) -> void:
 		draw_rect(Rect2(at.x - 16.0, at.y - 18.0, 32.0, 36.0), Color("2a1e18"))
