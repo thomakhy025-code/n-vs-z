@@ -128,8 +128,10 @@ static func apply_token(text: String) -> bool:
 
 
 static func name_of(id: String) -> String:
+	if id == "boss":
+		return "General"
 	var entry := Catalog.find_in(Catalog.enemy_roster(), id)
-	var label := str(entry.get("name", id))
+	var label := str(entry.get("name", ""))
 	if label == "":
 		return id
 	return label
@@ -155,6 +157,44 @@ static func line(id: String) -> String:
 			return "Storm. Lightning hits one fighter, then jumps to four others, one by one."
 		"oni":
 			return "Oni. A heavy blow hits everyone in range on its road."
+		"moth":
+			return "Moth. It flies on one road. A short blade cannot reach it."
+		"elder":
+			return "Elder. It appears on the road, strikes whoever is nearest, and then it fades."
+		"glut":
+			return "Glut. It eats the fighter in front, then sits and heals."
+		"brood":
+			return "Brood. It bites one fighter. When it dies, three Lings crawl out."
+		"ling":
+			return "Ling. A small fast biter that crawls out of Brood."
+		"knives":
+			return "Knives. It matches the sword soldier, and it strikes one fighter at short range."
+		"firebow":
+			return "Firebow. A hard shot, then fire stays on that spot."
+		"fan":
+			return "Fan. It blows its road and pushes the fighters in front back."
+		"ward":
+			return "Ward. A great shield, and a great deal of blood."
+		"javelin":
+			return "Javelin. It throws long shots, then fights up close."
+		"drum":
+			return "Drum. It deals no damage. It lifts three allies at once."
+		"crow":
+			return "Crow. It waits, then the first strike is heavy. After that it fights up close."
+		"cow":
+			return "Cow. It waits, then it charges. After that it fights up close, slower than the crow."
+		"smog":
+			return "Smog. It deals no damage. Smoke hides the road where it walks."
+		"buck":
+			return "Buck. It fires a shotgun, then it reloads."
+		"scope":
+			return "Scope. One long heavy shot, and it has little blood."
+		"aria":
+			return "Aria. The song lifts every ally on every road."
+		"bomber":
+			return "Bomber. It is fragile, and the hit is heavy."
+		"boss":
+			return "General. It walks out when the gate breaks. The level ends when the general dies."
 		_:
 			return name_of(id) + ". It strikes one fighter."
 

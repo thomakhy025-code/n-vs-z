@@ -138,10 +138,15 @@ func _draw_hit(box: Vector2, ground: float) -> void:
 			sword_phase = "hurt"
 			sword_t = 0.0
 	var foe_zoom := 2.7
-	if kind == "oni" or kind == "shell":
+	if kind == "oni" or kind == "shell" or kind == "boss" or kind == "glut":
 		foe_zoom = 2.05
+	elif kind == "ling":
+		foe_zoom = 1.55
+	var foe_y := ground
+	if kind == "moth":
+		foe_y = ground - 78.0
 	_actor(Painter.look("sword"), _pose(sword_phase, sword_t, clock), Vector2(sword_x, ground), 1.0, 2.7)
-	_actor(Painter.look(kind), _pose(foe_phase, foe_t, clock), Vector2(foe_x, ground), -1.0, foe_zoom)
+	_actor(Painter.look(_face()), _pose(foe_phase, foe_t, clock), Vector2(foe_x, foe_y), -1.0, foe_zoom)
 	if kind == "viper" and clock >= 2.2:
 		draw_arc(Vector2(sword_x, ground - 48.0), 28.0, 0.4, TAU - 0.2, 18, Color(0.62, 0.9, 0.7, 0.55), 2.4)
 	if kind == "storm" and clock >= 2.2 and clock < 4.2:
@@ -152,6 +157,12 @@ func _draw_hit(box: Vector2, ground: float) -> void:
 		draw_line(from, mid, Color(0.62, 0.86, 1.0, 0.9), 3.0)
 		draw_line(mid, tip, Color(1.0, 0.96, 0.78, 0.95), 2.2)
 		draw_circle(tip, 5.0, Color("fff6d0"))
+
+
+func _face() -> String:
+	if kind == "boss":
+		return "general"
+	return kind
 
 
 func _pose(phase: String, along: float, now: float, hang: float = 0.0) -> Dictionary:

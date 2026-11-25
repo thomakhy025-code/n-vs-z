@@ -57,6 +57,7 @@ var duel_celebrate: bool = false
 var story_version: int = Story.VERSION
 var story_seen: Dictionary = {}
 var early_fresh: bool = false
+var intros: Dictionary = {}
 var story_layer: CanvasLayer = null
 var diamonds: int = 0
 var coins: int = 0
@@ -327,9 +328,9 @@ func _harness() -> bool:
 func _maybe_demo() -> bool:
 	if picking_duel or _harness():
 		return false
-	if chosen_level < 1 or chosen_level > 19:
+	if chosen_level < 1 or chosen_level > Levels.count():
 		return false
-	var kind := Early.debut_on(chosen_level)
+	var kind := _next_intro()
 	if kind == "":
 		return false
 	_play_demo(kind)
@@ -347,10 +348,89 @@ func _play_demo(kind: String) -> void:
 
 
 func _on_demo_done(kind: String) -> void:
-	Early.mark_demo(kind)
+	_mark_intro(kind)
 	Sfx.hush()
 	_save_progress()
 	_show_foes()
+
+
+func _next_intro() -> String:
+	for item in _intro_roster(chosen_level):
+		var id := str(item)
+		if not _intro_seen(id):
+			return id
+	return ""
+
+
+func _intro_roster(level_index: int) -> Array:
+	var rules: Dictionary = Levels.level(level_index)
+	var ids: Array = []
+	var bag: Dictionary = {}
+	_intro_add(ids, bag, BattleScript.enemy_ids(level_index, rules, 0.0))
+	if bag.has("brood"):
+		_intro_add(ids, bag, ["ling"])
+	if bool(rules.get("boss", false)):
+		_intro_add(ids, bag, ["boss"])
+	return ids
+
+
+func _intro_add(ids: Array, bag: Dictionary, raw: Array) -> void:
+	for item in raw:
+		var id := str(item)
+		if id == "" or bag.has(id) or not _catalog_foe(id):
+			continue
+		bag[id] = true
+		ids.append(id)
+
+
+func _catalog_foe(id: String) -> bool:
+	return not Catalog.find_in(Catalog.enemy_roster(), id).is_empty()
+
+
+func _early_id(id: String) -> bool:
+	return Early.order().has(id)
+
+
+func _intro_seen(id: String) -> bool:
+	if _early_id(id):
+		return bool(Early.demos.get(id, false))
+	return bool(intros.get(id, false))
+
+
+func _mark_intro(id: String) -> void:
+	if id == "":
+		return
+	if _early_id(id):
+		Early.mark_demo(id)
+		return
+	if _catalog_foe(id):
+		intros[id] = true
+
+
+func _pack_intros() -> String:
+	var names: Array = []
+	for key in intros.keys():
+		var id := str(key)
+		if not bool(intros.get(id, false)) or _early_id(id) or not _catalog_foe(id):
+			continue
+		names.append(id)
+	names.sort()
+	var parts := PackedStringArray()
+	for item in names:
+		parts.append(str(item))
+	return ",".join(parts)
+
+
+func _unpack_intros(text: String) -> Dictionary:
+	var bag: Dictionary = {}
+	if text == "":
+		return bag
+	for part in text.split(",", false):
+		var id := str(part).strip_edges()
+		if id == "" or _early_id(id) or not _catalog_foe(id):
+			continue
+		bag[id] = true
+	return bag
 
 
 func _shot_flow() -> void:
@@ -2734,6 +2814,7 @@ func _set_duel_choice(mode: String) -> void:
 func _load_progress() -> void:
 	unlocked = 1
 	cleared = 0
+	intros = {}
 	duel_celebrated = false
 	duel_celebrate = false
 	diamonds = 0
@@ -2795,6 +2876,7 @@ func _load_progress() -> void:
 		var stored_story: int = int(cfg.get_value("progress", "story_version", 0))
 		story_version = stored_story
 		story_seen = _unpack_seen(str(cfg.get_value("progress", "story_seen", "")))
+		intros = _unpack_intros(str(cfg.get_value("progress", "intros", "")))
 		for key in story_seen.keys():
 			var seen_id := str(key)
 			if seen_id.begins_with("nv:"):
@@ -2902,6 +2984,7 @@ func _save_progress() -> void:
 		var early_token := Early.token()
 		if early_token != "":
 			cfg.set_value("progress", "early", early_token)
+	cfg.set_value("progress", "intros", _pack_intros())
 	cfg.set_value("progress", "duel_celebrated", duel_celebrated)
 	cfg.save(SAVE_PATH)
 	Cloud.push(_snapshot())
