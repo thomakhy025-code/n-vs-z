@@ -2,9 +2,9 @@ extends Node2D
 
 const Buff = preload("res://scripts/level_buff.gd")
 const Painter = preload("res://scripts/painter.gd")
-const SkillFx = preload("res://scripts/skill_fx.gd")
 const FrameBake = preload("res://scripts/frame_bake.gd")
 const Stamp = preload("res://scripts/stamp_bake.gd")
+const EnhanceFire = preload("res://scripts/enhance_fire.gd")
 
 var battle = null
 var side: int = 0
@@ -65,7 +65,7 @@ var frost_time: float = 0.0
 var blaze: float = 0.0
 var blaze_clock: float = 0.0
 var blaze_factor: float = 1.0
-var _aura: Sprite2D = null
+var _fire: Node2D = null
 var _body: Sprite2D = null
 var _flash_mat: ShaderMaterial = null
 var _sheet: Texture2D = null
@@ -82,7 +82,6 @@ var _muzzle_glow: Sprite2D = null
 var _muzzle_core: Sprite2D = null
 var _bone: Sprite2D = null
 var _numb: Sprite2D = null
-var _puffs: Array[Sprite2D] = []
 const RESPAWN: float = 6.0
 const HERO_SCALE: float = 1.42
 
@@ -547,6 +546,9 @@ func _build_picture() -> void:
 	_flash_mat = FrameBake.flash_material()
 	_body.material = _flash_mat
 	add_child(_body)
+	_fire = EnhanceFire.new()
+	_fire.z_index = 2
+	add_child(_fire)
 	_mark = _px(Vector2(-8, -78), Vector2(16, 3), Color("c44536"))
 	_bar = _px(Vector2(-26, -88), Vector2(52, 6), Color(0, 0, 0, 0.7))
 	_bar_fill = _px(Vector2(-26, -88), Vector2(52, 6), Color("f2d38a"))
@@ -565,17 +567,6 @@ func _build_picture() -> void:
 	_muzzle_core = _disc_sprite()
 	_bone = _mark_sprite(Stamp.bone_tex, Stamp.bone_offset)
 	_numb = _mark_sprite(Stamp.numb_tex, Stamp.numb_offset)
-	var puff_i := 0
-	while puff_i < 8:
-		var puff := Sprite2D.new()
-		puff.centered = false
-		puff.region_enabled = true
-		puff.visible = false
-		puff.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-		puff.z_index = 2
-		add_child(puff)
-		_puffs.append(puff)
-		puff_i += 1
 
 
 func _px(at: Vector2, size: Vector2, tint: Color) -> Sprite2D:
@@ -721,37 +712,6 @@ func _sync_slash() -> void:
 	var flip := -1.0 if facing < 0.0 else 1.0
 	_place_arc(_arc_a, show, at, flip, Color(1, 0.94, 0.72, alpha))
 	_place_arc(_arc_b, show, at, flip, Color(0.86, 0.22, 0.16, alpha))
-	var puff_i := 0
-	while puff_i < _puffs.size():
-		var puff: Sprite2D = _puffs[puff_i]
-		var lit := show and blaze > 0.0
-		if not lit:
-			puff.visible = false
-			puff_i += 1
-			continue
-		var along: float = 1.0 - clampf(slash / 0.28, 0.0, 1.0)
-		var t: float = float(puff_i) / 7.0
-		if t > along + 0.02:
-			puff.visible = false
-			puff_i += 1
-			continue
-		var tex: Texture2D = SkillFx.texture("en")
-		if tex == null:
-			puff.visible = false
-			puff_i += 1
-			continue
-		puff.visible = true
-		if puff.texture != tex:
-			puff.texture = tex
-		var frame: int = puff_i % SkillFx.FRAMES
-		puff.region_rect = SkillFx.region("en", frame)
-		var px: float = facing * (16.0 + t * 96.0)
-		var py: float = -8.0 - sin(t * PI) * 40.0
-		var cell: Vector2 = puff.region_rect.size
-		puff.position = Vector2(px - 34.0, py - 46.0)
-		if cell.x > 0.0 and cell.y > 0.0:
-			puff.scale = Vector2(68.0 / cell.x, 84.0 / cell.y)
-		puff_i += 1
 
 
 func _place_arc(sprite: Sprite2D, show: bool, at: Vector2, flip: float, tint: Color) -> void:
@@ -803,24 +763,55 @@ func _sync_ailment() -> void:
 
 
 func _sync_aura() -> void:
-	if blaze <= 0.0:
-		if _aura != null:
-			_aura.visible = false
+	if _fire == null:
 		return
-	var tex: Texture2D = SkillFx.texture("en")
-	if tex == null:
-		return
-	if _aura == null:
-		_aura = Sprite2D.new()
-		_aura.centered = true
-		_aura.z_index = -1
-		_aura.show_behind_parent = true
-		_aura.region_enabled = true
-		add_child(_aura)
-	_aura.visible = true
-	if _aura.texture != tex:
-		_aura.texture = tex
-	var frame: int = posmod(int(Time.get_ticks_msec() / 70), SkillFx.FRAMES)
-	_aura.region_rect = SkillFx.region("en", frame)
-	_aura.position = Vector2(0.0, -36.0)
-	_aura.scale = Vector2(1.62, 1.62)
+	var burning: bool = alive and blaze > 0.0
+	var bob: float = 0.0
+	if stepping and alive:
+		bob = sin(bob_time * 8.0) * 1.5
+	var rig: Dictionary = {}
+	if burning:
+		rig = Painter.blaze_rig(_sheet_look(), _baked_pose())
+	_fire.call("sync", burning, rig, facing, HERO_SCALE, bob)
+
+
+func _baked_pose() -> Dictionary:
+	var slot: int = _hero_slot()
+	var phase: String = "march"
+	var beat: int = 0
+	var along: float = 0.0
+	if slot >= 4:
+		phase = "act"
+		beat = slot - 4
+		if beat == 0:
+			along = 0.25
+		elif beat == 1:
+			along = 0.55
+		elif beat == 2:
+			along = 0.72
+		else:
+			along = 0.40
+	var pose: Dictionary = {
+		"phase": phase,
+		"t": along,
+		"clock": _slot_clock(slot),
+		"flash": 0.0,
+		"beat": beat,
+	}
+	if act_tool == "bow" and act > 0.0:
+		pose["tool"] = "bow"
+	return pose
+
+
+func _slot_clock(slot: int) -> float:
+	var idx: int = slot
+	if slot >= 4:
+		idx = slot - 4
+	var theta: float = 0.45
+	if idx == 1:
+		theta = 1.20
+	elif idx == 2:
+		theta = 3.59
+	elif idx == 3:
+		theta = 4.34
+	return theta / 8.0

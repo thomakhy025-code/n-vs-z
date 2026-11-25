@@ -1,7 +1,7 @@
 extends Node2D
 
-const SkillFx = preload("res://scripts/skill_fx.gd")
 const Stamp = preload("res://scripts/stamp_bake.gd")
+const EnhanceFire = preload("res://scripts/enhance_fire.gd")
 
 var velocity: Vector2 = Vector2.RIGHT
 var damage: float = 0.0
@@ -25,7 +25,7 @@ var trail: Array[Vector2] = []
 var _shaft: Sprite2D
 var _flick_a: Sprite2D
 var _flick_b: Sprite2D
-var _embers: Array[Sprite2D] = []
+var _flames: Array[Sprite2D] = []
 
 
 func setup(from: Vector2, aim: Vector2, amount: float, side: int, color: Color, reach: float, road: int, field, heavy: bool = false, may_hit_gate: bool = true, seek_cross: bool = false, shot_from: String = "", hazard_kind: String = "", hazard_amount: float = 0.0, splash_reach: float = 0.0) -> void:
@@ -66,20 +66,23 @@ func _ready() -> void:
 		dir = Vector2.RIGHT
 	_shaft.rotation = dir.angle()
 	add_child(_shaft)
-	if hazard == "fire" and from_id != "hero":
+	if hazard == "fire" and from_id == "hero":
+		EnhanceFire.ensure()
+		var flame_i: int = 0
+		while flame_i < 4:
+			var flame: Sprite2D = Sprite2D.new()
+			flame.centered = true
+			flame.texture = EnhanceFire.flame_tex
+			flame.material = EnhanceFire.sword_draw
+			flame.visible = false
+			flame.rotation = PI
+			flame.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+			add_child(flame)
+			_flames.append(flame)
+			flame_i += 1
+	elif hazard == "fire":
 		_flick_a = _dot()
 		_flick_b = _dot()
-	elif hazard == "fire":
-		var ember_i := 0
-		while ember_i < 8:
-			var ember := Sprite2D.new()
-			ember.centered = false
-			ember.region_enabled = true
-			ember.visible = false
-			ember.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-			add_child(ember)
-			_embers.append(ember)
-			ember_i += 1
 
 
 func _process(delta: float) -> void:
@@ -91,7 +94,7 @@ func _process(delta: float) -> void:
 	if hazard == "fire":
 		if from_id == "hero":
 			trail.append(position)
-			while trail.size() > 8:
+			while trail.size() > 4:
 				trail.pop_front()
 		_sync_fire()
 	if traveled >= max_dist:
@@ -186,26 +189,18 @@ func _sync_fire() -> void:
 		_flick_b.scale = Vector2.ONE * (2.2 / Stamp.disc_r)
 		_flick_b.modulate = Color("ff7a2a")
 		return
-	var tex: Texture2D = SkillFx.texture("en")
 	var count: int = trail.size()
 	var i: int = 0
-	while i < _embers.size():
-		var ember: Sprite2D = _embers[i]
-		if tex == null or i >= count:
-			ember.visible = false
+	while i < _flames.size():
+		var flame: Sprite2D = _flames[i]
+		if i >= count:
+			flame.visible = false
 			i += 1
 			continue
 		var spot: Vector2 = trail[i] - position
-		var fade: float = float(i + 1) / float(count)
-		var frame: int = i % SkillFx.FRAMES
-		var wide: float = 38.0 + fade * 30.0
-		ember.visible = true
-		if ember.texture != tex:
-			ember.texture = tex
-		ember.region_rect = SkillFx.region("en", frame)
-		var cell: Vector2 = ember.region_rect.size
-		ember.position = Vector2(spot.x - wide * 0.5, spot.y - wide * 1.05)
-		ember.modulate = Color(1, 1, 1, 0.85 + fade * 0.15)
-		if cell.x > 0.0 and cell.y > 0.0:
-			ember.scale = Vector2(wide / cell.x, wide * 1.35 / cell.y)
+		var fade: float = float(i + 1) / float(maxi(count, 1))
+		flame.visible = true
+		flame.position = spot
+		flame.scale = Vector2(0.22, 0.36) * (0.65 + fade * 0.55)
+		flame.modulate = Color(1.0, 0.72, 0.28, 0.45 + fade * 0.4)
 		i += 1

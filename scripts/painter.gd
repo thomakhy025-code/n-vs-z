@@ -1135,6 +1135,78 @@ static func _hero_arrow(ci: CanvasItem, nock: Vector2, head: Vector2, steel: Col
 	_dot(ci, nock, 1.0, ink)
 
 
+# Paint-local sword segment and body points for the enhancement overlay.
+# Same chest, hands, and blade the current skin already draws.
+static func blaze_rig(look: Dictionary, pose: Dictionary) -> Dictionary:
+	var phase: String = str(pose.get("phase", "idle"))
+	var along: float = float(pose.get("t", 0.0))
+	var clock: float = float(pose.get("clock", 0.0))
+	var beat: int = int(pose.get("beat", 0))
+	var weapon: String = str(pose.get("tool", look.get("weapon", "katana")))
+	var paint: String = str(look.get("paint", "hero"))
+	var cycle: String = _cycle_id(paint, weapon)
+	var motion: Dictionary = _motion(phase, along, clock, cycle, beat, "")
+	var lean: float = float(motion["lean"])
+	var squat: float = float(motion["squat"])
+	var step: float = float(motion["step"])
+	var breath: float = float(motion["breath"])
+	var rise: float = float(motion["rise"])
+	var rear_off: Vector2 = motion["rear"]
+	var front_off: Vector2 = motion["front"]
+	var tip_off: Vector2 = motion["tip"]
+	var mount: bool = bool(look.get("mount", false))
+	var lift: float = -2.0
+	if mount:
+		lift = -18.0
+	var drop: float = squat + rise
+	var ground: float = 18.0 + rise * 0.35
+	var chest: Vector2 = Vector2(lean + 1.0, lift + drop - breath)
+	var rear: Vector2 = chest + rear_off
+	var front: Vector2 = chest + front_off
+	var tip: Vector2 = chest + tip_off
+	var sheet: bool = bool(look.get("sheet", false))
+	var hand: Vector2 = rear
+	var blade_tip: Vector2 = tip
+	var drawn: bool = cycle != "bow" and cycle != "crossbow"
+	if not drawn:
+		hand = chest + Vector2(-7.0, -1.0)
+		blade_tip = chest + Vector2(-2.0, 14.0)
+	elif blade_tip.distance_to(hand) > 1.0:
+		var along_blade: Vector2 = (blade_tip - hand).normalized()
+		hand = hand - along_blade * 4.0
+	return {
+		"hand": hand,
+		"tip": blade_tip,
+		"body": _blaze_body(chest, rear, front, step, ground, sheet),
+	}
+
+
+static func _blaze_body(chest: Vector2, rear: Vector2, front: Vector2, step: float, ground: float, sheet: bool) -> PackedVector2Array:
+	var head: Vector2 = chest + Vector2(1.6, -16.0)
+	var torso: Vector2 = chest + Vector2(0.4, 1.0)
+	var shoulder_r: Vector2 = chest + Vector2(-4.0, -1.0)
+	var shoulder_f: Vector2 = chest + Vector2(5.0, -4.0)
+	var hip_r: Vector2 = chest + Vector2(-3.5, 11.0)
+	var hip_f: Vector2 = chest + Vector2(3.0, 11.0)
+	if sheet:
+		head = chest + Vector2(2.0, -17.2)
+		torso = chest + Vector2(1.0, 2.0)
+		shoulder_r = chest + Vector2(-3.5, -1.0)
+		shoulder_f = chest + Vector2(5.2, -4.2)
+		hip_r = chest + Vector2(-4.0, 11.0)
+		hip_f = chest + Vector2(3.2, 11.0)
+	var foot_r: Vector2 = Vector2(-5.0 - step * 11.0, ground)
+	var foot_f: Vector2 = Vector2(6.0 + step * 12.0, ground)
+	var pts: PackedVector2Array = PackedVector2Array()
+	pts.append(head)
+	pts.append(torso)
+	pts.append(shoulder_r.lerp(rear, 0.62))
+	pts.append(shoulder_f.lerp(front, 0.62))
+	pts.append(hip_r.lerp(foot_r, 0.55))
+	pts.append(hip_f.lerp(foot_f, 0.55))
+	return pts
+
+
 static func paint_local(ci: CanvasItem, look: Dictionary, pose: Dictionary) -> void:
 	paints += 1
 	var phase := str(pose.get("phase", "idle"))

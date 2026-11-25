@@ -2,9 +2,11 @@ extends RefCounted
 
 const Stamp = preload("res://scripts/stamp_bake.gd")
 
-# Baked sheet for Enhancement. Explosion, Light smashing, and Freezing
-# are not painted: the bomb is explosion_vfx.gd, the slash is slash_vfx.gd,
-# the ice pillars are ice_vfx.gd. FROST_WIND still times the lock sound.
+# Enhancement burn is enhance_fire.gd, not a painted sheet. The shout
+# still gathers with _draw_cast_flames until the burn starts. Explosion,
+# Light smashing, and Freezing are not painted here: the bomb is
+# explosion_vfx.gd, the slash is slash_vfx.gd, the ice pillars are
+# ice_vfx.gd. FROST_WIND still times the lock sound.
 const FRAMES := 12
 const PAD := 4
 const FROST_WIND := 0.68
@@ -44,10 +46,8 @@ static func sheet_object(kind: String) -> int:
 	return tex.get_instance_id()
 
 
-static func warm(host: Node) -> void:
-	var kinds := PackedStringArray(["en"])
-	for kind in kinds:
-		_request(host, str(kind))
+static func warm(_host: Node) -> void:
+	return
 
 
 static func region(kind: String, frame: int) -> Rect2:
@@ -105,17 +105,8 @@ static func draw_frost(_ci: CanvasItem, _casts: Array) -> void:
 	pass
 
 
-static func paint_sheet(ci: CanvasItem, kind: String) -> void:
-	if kind == "ex" or kind == "fz":
-		return
-	var box: Vector2 = _cell(kind)
-	var step: int = int(box.x) + PAD
-	var slot: int = 0
-	while slot < FRAMES:
-		ci.draw_set_transform(Vector2(float(slot * step), 0.0), 0.0, Vector2.ONE)
-		_paint_aura(ci, slot, box)
-		slot += 1
-	ci.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+static func paint_sheet(_ci: CanvasItem, _kind: String) -> void:
+	return
 
 
 static func _request(host: Node, kind: String) -> void:
@@ -197,56 +188,6 @@ static func _star(ci: CanvasItem, at: Vector2, radius: float, fill: Color) -> vo
 		k += 1
 	_fill_ink(ci, pts, fill)
 
-static func _paint_aura(ci: CanvasItem, frame: int, size: Vector2) -> void:
-	var center: Vector2 = Vector2(size.x * 0.5, size.y * 0.5)
-	var spin: float = TAU * float(frame) / float(FRAMES)
-	var shade_r: float = size.x * 0.2
-	ci.draw_circle(center + Vector2(6.0, 10.0), shade_r * 1.15, Color(0.05, 0.02, 0.015, 0.82))
-	ci.draw_circle(center, shade_r, Color(0.12, 0.04, 0.02, 0.9))
-	ci.draw_circle(center + Vector2(-4.0, -6.0), shade_r * 0.55, Color(0.28, 0.08, 0.04, 0.75))
-	var tongue: int = 0
-	while tongue < 18:
-		var ang: float = TAU * float(tongue) / 18.0 + spin
-		var dir: Vector2 = Vector2(cos(ang), sin(ang) * 0.92)
-		if dir.length() < 0.01:
-			dir = Vector2(0.0, -1.0)
-		else:
-			dir = dir.normalized()
-		var wobble: float = 0.62 + 0.48 * _unit(tongue * 11 + frame * 3)
-		var base: Vector2 = center + dir * (size.x * 0.16)
-		var length: float = size.y * (0.16 + 0.16 * wobble)
-		var half: float = 14.0 + wobble * 10.0
-		_flame_out(ci, base + Vector2(4.0, 6.0), dir, length, half, Color(0.08, 0.03, 0.02, 0.9), Color("3a100c"))
-		var hot := Color("c44536")
-		var core := Color("e6c36a")
-		if dir.y < -0.35:
-			hot = Color("e07a28")
-			core = Color("fff6c8")
-		elif dir.y > 0.45:
-			hot = Color("6b2418")
-			core = Color("c44536")
-		_flame_out(ci, base, dir, length, half, hot, core)
-		_star(ci, base + dir * length, 4.5 + wobble * 4.0, Color("ffffff"))
-		tongue += 1
-	var mid_i: int = 0
-	while mid_i < 12:
-		var ang_m: float = spin * -1.3 + TAU * float(mid_i) / 12.0
-		var dir_m: Vector2 = Vector2(cos(ang_m), sin(ang_m))
-		var inner_at: Vector2 = center + dir_m * (size.x * 0.1)
-		var mid_len: float = size.y * (0.1 + 0.06 * _unit(mid_i * 7 + frame))
-		_flame_out(ci, inner_at, dir_m, mid_len, 8.0, Color("e07a28"), Color("fff6c8"))
-		mid_i += 1
-	var ember: int = 0
-	while ember < 14:
-		var ang_e: float = spin * 1.7 + float(ember) * 0.85
-		var dist: float = size.x * (0.28 + 0.16 * _unit(ember * 5 + frame))
-		var at: Vector2 = center + Vector2(cos(ang_e) * dist, sin(ang_e) * dist * 0.86)
-		_coin(ci, at, 3.6 + _unit(ember * 3 + frame) * 4.2, Color("fff6c8"))
-		if ember % 2 == 0:
-			_star(ci, at, 5.0, Color("ffffff"))
-		ember += 1
-
-
 static func _fill_ink(ci: CanvasItem, pts: PackedVector2Array, fill: Color) -> void:
 	var count: int = pts.size()
 	if count < 3:
@@ -271,37 +212,11 @@ static func _fill_ink(ci: CanvasItem, pts: PackedVector2Array, fill: Color) -> v
 	ci.draw_colored_polygon(pts, fill)
 
 
-static func _coin(ci: CanvasItem, at: Vector2, radius: float, fill: Color) -> void:
-	if radius < 1.0:
-		return
-	ci.draw_circle(at, radius + 3.4, Color("1c140e"))
-	ci.draw_circle(at, radius, fill)
-
-
 static func _hoop(ci: CanvasItem, at: Vector2, radius: float, width: float, fill: Color) -> void:
 	if radius < 2.0 or width < 1.0:
 		return
 	ci.draw_arc(at, radius, 0.0, TAU, 64, Color("1c140e"), width + 8.0, false)
 	ci.draw_arc(at, radius, 0.0, TAU, 64, fill, width, false)
-
-
-static func _flame_out(ci: CanvasItem, base: Vector2, dir: Vector2, length: float, half: float, hot: Color, core: Color) -> void:
-	var side: Vector2 = Vector2(-dir.y, dir.x)
-	if side.length() < 0.01:
-		side = Vector2(0.0, 1.0)
-	else:
-		side = side.normalized()
-	var tip: Vector2 = base + dir * length
-	_fill_ink(ci, PackedVector2Array([
-		base - side * half,
-		base + side * half,
-		tip,
-	]), hot)
-	_poly(ci, PackedVector2Array([
-		base - side * half * 0.36 + dir * length * 0.24,
-		base + side * half * 0.36 + dir * length * 0.24,
-		base + dir * length * 0.62,
-	]), core)
 
 
 static func _glow(ci: CanvasItem, at: Vector2, radius: float, color: Color) -> void:
