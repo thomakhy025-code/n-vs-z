@@ -235,7 +235,7 @@ func take_damage(amount: float, quiet: bool = false, from_id: String = "", from_
 	if str(data.get("id", "")) == "elder" and randf() < 0.4:
 		battle.float_text(position + Vector2(0, -48), "miss", Color("c9d6c4"))
 		return false
-	if str(data.get("id", "")) == "viper" and randf() < 0.75:
+	if str(data.get("id", "")) == "viper" and randf() < 0.4:
 		battle.float_text(position + Vector2(0, -48), "miss", Color("c9d6c4"))
 		return false
 	hp -= amount
