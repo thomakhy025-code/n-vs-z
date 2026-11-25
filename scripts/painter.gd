@@ -921,8 +921,9 @@ static func _paint_school(ci: CanvasItem, chest: Vector2, rear: Vector2, front: 
 	var wash: float = 0.0
 	if flash > 0.0:
 		wash = clampf(flash * 4.0, 0.0, 0.72)
-	var white: Color = Color("f5ede0").lerp(Color.WHITE, wash)
-	var shade: Color = Color("cfc3ad").lerp(Color.WHITE, wash)
+	var cream: Color = Color("f6f1e6").lerp(Color.WHITE, wash)
+	var hood_shade: Color = Color("e4d8c4").lerp(Color.WHITE, wash)
+	var hood_red: Color = Color("d23b32").lerp(Color.WHITE, wash)
 	var red: Color = Color("cb322a").lerp(Color.WHITE, wash)
 	var red_dark: Color = Color("9c2922").lerp(Color.WHITE, wash)
 	var navy: Color = Color("25252d").lerp(Color.WHITE, wash)
@@ -942,7 +943,7 @@ static func _paint_school(ci: CanvasItem, chest: Vector2, rear: Vector2, front: 
 	_school_rod(ci, chest + Vector2(3.4, 8.2), fore_foot, 4.6, pants.lightened(0.05))
 	_ellipse(ci, fore_foot + Vector2(1.8, 0.2), 5.6, 2.4, shoe)
 	_school_jacket(ci, chest, navy, collar, red)
-	_school_face(ci, chest + Vector2(2.4, -15.4), white, shade, red, red_dark, ink, phase)
+	_hero_hood(ci, chest + Vector2(2.0, -17.2), cream, hood_shade, hood_red, ink, phase)
 	var apart: float = front.distance_to(rear)
 	_school_rod(ci, chest + Vector2(7.6, 0.4), rear, 3.1, navy)
 	if apart > 11.0:
@@ -1000,21 +1001,6 @@ static func _school_buttons(ci: CanvasItem, chest: Vector2, gold: Color) -> void
 	_ellipse(ci, chest + Vector2(-0.4, 7.2), 1.9, 1.45, gold)
 	_ellipse(ci, chest + Vector2(2.4, -2.4), 1.55, 1.55, gold)
 	_ellipse(ci, chest + Vector2(2.6, 1.8), 1.55, 1.55, gold)
-
-
-static func _school_face(ci: CanvasItem, at: Vector2, white: Color, shade: Color, red: Color, red_dark: Color, ink: Color, phase: String) -> void:
-	_ellipse(ci, at + Vector2(-0.2, 0.5), 12.2, 11.6, shade)
-	_ellipse(ci, at + Vector2(1.3, 0.8), 11.0, 10.5, white)
-	_ellipse(ci, at + Vector2(7.6, -7.2), 4.4, 5.4, red)
-	_ellipse(ci, at + Vector2(5.2, -4.6), 3.2, 2.8, red)
-	_ellipse(ci, at + Vector2(9.2, -5.6), 2.5, 3.2, red_dark)
-	_ellipse(ci, at + Vector2(4.4, 5.4), 3.8, 2.5, red)
-	_ellipse(ci, at + Vector2(7.0, 8.2), 6.0, 4.0, red)
-	_ellipse(ci, at + Vector2(8.2, 10.4), 3.8, 2.1, red_dark)
-	if phase == "hurt" or phase == "fall":
-		_line(ci, at + Vector2(2.8, 1.2), at + Vector2(10.0, 2.0), ink, 2.4)
-		return
-	_ellipse(ci, at + Vector2(6.2, 1.2), 5.0, 3.8, ink)
 
 
 static func _school_rod(ci: CanvasItem, a: Vector2, b: Vector2, radius: float, color: Color) -> void:
