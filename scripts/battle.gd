@@ -1843,6 +1843,7 @@ func _present_end(defender_side: int) -> void:
 		actions.append({"text": "Next level", "color": Color("c44536"), "call": Callable(get_parent(), "next_level")})
 	actions.append({"text": "Rematch", "color": Color("e6c36a"), "call": Callable(get_parent(), "rematch")})
 	actions.append({"text": "Change the call", "color": Color("d7c4a3"), "call": Callable(get_parent(), "change_squad")})
+	actions.append({"text": "Upgrade", "color": Color("e6c36a"), "call": Callable(get_parent(), "open_result_upgrade")})
 	actions.append({"text": "Home", "color": Color("f7f1df"), "call": Callable(get_parent(), "show_title")})
 	var lines := PackedStringArray()
 	var purse_line := _coin_board_text()
@@ -1896,6 +1897,14 @@ func _close_pause() -> void:
 	if pause_layer != null and is_instance_valid(pause_layer):
 		pause_layer.queue_free()
 	pause_layer = null
+
+
+func set_result_hidden(hidden: bool) -> void:
+	visible = not hidden
+	if layer != null and is_instance_valid(layer):
+		layer.visible = not hidden
+	if front != null and is_instance_valid(front):
+		front.visible = not hidden
 
 
 func _front_layer() -> CanvasLayer:

@@ -72,6 +72,7 @@ var hold_dirty: bool = false
 var hold_wait: float = 0.0
 var upgrades: Dictionary = {}
 var upgrade_reset_hold: int = 0
+var upgrade_from_result: bool = false
 var skill_marks: Dictionary = {}
 var skill_follow: Callable = Callable()
 var last_clear_time: float = 0.0
@@ -2422,6 +2423,26 @@ func _continue_skill(follow: Callable) -> void:
 		_show_menu()
 
 
+func open_result_upgrade() -> void:
+	upgrade_from_result = true
+	var battle := _battle_node()
+	if battle != null and battle.has_method("set_result_hidden"):
+		battle.call("set_result_hidden", true)
+	_show_upgrade()
+
+
+func _return_to_result() -> void:
+	upgrade_from_result = false
+	_disarm_upgrade_reset()
+	var battle := _battle_node()
+	screen = "battle"
+	_clear_screens()
+	if battle != null and is_instance_valid(battle) and battle.has_method("set_result_hidden"):
+		battle.call("set_result_hidden", false)
+		return
+	_show_menu()
+
+
 func _show_upgrade() -> void:
 	screen = "upgrade"
 	var box := _open_page("Upgrade")
@@ -2446,7 +2467,8 @@ func _show_upgrade() -> void:
 		list.add_child(_upgrade_row(str(id)))
 	list.add_child(_make_reset_row())
 	scroll.get_v_scroll_bar().value_changed.connect(_on_upgrade_scrolled)
-	var back := _menu_button("Back", Color("e6c36a"), _show_menu)
+	var back_to := Callable(self, "_return_to_result" if upgrade_from_result else "_show_menu")
+	var back := _menu_button("Back", Color("e6c36a"), back_to)
 	back.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	box.add_child(back)
 
