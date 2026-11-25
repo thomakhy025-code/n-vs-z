@@ -53,9 +53,9 @@ static func look_as(kind: String, sheet: bool, navy: bool, dress: String = "") -
 	var row := _painted(kind)
 	row["paint"] = kind
 	if dress == "school" and kind == "hero":
-		row["skin"] = Color("f3d2b0")
-		row["cloth"] = Color("1a2f6b")
-		row["trim"] = Color("c44536")
+		row["skin"] = Color("f5ede0")
+		row["cloth"] = Color("25252d")
+		row["trim"] = Color("cb322a")
 		row["dress"] = "school"
 		return row
 	if sheet:
@@ -918,89 +918,145 @@ static func _part_horse(ci: CanvasItem, trim: Color, step: float, drop: float) -
 
 
 static func _paint_school(ci: CanvasItem, chest: Vector2, rear: Vector2, front: Vector2, tip: Vector2, step: float, ground: float, phase: String, beat: int, t: float, cycle: String, flash: float) -> void:
-	var wash := 0.0
+	var wash: float = 0.0
 	if flash > 0.0:
 		wash = clampf(flash * 4.0, 0.0, 0.72)
-	var skin := Color("f3d2b0").lerp(Color.WHITE, wash)
-	var navy := Color("1a2f6b").lerp(Color.WHITE, wash)
-	var deep := Color("101c44").lerp(Color.WHITE, wash)
-	var white := Color("f7f4ee").lerp(Color.WHITE, wash)
-	var red := Color("c44536").lerp(Color.WHITE, wash)
-	var hair := Color("1a120e").lerp(Color.WHITE, wash)
-	var shoe := Color("1a120e").lerp(Color.WHITE, wash)
-	var steel := Color("d5dbe3").lerp(Color.WHITE, wash)
-	var wood := Color("8a6844").lerp(Color.WHITE, wash)
-	_oval_leg(ci, chest + Vector2(-3.5, 11.0), Vector2(-5.0 - step * 11.0, ground), deep)
-	_ellipse(ci, chest + Vector2(-6.2, 3.2), 11.2, 14.2, deep)
-	_ellipse(ci, chest + Vector2(0.4, 1.0), 8.6, 12.4, navy)
-	_ellipse(ci, chest + Vector2(6.4, -1.4), 5.0, 8.4, navy.lightened(0.16))
-	_oval_leg(ci, chest + Vector2(3.0, 11.0), Vector2(6.0 + step * 12.0, ground), navy)
-	_school_collar(ci, chest, white, navy, red)
-	_school_head(ci, chest + Vector2(1.6, -16.0), skin, hair, phase)
-	_arm(ci, chest + Vector2(-4.0, -1.0), rear, skin, navy, 2.6)
-	_arm(ci, chest + Vector2(5.0, -4.0), front, skin, navy.lightened(0.06), 2.9)
-	_school_cuff(ci, chest + Vector2(-4.0, -1.0), rear, white)
-	_school_cuff(ci, chest + Vector2(5.0, -4.0), front, white)
-	_school_sock(ci, Vector2(-5.0 - step * 11.0, ground), white, shoe)
-	_school_sock(ci, Vector2(6.0 + step * 12.0, ground), white, shoe)
-	_tool(ci, cycle, phase, beat, t, chest, rear, front, tip, ground, wood, navy, steel)
+	var white: Color = Color("f5ede0").lerp(Color.WHITE, wash)
+	var shade: Color = Color("cfc3ad").lerp(Color.WHITE, wash)
+	var red: Color = Color("cb322a").lerp(Color.WHITE, wash)
+	var red_dark: Color = Color("9c2922").lerp(Color.WHITE, wash)
+	var navy: Color = Color("25252d").lerp(Color.WHITE, wash)
+	var pants: Color = Color("151724").lerp(Color.WHITE, wash)
+	var collar: Color = Color("1a1823").lerp(Color.WHITE, wash)
+	var gold: Color = Color("d6ad44").lerp(Color.WHITE, wash)
+	var ink: Color = Color("1b1612").lerp(Color.WHITE, wash)
+	var shoe: Color = Color("12110f").lerp(Color.WHITE, wash)
+	var steel: Color = Color("d7dbe4").lerp(Color.WHITE, wash)
+	var light: Color = Color("f2f4ef").lerp(Color.WHITE, wash)
+	var wood: Color = Color("8a6844").lerp(Color.WHITE, wash)
+	var back_foot: Vector2 = Vector2(-5.0 - step * 11.0, ground)
+	var fore_foot: Vector2 = Vector2(6.0 + step * 12.0, ground)
+	_school_scarf(ci, chest, step, red, red_dark)
+	_school_rod(ci, chest + Vector2(-3.2, 8.4), back_foot, 4.3, pants)
+	_ellipse(ci, back_foot + Vector2(1.2, 0.3), 5.2, 2.3, shoe)
+	_school_rod(ci, chest + Vector2(3.4, 8.2), fore_foot, 4.6, pants.lightened(0.05))
+	_ellipse(ci, fore_foot + Vector2(1.8, 0.2), 5.6, 2.4, shoe)
+	_school_jacket(ci, chest, navy, collar, red)
+	_school_face(ci, chest + Vector2(2.4, -15.4), white, shade, red, red_dark, ink, phase)
+	var apart: float = front.distance_to(rear)
+	_school_rod(ci, chest + Vector2(7.6, 0.4), rear, 3.1, navy)
+	if apart > 11.0:
+		_school_rod(ci, chest + Vector2(-5.2, -1.4), front, 2.8, navy)
+	_school_buttons(ci, chest, gold)
+	if cycle == "bow" or cycle == "crossbow":
+		_tool(ci, cycle, phase, beat, t, chest, rear, front, tip, ground, wood, navy, steel)
+	else:
+		_school_sword(ci, rear, tip, ink, red, steel, light)
 
 
-static func _school_sock(ci: CanvasItem, foot: Vector2, white: Color, shoe: Color) -> void:
-	_ellipse(ci, foot + Vector2(0.6, -3.2), 3.4, 2.2, white)
-	_ellipse(ci, foot + Vector2(1.8, -0.4), 5.0, 2.2, shoe)
-	_ellipse(ci, foot + Vector2(2.4, 0.8), 4.2, 1.1, shoe.lightened(0.16))
-
-
-static func _school_collar(ci: CanvasItem, chest: Vector2, white: Color, navy: Color, red: Color) -> void:
+static func _school_scarf(ci: CanvasItem, chest: Vector2, step: float, red: Color, red_dark: Color) -> void:
+	var wag: float = step * 2.6
+	var neck: Vector2 = chest + Vector2(-1.6, -5.8)
 	_poly(ci, PackedVector2Array([
-		chest + Vector2(-0.4, -9.4),
-		chest + Vector2(-12.6, -5.0),
-		chest + Vector2(-11.0, 6.6),
-		chest + Vector2(-1.2, 1.4),
-	]), white)
+		neck + Vector2(2.0, -2.2),
+		neck + Vector2(-8.0, -6.6),
+		neck + Vector2(-22.0 + wag, -3.4),
+		neck + Vector2(-27.0 + wag, 1.8),
+		neck + Vector2(-16.0 + wag * 0.3, 0.2),
+		neck + Vector2(-6.0, 1.4),
+	]), red)
 	_poly(ci, PackedVector2Array([
-		chest + Vector2(-1.8, -7.6),
-		chest + Vector2(-10.4, -4.2),
-		chest + Vector2(-9.2, 4.4),
-		chest + Vector2(-2.2, 0.2),
+		neck + Vector2(-7.0, -1.2),
+		neck + Vector2(-18.0 + wag * 0.65, 2.0),
+		neck + Vector2(-25.0 + wag, 10.0),
+		neck + Vector2(-16.0 + wag * 0.3, 11.2),
+		neck + Vector2(-7.0, 4.6),
+	]), red_dark)
+
+
+static func _school_jacket(ci: CanvasItem, chest: Vector2, navy: Color, collar: Color, red: Color) -> void:
+	_poly(ci, PackedVector2Array([
+		chest + Vector2(-8.8, -4.2),
+		chest + Vector2(8.2, -5.2),
+		chest + Vector2(9.6, 5.6),
+		chest + Vector2(2.6, 8.4),
+		chest + Vector2(-7.6, 7.8),
 	]), navy)
 	_poly(ci, PackedVector2Array([
-		chest + Vector2(0.2, -8.6),
-		chest + Vector2(7.8, -6.2),
-		chest + Vector2(6.6, 1.8),
-		chest + Vector2(1.0, -0.8),
-	]), white)
-	_line(ci, chest + Vector2(1.6, -6.8), chest + Vector2(5.8, 0.8), navy, 1.8)
-	_ellipse(ci, chest + Vector2(3.2, -5.4), 2.6, 1.6, red)
+		chest + Vector2(-5.2, -7.8),
+		chest + Vector2(6.2, -8.8),
+		chest + Vector2(6.6, -2.4),
+		chest + Vector2(-4.6, -1.6),
+	]), collar)
 	_poly(ci, PackedVector2Array([
-		chest + Vector2(2.0, -4.6),
-		chest + Vector2(5.2, -3.6),
-		chest + Vector2(3.4, 2.2),
+		chest + Vector2(-8.4, 5.6),
+		chest + Vector2(9.4, 4.8),
+		chest + Vector2(9.8, 8.8),
+		chest + Vector2(-7.8, 9.4),
 	]), red)
-	_line(ci, chest + Vector2(2.6, -3.8), chest + Vector2(1.0, 1.8), red.darkened(0.12), 2.2)
-	_line(ci, chest + Vector2(3.8, -3.6), chest + Vector2(5.8, 1.4), red, 2.0)
 
 
-static func _school_head(ci: CanvasItem, at: Vector2, skin: Color, hair: Color, phase: String) -> void:
-	_ellipse(ci, at + Vector2(-4.0, 0.4), 8.2, 8.0, hair)
-	_ellipse(ci, at + Vector2(-6.0, 5.6), 3.8, 4.4, hair)
-	_ellipse(ci, at + Vector2(2.8, 1.4), 5.8, 6.4, skin)
-	_ellipse(ci, at + Vector2(1.4, -2.4), 5.6, 2.8, hair)
+static func _school_buttons(ci: CanvasItem, chest: Vector2, gold: Color) -> void:
+	_ellipse(ci, chest + Vector2(-0.4, 7.2), 1.9, 1.45, gold)
+	_ellipse(ci, chest + Vector2(2.4, -2.4), 1.55, 1.55, gold)
+	_ellipse(ci, chest + Vector2(2.6, 1.8), 1.55, 1.55, gold)
+
+
+static func _school_face(ci: CanvasItem, at: Vector2, white: Color, shade: Color, red: Color, red_dark: Color, ink: Color, phase: String) -> void:
+	_ellipse(ci, at + Vector2(-0.2, 0.5), 12.2, 11.6, shade)
+	_ellipse(ci, at + Vector2(1.3, 0.8), 11.0, 10.5, white)
+	_ellipse(ci, at + Vector2(7.6, -7.2), 4.4, 5.4, red)
+	_ellipse(ci, at + Vector2(5.2, -4.6), 3.2, 2.8, red)
+	_ellipse(ci, at + Vector2(9.2, -5.6), 2.5, 3.2, red_dark)
+	_ellipse(ci, at + Vector2(4.4, 5.4), 3.8, 2.5, red)
+	_ellipse(ci, at + Vector2(7.0, 8.2), 6.0, 4.0, red)
+	_ellipse(ci, at + Vector2(8.2, 10.4), 3.8, 2.1, red_dark)
 	if phase == "hurt" or phase == "fall":
-		_line(ci, at + Vector2(1.2, 0.2), at + Vector2(5.4, 1.0), Color(0.15, 0.1, 0.08), 1.4)
+		_line(ci, at + Vector2(2.8, 1.2), at + Vector2(10.0, 2.0), ink, 2.4)
 		return
-	_dot(ci, at + Vector2(4.2, 0.4), 1.15, Color(0.1, 0.08, 0.06))
-	_dot(ci, at + Vector2(4.6, 0.1), 0.4, Color("f7f4ee"))
+	_ellipse(ci, at + Vector2(6.2, 1.2), 5.0, 3.8, ink)
 
 
-static func _school_cuff(ci: CanvasItem, shoulder: Vector2, hand: Vector2, white: Color) -> void:
-	var delta := hand - shoulder
-	var wrist := hand.lerp(shoulder, 0.26)
-	var side := Vector2(0.0, 2.2)
-	if delta.length() > 1.0:
-		side = Vector2(-delta.y, delta.x).normalized() * 2.3
-	_line(ci, wrist + side, wrist - side, white, 2.2)
+static func _school_rod(ci: CanvasItem, a: Vector2, b: Vector2, radius: float, color: Color) -> void:
+	var delta: Vector2 = b - a
+	var span: float = delta.length()
+	if span < 0.8:
+		_ellipse(ci, a, radius, radius, color)
+		return
+	var n: Vector2 = delta / span
+	var side: Vector2 = Vector2(-n.y, n.x) * radius
+	_poly(ci, PackedVector2Array([a + side, b + side, b - side, a - side]), color)
+	_ellipse(ci, a, radius, radius, color)
+	_ellipse(ci, b, radius, radius, color)
+
+
+static func _school_sword(ci: CanvasItem, hand: Vector2, tip: Vector2, ink: Color, red: Color, steel: Color, light: Color) -> void:
+	var dir: Vector2 = tip - hand
+	if dir.length() < 1.0:
+		return
+	var n: Vector2 = dir.normalized()
+	var side: Vector2 = Vector2(-n.y, n.x)
+	var reach: float = maxf(dir.length(), 16.0)
+	var end: Vector2 = hand + n * reach
+	var pommel: Vector2 = hand - n * 7.4
+	var guard: Vector2 = hand + n * 2.2
+	_school_rod(ci, pommel, guard, 2.45, ink)
+	_school_rod(ci, pommel + n * 1.6, pommel + n * 3.3, 2.15, red)
+	_school_rod(ci, hand - n * 2.0, hand - n * 0.4, 2.15, red)
+	_school_rod(ci, guard + side * 4.2, guard - side * 4.2, 1.15, ink)
+	_ellipse(ci, guard + n * 0.4, 1.35, 1.35, red)
+	_poly(ci, PackedVector2Array([
+		guard + side * 2.7,
+		end + side * 0.85,
+		end - side * 0.55,
+		guard - side * 2.3,
+	]), steel)
+	_poly(ci, PackedVector2Array([
+		guard + side * 1.15,
+		end + side * 0.35,
+		end,
+		guard + side * 0.15,
+	]), light)
 
 
 static func _paint_hero(ci: CanvasItem, chest: Vector2, rear: Vector2, front: Vector2, tip: Vector2, step: float, ground: float, phase: String, beat: int, t: float, cycle: String, snap: float, flash: float) -> void:
