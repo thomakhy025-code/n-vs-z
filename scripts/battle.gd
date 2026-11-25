@@ -2145,11 +2145,16 @@ func _worn_look(which: int, kind: String) -> Dictionary:
 	var sheet_raw: Variant = pack.get("sheets", [])
 	var sheets: Array = sheet_raw if sheet_raw is Array else []
 	var sheet := false
+	var dress := ""
 	for item in sheets:
-		if str(item) == kind:
+		var name := str(item)
+		if name == kind:
 			sheet = true
-			break
-	return Painter.look_as(kind, sheet, false)
+		if kind == "hero" and name == "hero_school":
+			dress = "school"
+	if dress == "school":
+		sheet = false
+	return Painter.look_as(kind, sheet, false, dress)
 
 
 func _bind_duel_signals() -> void:

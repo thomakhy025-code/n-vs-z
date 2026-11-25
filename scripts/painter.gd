@@ -3,6 +3,7 @@ extends RefCounted
 static var _tilt: float = 0.0
 static var saber_navy: bool = false
 static var sheet_on: Dictionary = {}
+static var hero_dress: String = ""
 static var paints: int = 0
 
 
@@ -39,15 +40,24 @@ static func dress_foe(look: Dictionary) -> Dictionary:
 
 
 static func look(kind: String) -> Dictionary:
+	var dress := ""
+	if kind == "hero":
+		dress = hero_dress
 	var sheet := false
-	if sheet_on.has(kind):
+	if dress == "" and sheet_on.has(kind):
 		sheet = bool(sheet_on[kind])
-	return look_as(kind, sheet, kind == "saber" and saber_navy)
+	return look_as(kind, sheet, kind == "saber" and saber_navy, dress)
 
 
-static func look_as(kind: String, sheet: bool, navy: bool) -> Dictionary:
+static func look_as(kind: String, sheet: bool, navy: bool, dress: String = "") -> Dictionary:
 	var row := _painted(kind)
 	row["paint"] = kind
+	if dress == "school" and kind == "hero":
+		row["skin"] = Color("f3d2b0")
+		row["cloth"] = Color("1a2f6b")
+		row["trim"] = Color("c44536")
+		row["dress"] = "school"
+		return row
 	if sheet:
 		var pal := _sheet_row(kind)
 		if not pal.is_empty():
@@ -907,6 +917,92 @@ static func _part_horse(ci: CanvasItem, trim: Color, step: float, drop: float) -
 	_line(ci, base + Vector2(-5.0, 7.2), base + Vector2(9.0, 7.2), trim, 1.4)
 
 
+static func _paint_school(ci: CanvasItem, chest: Vector2, rear: Vector2, front: Vector2, tip: Vector2, step: float, ground: float, phase: String, beat: int, t: float, cycle: String, flash: float) -> void:
+	var wash := 0.0
+	if flash > 0.0:
+		wash = clampf(flash * 4.0, 0.0, 0.72)
+	var skin := Color("f3d2b0").lerp(Color.WHITE, wash)
+	var navy := Color("1a2f6b").lerp(Color.WHITE, wash)
+	var deep := Color("101c44").lerp(Color.WHITE, wash)
+	var white := Color("f7f4ee").lerp(Color.WHITE, wash)
+	var red := Color("c44536").lerp(Color.WHITE, wash)
+	var hair := Color("1a120e").lerp(Color.WHITE, wash)
+	var shoe := Color("1a120e").lerp(Color.WHITE, wash)
+	var steel := Color("d5dbe3").lerp(Color.WHITE, wash)
+	var wood := Color("8a6844").lerp(Color.WHITE, wash)
+	_oval_leg(ci, chest + Vector2(-3.5, 11.0), Vector2(-5.0 - step * 11.0, ground), deep)
+	_ellipse(ci, chest + Vector2(-6.2, 3.2), 11.2, 14.2, deep)
+	_ellipse(ci, chest + Vector2(0.4, 1.0), 8.6, 12.4, navy)
+	_ellipse(ci, chest + Vector2(6.4, -1.4), 5.0, 8.4, navy.lightened(0.16))
+	_oval_leg(ci, chest + Vector2(3.0, 11.0), Vector2(6.0 + step * 12.0, ground), navy)
+	_school_collar(ci, chest, white, navy, red)
+	_school_head(ci, chest + Vector2(1.6, -16.0), skin, hair, phase)
+	_arm(ci, chest + Vector2(-4.0, -1.0), rear, skin, navy, 2.6)
+	_arm(ci, chest + Vector2(5.0, -4.0), front, skin, navy.lightened(0.06), 2.9)
+	_school_cuff(ci, chest + Vector2(-4.0, -1.0), rear, white)
+	_school_cuff(ci, chest + Vector2(5.0, -4.0), front, white)
+	_school_sock(ci, Vector2(-5.0 - step * 11.0, ground), white, shoe)
+	_school_sock(ci, Vector2(6.0 + step * 12.0, ground), white, shoe)
+	_tool(ci, cycle, phase, beat, t, chest, rear, front, tip, ground, wood, navy, steel)
+
+
+static func _school_sock(ci: CanvasItem, foot: Vector2, white: Color, shoe: Color) -> void:
+	_ellipse(ci, foot + Vector2(0.6, -3.2), 3.4, 2.2, white)
+	_ellipse(ci, foot + Vector2(1.8, -0.4), 5.0, 2.2, shoe)
+	_ellipse(ci, foot + Vector2(2.4, 0.8), 4.2, 1.1, shoe.lightened(0.16))
+
+
+static func _school_collar(ci: CanvasItem, chest: Vector2, white: Color, navy: Color, red: Color) -> void:
+	_poly(ci, PackedVector2Array([
+		chest + Vector2(-0.4, -9.4),
+		chest + Vector2(-12.6, -5.0),
+		chest + Vector2(-11.0, 6.6),
+		chest + Vector2(-1.2, 1.4),
+	]), white)
+	_poly(ci, PackedVector2Array([
+		chest + Vector2(-1.8, -7.6),
+		chest + Vector2(-10.4, -4.2),
+		chest + Vector2(-9.2, 4.4),
+		chest + Vector2(-2.2, 0.2),
+	]), navy)
+	_poly(ci, PackedVector2Array([
+		chest + Vector2(0.2, -8.6),
+		chest + Vector2(7.8, -6.2),
+		chest + Vector2(6.6, 1.8),
+		chest + Vector2(1.0, -0.8),
+	]), white)
+	_line(ci, chest + Vector2(1.6, -6.8), chest + Vector2(5.8, 0.8), navy, 1.8)
+	_ellipse(ci, chest + Vector2(3.2, -5.4), 2.6, 1.6, red)
+	_poly(ci, PackedVector2Array([
+		chest + Vector2(2.0, -4.6),
+		chest + Vector2(5.2, -3.6),
+		chest + Vector2(3.4, 2.2),
+	]), red)
+	_line(ci, chest + Vector2(2.6, -3.8), chest + Vector2(1.0, 1.8), red.darkened(0.12), 2.2)
+	_line(ci, chest + Vector2(3.8, -3.6), chest + Vector2(5.8, 1.4), red, 2.0)
+
+
+static func _school_head(ci: CanvasItem, at: Vector2, skin: Color, hair: Color, phase: String) -> void:
+	_ellipse(ci, at + Vector2(-4.0, 0.4), 8.2, 8.0, hair)
+	_ellipse(ci, at + Vector2(-6.0, 5.6), 3.8, 4.4, hair)
+	_ellipse(ci, at + Vector2(2.8, 1.4), 5.8, 6.4, skin)
+	_ellipse(ci, at + Vector2(1.4, -2.4), 5.6, 2.8, hair)
+	if phase == "hurt" or phase == "fall":
+		_line(ci, at + Vector2(1.2, 0.2), at + Vector2(5.4, 1.0), Color(0.15, 0.1, 0.08), 1.4)
+		return
+	_dot(ci, at + Vector2(4.2, 0.4), 1.15, Color(0.1, 0.08, 0.06))
+	_dot(ci, at + Vector2(4.6, 0.1), 0.4, Color("f7f4ee"))
+
+
+static func _school_cuff(ci: CanvasItem, shoulder: Vector2, hand: Vector2, white: Color) -> void:
+	var delta := hand - shoulder
+	var wrist := hand.lerp(shoulder, 0.26)
+	var side := Vector2(0.0, 2.2)
+	if delta.length() > 1.0:
+		side = Vector2(-delta.y, delta.x).normalized() * 2.3
+	_line(ci, wrist + side, wrist - side, white, 2.2)
+
+
 static func _paint_hero(ci: CanvasItem, chest: Vector2, rear: Vector2, front: Vector2, tip: Vector2, step: float, ground: float, phase: String, beat: int, t: float, cycle: String, snap: float, flash: float) -> void:
 	var wash := 0.0
 	if flash > 0.0:
@@ -1260,6 +1356,12 @@ static func paint_local(ci: CanvasItem, look: Dictionary, pose: Dictionary) -> v
 	var snap := 0.0
 	if phase == "act":
 		snap = tip.x - chest.x
+	if str(look.get("dress", "")) == "school":
+		_paint_school(ci, chest, rear, front, tip, step, ground, phase, beat, t, cycle, flash)
+		if phase == "act" and beat == contact_beat(weapon) and t > 0.35 and not _is_quiet(cycle):
+			_arc(ci, front, 16.0 + t * 12.0, -1.15, 0.95, 14, Color(0.77, 0.27, 0.21, (1.0 - t) * 0.85), 3.0)
+		_tilt = 0.0
+		return
 	if paint == "hero" and bool(look.get("sheet", false)):
 		_paint_hero(ci, chest, rear, front, tip, step, ground, phase, beat, t, cycle, snap, flash)
 		if phase == "act" and beat == contact_beat(weapon) and t > 0.35 and not _is_quiet(cycle):

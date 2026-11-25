@@ -341,6 +341,8 @@ const MAP := {
 	"Unlock for %d diamonds": "用 %d 顆鑽石解開",
 	"Wear a skin you own. Nothing puts the old clothes back.": "穿上你擁有的造型。原本會把舊衣服換回來。",
 	"New skin": "新造型",
+	"School uniform": "校服",
+	"Navy sailor top, white collar, red neckerchief, and a sword.": "藏青水手領、白領、紅領巾，和一把劍。",
 	"Wearing this": "穿著這套",
 	"In the shop": "在商店裡",
 	"Wear this": "穿上這套",

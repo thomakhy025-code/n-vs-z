@@ -685,7 +685,7 @@ func _skin_ids() -> Array:
 
 
 func _known_skin(id: String) -> bool:
-	return id in _skin_ids()
+	return id in _skin_ids() or id == "hero_school"
 
 
 func _skin_title(id: String) -> String:
@@ -961,6 +961,8 @@ func _show_shop() -> void:
 	var list := _page_list(box)
 	for id in _skin_ids():
 		list.add_child(_shop_sheet(str(id)))
+		if str(id) == "hero":
+			list.add_child(_shop_school())
 	var back := _menu_button("Back", Color("e6c36a"), _show_menu)
 	back.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	box.add_child(back)
@@ -1007,6 +1009,39 @@ func _buy_sheet(id: String) -> void:
 	_show_shop()
 
 
+func _shop_school() -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 16)
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	var stage := SkinPreview.new()
+	stage.kind = "hero"
+	stage.sheet = false
+	stage.dress = "school"
+	stage.custom_minimum_size = Vector2(180, 150)
+	row.add_child(stage)
+	var text := VBoxContainer.new()
+	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	text.add_theme_constant_override("separation", 6)
+	row.add_child(text)
+	var name := UiSkin.label("School uniform", 22, Color("1c140e"))
+	name.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	text.add_child(name)
+	var blurb := UiSkin.label("Navy sailor top, white collar, red neckerchief, and a sword.", 15, Color("2c2118"))
+	blurb.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	blurb.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	text.add_child(blurb)
+	var owned := bool(sheet_owned.get("hero_school", false))
+	var caption := "Owned"
+	var color := Color("e6c36a")
+	if not owned:
+		caption = "Unlock for %d diamonds" % SKIN_COST
+		color = Color("1e3f8f")
+	var buy := _menu_button(caption, color, _buy_sheet.bind("hero_school"), 220, 16)
+	buy.disabled = owned or diamonds < SKIN_COST
+	text.add_child(buy)
+	return row
+
+
 func _show_skin() -> void:
 	screen = "skin"
 	var box := _open_page("Skin")
@@ -1037,33 +1072,45 @@ func _skin_block(id: String) -> VBoxContainer:
 	row.add_theme_constant_override("separation", 18)
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	block.add_child(row)
-	row.add_child(_wear_column(id, false, false))
-	row.add_child(_wear_column(id, true, false))
+	row.add_child(_wear_column(id, false, false, ""))
+	row.add_child(_wear_column(id, true, false, ""))
+	if id == "hero":
+		row.add_child(_wear_column(id, false, false, "school"))
 	return block
 
 
-func _wear_column(id: String, sheet: bool, navy: bool) -> VBoxContainer:
+func _wear_column(id: String, sheet: bool, navy: bool, dress: String = "") -> VBoxContainer:
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", 6)
 	column.custom_minimum_size = Vector2(210, 0)
 	var stage := SkinPreview.new()
 	stage.kind = id
-	stage.sheet = sheet
+	stage.sheet = sheet and dress == ""
 	stage.navy = navy
+	stage.dress = dress
 	stage.custom_minimum_size = Vector2(210, 150)
 	column.add_child(stage)
-	var heading := "New skin" if sheet else "Nothing"
+	var heading := "Nothing"
+	if dress == "school":
+		heading = "School uniform"
+	elif sheet:
+		heading = "New skin"
 	var label := UiSkin.label(heading, 16, Color("1c140e"))
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	column.add_child(label)
 	var owned := true
 	var wearing := false
-	if sheet:
+	if dress == "school":
+		owned = bool(sheet_owned.get("hero_school", false))
+		wearing = bool(sheet_worn.get("hero_school", false))
+	elif sheet:
 		owned = bool(sheet_owned.get(id, false))
 		wearing = bool(sheet_worn.get(id, false))
 	else:
 		wearing = not bool(sheet_worn.get(id, false))
+		if id == "hero":
+			wearing = wearing and not bool(sheet_worn.get("hero_school", false))
 	var caption := "Wearing this"
 	var color := Color("e6c36a")
 	if not owned:
@@ -1072,24 +1119,33 @@ func _wear_column(id: String, sheet: bool, navy: bool) -> VBoxContainer:
 		wearing = false
 	elif not wearing:
 		caption = "Wear this"
-		color = Color("1e3f8f") if sheet else Color("1a1216")
-	var button := _menu_button(caption, color, _wear_choice.bind(id, sheet, navy), 200, 16)
+		color = Color("1e3f8f") if sheet or dress == "school" else Color("1a1216")
+	var button := _menu_button(caption, color, _wear_choice.bind(id, sheet, navy, dress), 200, 16)
 	button.disabled = wearing or not owned
 	column.add_child(button)
 	return column
 
 
-func _wear_choice(id: String, sheet: bool, navy: bool) -> void:
+func _wear_choice(id: String, sheet: bool, navy: bool, dress: String = "") -> void:
 	if navy:
 		return
-	if sheet:
+	if dress == "school":
+		if id != "hero" or not bool(sheet_owned.get("hero_school", false)):
+			return
+		sheet_worn.erase("hero")
+		sheet_worn["hero_school"] = true
+	elif sheet:
 		if not bool(sheet_owned.get(id, false)):
 			return
 		sheet_worn[id] = true
+		if id == "hero":
+			sheet_worn.erase("hero_school")
 		if id == "saber":
 			saber_worn = "none"
 	else:
 		sheet_worn.erase(id)
+		if id == "hero":
+			sheet_worn.erase("hero_school")
 		if id == "saber":
 			saber_worn = "none"
 	_apply_skins()
@@ -1099,9 +1155,14 @@ func _wear_choice(id: String, sheet: bool, navy: bool) -> void:
 
 func _apply_skins() -> void:
 	Painter.saber_navy = false
+	Painter.hero_dress = ""
 	Painter.sheet_on.clear()
 	for key in sheet_worn.keys():
-		Painter.sheet_on[str(key)] = true
+		var id := str(key)
+		if id == "hero_school":
+			Painter.hero_dress = "school"
+		else:
+			Painter.sheet_on[id] = true
 
 
 func _show_levels() -> void:
@@ -3499,7 +3560,10 @@ func _show_profile(row: Dictionary, from_rank: bool) -> void:
 	portraits.add_theme_constant_override("separation", 18)
 	portraits.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	box.add_child(portraits)
-	_add_portrait(portraits, "hero", bool(viewing.get("hero_sheet", false)), false, "Hero")
+	var worn_dress: String = str(viewing.get("hero_dress", ""))
+	if worn_dress != "school":
+		worn_dress = ""
+	_add_portrait(portraits, "hero", bool(viewing.get("hero_sheet", false)), false, "Hero", worn_dress)
 	var fav := str(viewing.get("favorite", ""))
 	if _roster_known(fav):
 		var skin := _draw_skin(fav, str(viewing.get("favorite_skin", "")), own)
@@ -3569,7 +3633,7 @@ func _pick_favorite(id: String) -> void:
 	_show_profile(_self_view(), profile_from_rank)
 
 
-func _add_portrait(parent: Node, kind: String, sheet: bool, navy: bool, caption: String) -> void:
+func _add_portrait(parent: Node, kind: String, sheet: bool, navy: bool, caption: String, dress: String = "") -> void:
 	var column := VBoxContainer.new()
 	column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	column.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -3582,6 +3646,7 @@ func _add_portrait(parent: Node, kind: String, sheet: bool, navy: bool, caption:
 	pic.kind = kind
 	pic.sheet = sheet
 	pic.navy = navy
+	pic.dress = dress
 	pic.custom_minimum_size = Vector2(180, 280)
 	pic.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	pic.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -3603,6 +3668,7 @@ func _self_view() -> Dictionary:
 		"favorite": favorite,
 		"favorite_skin": favorite_skin,
 		"hero_sheet": bool(sheet_worn.get("hero", false)),
+		"hero_dress": "school" if bool(sheet_worn.get("hero_school", false)) else "",
 		"saber_worn": "none",
 		"best_rank": best_rank,
 		"place": place,
@@ -4515,6 +4581,7 @@ class Portrait:
 	var kind: String = "sword"
 	var sheet: bool = false
 	var navy: bool = false
+	var dress: String = ""
 	var fit: bool = false
 
 	func _ready() -> void:
@@ -4549,7 +4616,7 @@ class Portrait:
 		if origin_y + foot_y * zoom > size.y - 4.0:
 			origin_y = size.y - 4.0 - foot_y * zoom
 		var origin := Vector2(size.x * 0.46, origin_y)
-		var look: Dictionary = Painter.look_as(kind, sheet, false)
+		var look: Dictionary = Painter.look_as(kind, sheet, false, dress)
 		if not Painter.wears_own(kind):
 			look = Painter.dress_foe(look)
 		draw_set_transform(origin, 0.0, Vector2(zoom, zoom))
@@ -4614,6 +4681,7 @@ class SkinPreview:
 	var kind: String = "sword"
 	var sheet: bool = false
 	var navy: bool = false
+	var dress: String = ""
 	var clock: float = 0.0
 
 	func _ready() -> void:
@@ -4633,7 +4701,7 @@ class SkinPreview:
 			zoom = 1.65
 			origin.y = size.y * 0.8
 		draw_set_transform(origin, 0.0, Vector2(zoom, zoom))
-		var look: Dictionary = Painter.look_as(kind, sheet, false)
+		var look: Dictionary = Painter.look_as(kind, sheet, false, dress)
 		var span := fmod(clock, 2.2)
 		var phase := "march"
 		var beat := 0

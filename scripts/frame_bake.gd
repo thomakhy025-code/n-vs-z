@@ -66,6 +66,7 @@ static func make_key(look: Dictionary, bits: int) -> String:
 	parts.append("1" if bool(look.get("sash", false)) else "0")
 	parts.append("1" if bool(look.get("pack", true)) else "0")
 	parts.append("1" if bool(look.get("bare", false)) else "0")
+	parts.append(str(look.get("dress", "")))
 	parts.append(str(bits))
 	return "|".join(parts)
 
