@@ -293,6 +293,7 @@ var duel_address: LineEdit
 
 
 func _ready() -> void:
+	Tr.install()
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	Engine.time_scale = 1.0
 	roster = Catalog.player_roster()
@@ -618,7 +619,6 @@ func _lang_row() -> HBoxContainer:
 	en.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var zh := _menu_button("繁體中文", Color("e6c36a") if not en_on else Color("f3e6c8"), func() -> void: _choose_lang("zh"), 204, 16)
 	zh.custom_minimum_size = Vector2(204, 40)
-	zh.add_theme_font_override("font", Tr.cjk())
 	zh.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(en)
 	row.add_child(zh)
@@ -639,12 +639,8 @@ func _choose_lang(code: String) -> void:
 
 
 func _apply_lang_font() -> void:
-	if Tr.lang == "zh":
-		var face := Tr.cjk()
-		if face != null:
-			add_theme_font_override("font", face)
-	else:
-		remove_theme_font_override("font")
+	Tr.install()
+	remove_theme_font_override("font")
 
 
 func _home_pair(left_text: String, left_color: Color, left_call: Callable, right_text: String, right_color: Color, right_call: Callable) -> HBoxContainer:

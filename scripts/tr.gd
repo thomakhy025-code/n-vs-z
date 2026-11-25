@@ -1,10 +1,10 @@
 class_name Tr
 extends RefCounted
 
-const FONT_PATH := "res://fonts/NotoSansTC-Regular.ttf"
+const CJK_FONT: Font = preload("res://fonts/NotoSansTC-Regular.otf")
 
 static var lang: String = "en"
-static var _cjk: Font
+static var _installed: bool = false
 static var _cache: Dictionary = {}
 static var _pat_rx: Array[RegEx] = []
 static var _pat_zh: PackedStringArray = PackedStringArray()
@@ -581,20 +581,51 @@ static func set_lang(code: String) -> void:
 	_cache.clear()
 
 
+static func install() -> void:
+	if _installed:
+		return
+	var base: Font = ThemeDB.fallback_font
+	if base == null:
+		return
+	var theme: Theme = ThemeDB.get_default_theme()
+	if theme != null:
+		_attach(theme.default_font)
+		var types: PackedStringArray = theme.get_type_list()
+		for type_name in types:
+			var items: PackedStringArray = theme.get_font_list(type_name)
+			for item_name in items:
+				_attach(theme.get_font(item_name, type_name))
+	_attach(base)
+	_installed = true
+
+
+static func _attach(face: Font) -> void:
+	if face == null or face == CJK_FONT:
+		return
+	var chain: Array[Font] = []
+	var existing: Array = face.fallbacks
+	for item in existing:
+		var old: Font = item as Font
+		if old == null:
+			continue
+		if old == CJK_FONT:
+			return
+		chain.append(old)
+	chain.append(CJK_FONT)
+	face.fallbacks = chain
+
+
 static func cjk() -> Font:
-	if _cjk != null:
-		return _cjk
-	var loaded: Font = load(FONT_PATH) as Font
-	if loaded == null:
-		return ThemeDB.fallback_font
-	_cjk = loaded
-	return _cjk
+	install()
+	return CJK_FONT
 
 
 static func font() -> Font:
-	if lang != "zh":
-		return ThemeDB.fallback_font
-	return cjk()
+	install()
+	var base: Font = ThemeDB.fallback_font
+	if base == null:
+		return CJK_FONT
+	return base
 
 
 static func t(source: String) -> String:
