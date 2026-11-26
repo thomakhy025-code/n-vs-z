@@ -612,23 +612,25 @@ func _show_menu() -> void:
 func _lang_row() -> HBoxContainer:
 	var row := HBoxContainer.new()
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.add_theme_constant_override("separation", 12)
-	var en_on := Tr.lang != "zh"
-	var en := _menu_button("English", Color("e6c36a") if en_on else Color("f3e6c8"), func() -> void: _choose_lang("en"), 204, 16)
-	en.custom_minimum_size = Vector2(204, 40)
-	en.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var zh := _menu_button("繁體中文", Color("e6c36a") if not en_on else Color("f3e6c8"), func() -> void: _choose_lang("zh"), 204, 16)
-	zh.custom_minimum_size = Vector2(204, 40)
-	zh.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.add_child(en)
-	row.add_child(zh)
+	row.add_theme_constant_override("separation", 8)
+	row.add_child(_lang_button("English", "en"))
+	row.add_child(_lang_button("繁體中文", "zh"))
+	row.add_child(_lang_button("简体中文", "zh_cn"))
 	return row
+
+
+func _lang_button(label: String, code: String) -> Button:
+	var on := Tr.lang == code
+	var button := _menu_button(label, Color("e6c36a") if on else Color("f3e6c8"), func() -> void: _choose_lang(code), 136, 16)
+	button.custom_minimum_size = Vector2(136, 40)
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	return button
 
 
 func _choose_lang(code: String) -> void:
 	var next := "en"
-	if code == "zh":
-		next = "zh"
+	if code == "zh" or code == "zh_cn":
+		next = code
 	if Tr.lang == next:
 		return
 	Tr.set_lang(next)
@@ -3037,7 +3039,12 @@ func _load_progress() -> void:
 		story_version = stored_story
 		story_seen = _unpack_seen(str(cfg.get_value("progress", "story_seen", "")))
 		var lang_code := str(cfg.get_value("progress", "lang", "en"))
-		saved_lang = "zh" if lang_code == "zh" else "en"
+		if lang_code == "zh_cn":
+			saved_lang = "zh_cn"
+		elif lang_code == "zh":
+			saved_lang = "zh"
+		else:
+			saved_lang = "en"
 		intros = _unpack_intros(str(cfg.get_value("progress", "intros", "")))
 		for key in story_seen.keys():
 			var seen_id := str(key)

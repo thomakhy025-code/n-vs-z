@@ -48,7 +48,7 @@ func _draw() -> void:
 	var font := Tr.font()
 	if font != null:
 		draw_string(font, Vector2(40, 48), Tr.t(Early.name_of(kind)), HORIZONTAL_ALIGNMENT_LEFT, box.x - 80.0, 32, Color("f3e6c8"))
-		if Tr.lang == "zh":
+		if Tr.lang == "zh" or Tr.lang == "zh_cn":
 			draw_multiline_string(font, Vector2(40, box.y - 148.0), Tr.t(Early.line(kind)), HORIZONTAL_ALIGNMENT_LEFT, box.x - 80.0, 20, 4, Color("f4efe4"))
 		else:
 			var y := box.y - 96.0
