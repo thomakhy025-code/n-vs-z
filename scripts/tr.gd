@@ -343,6 +343,7 @@ const MAP := {
 	"New skin": "新造型",
 	"School uniform": "校服",
 	"Navy sailor top, white collar, red neckerchief, and a sword.": "藏青水手領、白領、紅領巾，和一把劍。",
+	"Navy jacket, red scarf, and this fighter's own weapon.": "藏青外套、紅圍巾，並用這個忍者原本的兵器。",
 	"Wearing this": "穿著這套",
 	"In the shop": "在商店裡",
 	"Wear this": "穿上這套",

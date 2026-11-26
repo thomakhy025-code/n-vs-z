@@ -3,6 +3,7 @@ extends RefCounted
 static var _tilt: float = 0.0
 static var saber_navy: bool = false
 static var sheet_on: Dictionary = {}
+static var school_on: Dictionary = {}
 static var hero_dress: String = ""
 static var paints: int = 0
 
@@ -41,8 +42,10 @@ static func dress_foe(look: Dictionary) -> Dictionary:
 
 static func look(kind: String) -> Dictionary:
 	var dress := ""
-	if kind == "hero":
-		dress = hero_dress
+	if bool(school_on.get(kind, false)):
+		dress = "school"
+	elif kind == "hero" and hero_dress == "school":
+		dress = "school"
 	var sheet := false
 	if dress == "" and sheet_on.has(kind):
 		sheet = bool(sheet_on[kind])
@@ -52,10 +55,7 @@ static func look(kind: String) -> Dictionary:
 static func look_as(kind: String, sheet: bool, navy: bool, dress: String = "") -> Dictionary:
 	var row := _painted(kind)
 	row["paint"] = kind
-	if dress == "school" and kind == "hero":
-		row["skin"] = Color("f5ede0")
-		row["cloth"] = Color("25252d")
-		row["trim"] = Color("cb322a")
+	if dress == "school" and wears_own(kind):
 		row["dress"] = "school"
 		return row
 	if sheet:
@@ -917,7 +917,7 @@ static func _part_horse(ci: CanvasItem, trim: Color, step: float, drop: float) -
 	_line(ci, base + Vector2(-5.0, 7.2), base + Vector2(9.0, 7.2), trim, 1.4)
 
 
-static func _paint_school(ci: CanvasItem, chest: Vector2, rear: Vector2, front: Vector2, tip: Vector2, step: float, ground: float, phase: String, beat: int, t: float, cycle: String, flash: float) -> void:
+static func _paint_school(ci: CanvasItem, chest: Vector2, rear: Vector2, front: Vector2, tip: Vector2, step: float, ground: float, phase: String, beat: int, t: float, cycle: String, flash: float, weapon: String, mount: bool, trim: Color) -> void:
 	var wash: float = 0.0
 	if flash > 0.0:
 		wash = clampf(flash * 4.0, 0.0, 0.72)
@@ -934,9 +934,11 @@ static func _paint_school(ci: CanvasItem, chest: Vector2, rear: Vector2, front: 
 	var shoe: Color = Color("12110f").lerp(Color.WHITE, wash)
 	var steel: Color = Color("d7dbe4").lerp(Color.WHITE, wash)
 	var light: Color = Color("f2f4ef").lerp(Color.WHITE, wash)
-	var wood: Color = Color("8a6844").lerp(Color.WHITE, wash)
-	var back_foot: Vector2 = Vector2(-5.0 - step * 11.0, ground)
-	var fore_foot: Vector2 = Vector2(6.0 + step * 12.0, ground)
+	var back_foot := Vector2(-5.0 - step * 11.0, ground)
+	var fore_foot := Vector2(6.0 + step * 12.0, ground)
+	if mount:
+		back_foot = chest + Vector2(-5.0 - step * 3.0, 17.0)
+		fore_foot = chest + Vector2(7.0 + step * 3.0, 17.0)
 	_school_scarf(ci, chest, step, red, red_dark)
 	_school_rod(ci, chest + Vector2(-3.2, 8.4), back_foot, 4.3, pants)
 	_ellipse(ci, back_foot + Vector2(1.2, 0.3), 5.2, 2.3, shoe)
@@ -949,10 +951,10 @@ static func _paint_school(ci: CanvasItem, chest: Vector2, rear: Vector2, front: 
 	if apart > 11.0:
 		_school_rod(ci, chest + Vector2(-5.2, -1.4), front, 2.8, navy)
 	_school_buttons(ci, chest, gold)
-	if cycle == "bow" or cycle == "crossbow":
-		_tool(ci, cycle, phase, beat, t, chest, rear, front, tip, ground, wood, navy, steel)
-	else:
+	if weapon == "katana":
 		_school_sword(ci, rear, tip, ink, red, steel, light)
+	else:
+		_tool(ci, cycle, phase, beat, t, chest, rear, front, tip, ground, trim, navy)
 
 
 static func _school_scarf(ci: CanvasItem, chest: Vector2, step: float, red: Color, red_dark: Color) -> void:
@@ -1399,7 +1401,7 @@ static func paint_local(ci: CanvasItem, look: Dictionary, pose: Dictionary) -> v
 	if phase == "act":
 		snap = tip.x - chest.x
 	if str(look.get("dress", "")) == "school":
-		_paint_school(ci, chest, rear, front, tip, step, ground, phase, beat, t, cycle, flash)
+		_paint_school(ci, chest, rear, front, tip, step, ground, phase, beat, t, cycle, flash, weapon, mount, trim)
 		if phase == "act" and beat == contact_beat(weapon) and t > 0.35 and not _is_quiet(cycle):
 			_arc(ci, front, 16.0 + t * 12.0, -1.15, 0.95, 14, Color(0.77, 0.27, 0.21, (1.0 - t) * 0.85), 3.0)
 		_tilt = 0.0

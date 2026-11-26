@@ -2150,7 +2150,9 @@ func _worn_look(which: int, kind: String) -> Dictionary:
 		var name := str(item)
 		if name == kind:
 			sheet = true
-		if kind == "hero" and name == "hero_school":
+		if name == "hero_school" and kind == "hero":
+			dress = "school"
+		elif name.ends_with("_u") and name.substr(0, name.length() - 2) == kind:
 			dress = "school"
 	if dress == "school":
 		sheet = false
