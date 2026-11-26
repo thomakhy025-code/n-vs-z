@@ -2148,13 +2148,17 @@ func _worn_look(which: int, kind: String) -> Dictionary:
 	var dress := ""
 	for item in sheets:
 		var name := str(item)
-		if name == kind:
+		if name == "hero_nc" and kind == "hero":
+			dress = "night"
+		elif dress == "night":
+			continue
+		elif name == kind:
 			sheet = true
-		if name == "hero_school" and kind == "hero":
+		elif name == "hero_school" and kind == "hero":
 			dress = "school"
 		elif name.ends_with("_u") and name.substr(0, name.length() - 2) == kind:
 			dress = "school"
-	if dress == "school":
+	if dress != "":
 		sheet = false
 	return Painter.look_as(kind, sheet, false, dress)
 

@@ -42,7 +42,9 @@ static func dress_foe(look: Dictionary) -> Dictionary:
 
 static func look(kind: String) -> Dictionary:
 	var dress := ""
-	if bool(school_on.get(kind, false)):
+	if kind == "hero" and hero_dress == "night":
+		dress = "night"
+	elif bool(school_on.get(kind, false)):
 		dress = "school"
 	elif kind == "hero" and hero_dress == "school":
 		dress = "school"
@@ -55,6 +57,9 @@ static func look(kind: String) -> Dictionary:
 static func look_as(kind: String, sheet: bool, navy: bool, dress: String = "") -> Dictionary:
 	var row := _painted(kind)
 	row["paint"] = kind
+	if dress == "night" and kind == "hero":
+		row["dress"] = "night"
+		return row
 	if dress == "school" and wears_own(kind):
 		row["dress"] = "school"
 		return row
@@ -1079,6 +1084,111 @@ static func _school_rod(ci: CanvasItem, a: Vector2, b: Vector2, radius: float, c
 
 
 
+static func _paint_night(ci: CanvasItem, chest: Vector2, rear: Vector2, front: Vector2, tip: Vector2, step: float, ground: float, phase: String, beat: int, t: float, cycle: String, flash: float) -> void:
+	# Long open black coat. The hood, sword, and bow stay the New skin drawing.
+	var wash := 0.0
+	if flash > 0.0:
+		wash = clampf(flash * 4.0, 0.0, 0.72)
+	var ink := Color("1a1c24").lerp(Color.WHITE, wash)
+	var lining := Color("9c2430").lerp(Color.WHITE, wash)
+	var gold := Color("d6ad44").lerp(Color.WHITE, wash)
+	var pants := Color("12141c").lerp(Color.WHITE, wash)
+	var wrap := Color("f4f1ea").lerp(Color.WHITE, wash)
+	var cream := Color("f6f1e6").lerp(Color.WHITE, wash)
+	var shade := Color("e4d8c4").lerp(Color.WHITE, wash)
+	var red := Color("d23b32").lerp(Color.WHITE, wash)
+	var steel := Color("d8dee6").lerp(Color.WHITE, wash)
+	var fit := Color("e2b034").lerp(Color.WHITE, wash)
+	var wood := Color("8b5a32").lerp(Color.WHITE, wash)
+	var hilt := Color("1c1614").lerp(Color.WHITE, wash)
+	_night_collar_back(ci, chest, ink, gold)
+	var back_foot := Vector2(-5.0 - step * 11.0, ground)
+	var fore_foot := Vector2(6.0 + step * 12.0, ground)
+	_hero_leg(ci, chest + Vector2(-4.0, 11.0), back_foot, pants, pants, wrap)
+	_hero_leg(ci, chest + Vector2(3.2, 11.0), fore_foot, pants.lightened(0.04), pants.lightened(0.04), wrap)
+	_night_coat(ci, chest, ink, lining, gold)
+	if cycle == "bow":
+		_hero_sheath(ci, chest, hilt, red, fit)
+	_hero_hood(ci, chest + Vector2(2.0, -17.2), cream, shade, red, hilt, phase)
+	_night_collar_front(ci, chest, ink, gold)
+	_hero_arm(ci, chest + Vector2(-3.5, -1.0), rear, ink, ink)
+	_hero_arm(ci, chest + Vector2(5.2, -4.2), front, ink.lightened(0.05), ink)
+	_night_clasp(ci, chest, gold)
+	_night_wraps(ci, back_foot, wrap)
+	_night_wraps(ci, fore_foot, wrap)
+	if cycle == "bow":
+		_hero_bow(ci, beat, t, front, rear, wood, red, steel, hilt)
+	else:
+		_hero_katana(ci, rear, tip, steel, hilt, red, fit)
+
+
+static func _night_coat(ci: CanvasItem, chest: Vector2, ink: Color, lining: Color, gold: Color) -> void:
+	# Open past the school jacket. The hem stops above the ankles so the dark trousers show.
+	_poly(ci, PackedVector2Array([
+		chest + Vector2(-5.6, -0.4),
+		chest + Vector2(5.8, -1.2),
+		chest + Vector2(6.2, 11.4),
+		chest + Vector2(-5.4, 10.6),
+	]), lining)
+	_poly(ci, PackedVector2Array([
+		chest + Vector2(-11.4, -5.2),
+		chest + Vector2(-3.8, -3.2),
+		chest + Vector2(-3.4, 9.2),
+		chest + Vector2(-13.0, 8.4),
+	]), ink.darkened(0.16))
+	_poly(ci, PackedVector2Array([
+		chest + Vector2(4.6, -4.2),
+		chest + Vector2(11.6, -5.8),
+		chest + Vector2(12.8, 9.6),
+		chest + Vector2(5.0, 10.6),
+	]), ink)
+	_poly(ci, PackedVector2Array([
+		chest + Vector2(-10.6, -6.6),
+		chest + Vector2(10.2, -7.6),
+		chest + Vector2(8.6, -1.6),
+		chest + Vector2(-8.8, -0.8),
+	]), ink)
+	_line(ci, chest + Vector2(-3.6, -0.8), chest + Vector2(-3.2, 9.0), gold, 1.4)
+	_line(ci, chest + Vector2(4.4, -1.0), chest + Vector2(4.8, 10.4), gold, 1.4)
+	_line(ci, chest + Vector2(-12.6, 8.2), chest + Vector2(-3.6, 9.0), gold, 1.4)
+	_line(ci, chest + Vector2(5.2, 10.4), chest + Vector2(12.4, 9.4), gold, 1.4)
+	_line(ci, chest + Vector2(-5.0, 10.4), chest + Vector2(5.8, 11.2), gold, 1.3)
+
+
+static func _night_clasp(ci: CanvasItem, chest: Vector2, gold: Color) -> void:
+	var at := chest + Vector2(1.0, -2.6)
+	_ellipse(ci, at, 2.7, 2.1, gold.darkened(0.2))
+	_ellipse(ci, at + Vector2(-0.3, -0.35), 1.7, 1.25, gold)
+	_dot(ci, at + Vector2(-0.7, -0.7), 0.55, gold.lightened(0.35))
+
+
+static func _night_collar_back(ci: CanvasItem, chest: Vector2, ink: Color, gold: Color) -> void:
+	_poly(ci, PackedVector2Array([
+		chest + Vector2(-8.6, -14.2),
+		chest + Vector2(-1.8, -15.0),
+		chest + Vector2(-1.0, -5.4),
+		chest + Vector2(-8.0, -4.6),
+	]), ink)
+	_line(ci, chest + Vector2(-8.4, -13.6), chest + Vector2(-7.8, -5.0), gold, 1.7)
+
+
+static func _night_collar_front(ci: CanvasItem, chest: Vector2, ink: Color, gold: Color) -> void:
+	_poly(ci, PackedVector2Array([
+		chest + Vector2(-0.8, -12.2),
+		chest + Vector2(6.6, -12.8),
+		chest + Vector2(6.0, -4.2),
+		chest + Vector2(-0.2, -3.6),
+	]), ink)
+	_line(ci, chest + Vector2(-0.4, -11.6), chest + Vector2(6.2, -12.2), gold, 1.8)
+	_line(ci, chest + Vector2(6.4, -12.2), chest + Vector2(5.8, -4.4), gold, 1.5)
+
+
+static func _night_wraps(ci: CanvasItem, foot: Vector2, wrap: Color) -> void:
+	var ankle := foot + Vector2(0.6, -3.4)
+	_line(ci, ankle + Vector2(-2.6, 0.4), ankle + Vector2(2.8, 0.0), wrap, 2.2)
+	_line(ci, ankle + Vector2(-2.4, -1.0), ankle + Vector2(2.6, -1.2), wrap, 1.7)
+
+
 static func _paint_hero(ci: CanvasItem, chest: Vector2, rear: Vector2, front: Vector2, tip: Vector2, step: float, ground: float, phase: String, beat: int, t: float, cycle: String, snap: float, flash: float) -> void:
 	var wash := 0.0
 	if flash > 0.0:
@@ -1188,18 +1298,21 @@ static func _hero_scarf(ci: CanvasItem, chest: Vector2, snap: float, red: Color,
 	_line(ci, end + Vector2(1.0, 1.0), lower, red_dark, 3.6)
 
 
-static func _hero_leg(ci: CanvasItem, hip: Vector2, foot: Vector2, ink: Color, red: Color) -> void:
+static func _hero_leg(ci: CanvasItem, hip: Vector2, foot: Vector2, ink: Color, red: Color, band: Color = Color(0, 0, 0, 0)) -> void:
 	var knee := (hip + foot) * 0.5 + Vector2(-2.0, -1.6)
 	var bend := clampf(hip.distance_to(foot), 8.0, 24.0)
 	knee.y -= maxf(0.0, 16.0 - bend)
 	var ankle := foot + Vector2(0.6, -4.0)
+	var ankle_color := red
+	if band.a > 0.0:
+		ankle_color = band
 	_line(ci, hip, knee, ink, 4.8)
 	_ellipse(ci, knee, 2.2, 1.9, ink.lightened(0.08))
 	_line(ci, knee, ankle, ink.lightened(0.04), 4.0)
 	_line(ci, hip + Vector2(1.0, 1.0), knee, red, 1.3)
 	_ellipse(ci, foot + Vector2(1.8, -1.6), 5.2, 3.0, ink)
 	_ellipse(ci, foot + Vector2(2.6, 0.8), 5.6, 1.7, Color("12100e"))
-	_line(ci, ankle + Vector2(-2.4, 0.6), ankle + Vector2(3.0, 0.0), red, 1.9)
+	_line(ci, ankle + Vector2(-2.4, 0.6), ankle + Vector2(3.0, 0.0), ankle_color, 1.9)
 
 
 static func _hero_arm(ci: CanvasItem, shoulder: Vector2, hand: Vector2, ink: Color, red: Color) -> void:
@@ -1432,7 +1545,14 @@ static func paint_local(ci: CanvasItem, look: Dictionary, pose: Dictionary) -> v
 	var snap := 0.0
 	if phase == "act":
 		snap = tip.x - chest.x
-	if str(look.get("dress", "")) == "school":
+	var worn := str(look.get("dress", ""))
+	if worn == "night" and paint == "hero":
+		_paint_night(ci, chest, rear, front, tip, step, ground, phase, beat, t, cycle, flash)
+		if phase == "act" and beat == contact_beat(weapon) and t > 0.35 and not _is_quiet(cycle):
+			_arc(ci, front, 16.0 + t * 12.0, -1.15, 0.95, 14, Color(0.82, 0.23, 0.2, (1.0 - t) * 0.85), 3.0)
+		_tilt = 0.0
+		return
+	if worn == "school":
 		_paint_school(ci, chest, rear, front, tip, step, ground, phase, beat, t, cycle, flash, weapon, mount, trim, paint)
 		if phase == "act" and beat == contact_beat(weapon) and t > 0.35 and not _is_quiet(cycle):
 			_arc(ci, front, 16.0 + t * 12.0, -1.15, 0.95, 14, Color(0.77, 0.27, 0.21, (1.0 - t) * 0.85), 3.0)
