@@ -100,6 +100,10 @@ var _key_skin: int = -1
 var _key_cloth: int = -1
 var _key_trim: int = -1
 var _key_eye: int = -1
+var _key_mask: int = -1
+var _key_scarf: int = -1
+var _key_blade: int = -1
+var _key_dress: String = ""
 var _key_bits: int = -99999
 var _key_flags: int = -1
 var _key_weapon: String = ""
@@ -1535,28 +1539,39 @@ func _current_key() -> String:
 	var cloth: Color = look.get("cloth", Color.BLACK)
 	var trim: Color = look.get("trim", Color.BLACK)
 	var eye: Color = look.get("eye", Color.BLACK)
+	var mask: Color = look.get("mask", Color.BLACK)
+	var scarf: Color = look.get("scarf", Color.BLACK)
+	var blade: Color = look.get("blade", Color.BLACK)
 	var skin_i := skin.to_rgba32()
 	var cloth_i := cloth.to_rgba32()
 	var trim_i := trim.to_rgba32()
 	var eye_i := eye.to_rgba32()
+	var mask_i := mask.to_rgba32()
+	var scarf_i := scarf.to_rgba32()
+	var blade_i := blade.to_rgba32()
 	var weapon := str(look.get("weapon", ""))
 	var paint := str(look.get("paint", ""))
 	var faction := str(look.get("faction", ""))
 	var helm := str(look.get("helm", ""))
+	var dress := str(look.get("dress", ""))
 	var bits := _extra_bits()
 	var flags := _look_flags()
-	if _bake_key != "" and skin_i == _key_skin and cloth_i == _key_cloth and trim_i == _key_trim and eye_i == _key_eye and bits == _key_bits and flags == _key_flags and weapon == _key_weapon and paint == _key_paint and faction == _key_faction and helm == _key_helm:
+	if _bake_key != "" and skin_i == _key_skin and cloth_i == _key_cloth and trim_i == _key_trim and eye_i == _key_eye and mask_i == _key_mask and scarf_i == _key_scarf and blade_i == _key_blade and bits == _key_bits and flags == _key_flags and weapon == _key_weapon and paint == _key_paint and faction == _key_faction and helm == _key_helm and dress == _key_dress:
 		return _bake_key
 	_key_skin = skin_i
 	_key_cloth = cloth_i
 	_key_trim = trim_i
 	_key_eye = eye_i
+	_key_mask = mask_i
+	_key_scarf = scarf_i
+	_key_blade = blade_i
 	_key_bits = bits
 	_key_flags = flags
 	_key_weapon = weapon
 	_key_paint = paint
 	_key_faction = faction
 	_key_helm = helm
+	_key_dress = dress
 	_bake_key = FrameBake.make_key(look, bits)
 	return _bake_key
 
