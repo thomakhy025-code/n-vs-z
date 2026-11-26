@@ -4,6 +4,7 @@ static var _tilt: float = 0.0
 static var saber_navy: bool = false
 static var sheet_on: Dictionary = {}
 static var school_on: Dictionary = {}
+static var night_on: Dictionary = {}
 static var hero_dress: String = ""
 static var paints: int = 0
 
@@ -34,6 +35,35 @@ static func wears_own(kind: String) -> bool:
 	return kind == "sword" or kind == "archer" or kind == "shield" or kind == "saber" or kind == "lancer" or kind == "berserker" or kind == "horse" or kind == "suicide" or kind == "assassin" or kind == "heal" or kind == "level" or kind == "hero"
 
 
+# Two-letter coat keys. The owned list is one Firestore string of at most 240 characters.
+static func _night_table() -> Dictionary:
+	return {
+		"sword": "sn",
+		"archer": "ar",
+		"shield": "sh",
+		"saber": "sa",
+		"lancer": "ln",
+		"berserker": "bk",
+		"horse": "ho",
+		"suicide": "su",
+		"assassin": "as",
+		"heal": "he",
+		"level": "lv",
+	}
+
+
+static func night_code(kind: String) -> String:
+	return str(_night_table().get(kind, ""))
+
+
+static func night_kind(code: String) -> String:
+	var table := _night_table()
+	for kind in table.keys():
+		if str(table[kind]) == code:
+			return str(kind)
+	return ""
+
+
 static func dress_foe(look: Dictionary) -> Dictionary:
 	if is_human_body(str(look.get("paint", ""))):
 		return as_human(look)
@@ -43,6 +73,8 @@ static func dress_foe(look: Dictionary) -> Dictionary:
 static func look(kind: String) -> Dictionary:
 	var dress := ""
 	if kind == "hero" and hero_dress == "night":
+		dress = "night"
+	elif bool(night_on.get(kind, false)):
 		dress = "night"
 	elif bool(school_on.get(kind, false)):
 		dress = "school"
@@ -57,7 +89,7 @@ static func look(kind: String) -> Dictionary:
 static func look_as(kind: String, sheet: bool, navy: bool, dress: String = "") -> Dictionary:
 	var row := _painted(kind)
 	row["paint"] = kind
-	if dress == "night" and kind == "hero":
+	if dress == "night" and wears_own(kind):
 		row["dress"] = "night"
 		return row
 	if dress == "school" and wears_own(kind):
@@ -1122,6 +1154,60 @@ static func _paint_night(ci: CanvasItem, chest: Vector2, rear: Vector2, front: V
 		_hero_katana(ci, rear, tip, steel, hilt, red, fit)
 
 
+static func _paint_night_sheet(ci: CanvasItem, chest: Vector2, rear: Vector2, front: Vector2, tip: Vector2, step: float, ground: float, phase: String, beat: int, t: float, cycle: String, flash: float, mount: bool, who: String, drop: float) -> void:
+	# Same open coat as the hero. Head, legs, and the sheet weapon stay this ninja's New skin.
+	var pal := _sheet_row(who)
+	if pal.is_empty():
+		return
+	var wash := 0.0
+	if flash > 0.0:
+		wash = clampf(flash * 4.0, 0.0, 0.72)
+	var ink := Color("1a1c24").lerp(Color.WHITE, wash)
+	var lining := Color("9c2430").lerp(Color.WHITE, wash)
+	var gold := Color("d6ad44").lerp(Color.WHITE, wash)
+	var cloth: Color = pal["cloth"] as Color
+	var trim: Color = pal["trim"] as Color
+	var eye: Color = pal["eye"] as Color
+	var mask: Color = pal["mask"] as Color
+	var blade: Color = pal["blade"] as Color
+	if wash > 0.0:
+		cloth = cloth.lerp(Color.WHITE, wash)
+		trim = trim.lerp(Color.WHITE, wash)
+		eye = eye.lerp(Color.WHITE, wash)
+		blade = blade.lerp(Color.WHITE, wash)
+	if mount:
+		_part_horse(ci, trim, step, drop)
+	_night_collar_back(ci, chest, ink, gold)
+	if who == "archer":
+		_part_quiver(ci, chest, trim)
+	var pants := cloth.darkened(0.28)
+	if cloth.get_luminance() > 0.55:
+		pants = Color("2c261e")
+	var wraps := 1
+	if who == "heal":
+		wraps = 2
+	var back_hip := chest + Vector2(-4.0, 11.0)
+	var back_foot := Vector2(-5.0 - step * 11.0, ground)
+	var fore_hip := chest + Vector2(3.0, 11.0)
+	var fore_foot := Vector2(6.0 + step * 12.0, ground)
+	if mount:
+		back_hip = chest + Vector2(-4.0, 9.0)
+		back_foot = chest + Vector2(-5.0 - step * 3.0, 17.0)
+		fore_hip = chest + Vector2(3.0, 9.0)
+		fore_foot = chest + Vector2(7.0 + step * 3.0, 17.0)
+	_part_leg(ci, back_hip, back_foot, pants, trim, wraps)
+	_part_leg(ci, fore_hip, fore_foot, pants.lightened(0.06), trim, wraps)
+	_night_coat(ci, chest, ink, lining, gold)
+	if who == "shield":
+		_part_hip_sword(ci, chest, trim)
+	_part_hood(ci, chest + Vector2(1.6, -16.0), cloth, trim, eye, mask, phase, who)
+	_night_collar_front(ci, chest, ink, gold)
+	_hero_arm(ci, chest + Vector2(-3.5, -1.0), rear, ink, ink)
+	_hero_arm(ci, chest + Vector2(5.2, -4.2), front, ink.lightened(0.05), ink)
+	_night_clasp(ci, chest, gold)
+	_part_weapon(ci, cycle, phase, beat, t, chest, rear, front, tip, ground, trim, cloth, blade)
+
+
 static func _night_coat(ci: CanvasItem, chest: Vector2, ink: Color, lining: Color, gold: Color) -> void:
 	# Open past the school jacket. The hem stops above the ankles so the dark trousers show.
 	_poly(ci, PackedVector2Array([
@@ -1540,16 +1626,22 @@ static func paint_local(ci: CanvasItem, look: Dictionary, pose: Dictionary) -> v
 	if phase == "act" and beat == contact_beat(weapon) and t > 0.4:
 		_ellipse(ci, Vector2(10.0 + t * 12.0, 21.0), 8.0, 2.4, Color(1, 0.94, 0.82, 0.32 * (1.0 - t)))
 	_tilt = float(motion["tilt"])
-	if mount and not bool(look.get("sheet", false)):
+	var worn := str(look.get("dress", ""))
+	if mount and not bool(look.get("sheet", false)) and worn != "night":
 		_horse(ci, cloth, trim, step, drop)
 	var snap := 0.0
 	if phase == "act":
 		snap = tip.x - chest.x
-	var worn := str(look.get("dress", ""))
 	if worn == "night" and paint == "hero":
 		_paint_night(ci, chest, rear, front, tip, step, ground, phase, beat, t, cycle, flash)
 		if phase == "act" and beat == contact_beat(weapon) and t > 0.35 and not _is_quiet(cycle):
 			_arc(ci, front, 16.0 + t * 12.0, -1.15, 0.95, 14, Color(0.82, 0.23, 0.2, (1.0 - t) * 0.85), 3.0)
+		_tilt = 0.0
+		return
+	if worn == "night":
+		_paint_night_sheet(ci, chest, rear, front, tip, step, ground, phase, beat, t, cycle, flash, mount, paint, drop)
+		if phase == "act" and beat == contact_beat(weapon) and t > 0.35 and not _is_quiet(cycle):
+			_arc(ci, front, 16.0 + t * 12.0, -1.15, 0.95, 14, Color(trim.r, trim.g, trim.b, (1.0 - t) * 0.8), 3.0)
 		_tilt = 0.0
 		return
 	if worn == "school":

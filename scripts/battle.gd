@@ -2148,7 +2148,8 @@ func _worn_look(which: int, kind: String) -> Dictionary:
 	var dress := ""
 	for item in sheets:
 		var name := str(item)
-		if name == "hero_nc" and kind == "hero":
+		var night_who := "hero" if name == "hero_nc" else Painter.night_kind(name)
+		if night_who == kind:
 			dress = "night"
 		elif dress == "night":
 			continue

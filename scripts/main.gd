@@ -692,8 +692,14 @@ func _school_key(id: String) -> String:
 	return id + "_u"
 
 
+func _night_key(id: String) -> String:
+	if id == "hero":
+		return "hero_nc"
+	return Painter.night_code(id)
+
+
 func _known_skin(id: String) -> bool:
-	if id in _skin_ids() or id == "hero_school" or id == "hero_nc":
+	if id in _skin_ids() or id == "hero_school" or id == "hero_nc" or Painter.night_kind(id) != "":
 		return true
 	if id.ends_with("_u") and id.length() > 2:
 		var base := id.substr(0, id.length() - 2)
@@ -973,10 +979,10 @@ func _show_shop() -> void:
 	box.add_child(pay)
 	var list := _page_list(box)
 	for id in _skin_ids():
-		list.add_child(_shop_sheet(str(id)))
-		list.add_child(_shop_school(str(id)))
-		if str(id) == "hero":
-			list.add_child(_shop_night())
+		var skin_id := str(id)
+		list.add_child(_shop_sheet(skin_id))
+		list.add_child(_shop_school(skin_id))
+		list.add_child(_shop_night(skin_id))
 	var back := _menu_button("Back", Color("e6c36a"), _show_menu)
 	back.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	box.add_child(back)
@@ -1057,12 +1063,12 @@ func _shop_school(id: String) -> HBoxContainer:
 	return row
 
 
-func _shop_night() -> HBoxContainer:
+func _shop_night(id: String) -> HBoxContainer:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 16)
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	var stage := SkinPreview.new()
-	stage.kind = "hero"
+	stage.kind = id
 	stage.sheet = false
 	stage.dress = "night"
 	stage.custom_minimum_size = Vector2(180, 150)
@@ -1072,20 +1078,21 @@ func _shop_night() -> HBoxContainer:
 	text.add_theme_constant_override("separation", 6)
 	row.add_child(text)
 	var name := UiSkin.label("Night coat", 22, Color("1c140e"))
-	name.text = Tr.t("Hero") + " · " + Tr.t("Night coat")
+	name.text = Tr.t(_skin_title(id)) + " · " + Tr.t("Night coat")
 	name.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	text.add_child(name)
 	var blurb := UiSkin.label("A long black coat with a crimson lining and a gold clasp.", 15, Color("2c2118"))
 	blurb.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	blurb.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	text.add_child(blurb)
-	var owned := bool(sheet_owned.get("hero_nc", false))
+	var night_key := _night_key(id)
+	var owned := night_key != "" and bool(sheet_owned.get(night_key, false))
 	var caption := "Owned"
 	var color := Color("e6c36a")
 	if not owned:
 		caption = "Unlock for %d diamonds" % SKIN_COST
 		color = Color("1e3f8f")
-	var buy := _menu_button(caption, color, _buy_sheet.bind("hero_nc"), 220, 16)
+	var buy := _menu_button(caption, color, _buy_sheet.bind(night_key), 220, 16)
 	buy.disabled = owned or diamonds < SKIN_COST
 	text.add_child(buy)
 	return row
@@ -1128,8 +1135,7 @@ func _skin_block(id: String) -> VBoxContainer:
 	row.add_child(_wear_column(id, false, false, ""))
 	row.add_child(_wear_column(id, true, false, ""))
 	row.add_child(_wear_column(id, false, false, "school"))
-	if id == "hero":
-		row.add_child(_wear_column(id, false, false, "night"))
+	row.add_child(_wear_column(id, false, false, "night"))
 	return block
 
 
@@ -1157,9 +1163,10 @@ func _wear_column(id: String, sheet: bool, navy: bool, dress: String = "") -> VB
 	column.add_child(label)
 	var owned := true
 	var wearing := false
+	var night_key := _night_key(id)
 	if dress == "night":
-		owned = id == "hero" and bool(sheet_owned.get("hero_nc", false))
-		wearing = bool(sheet_worn.get("hero_nc", false))
+		owned = night_key != "" and bool(sheet_owned.get(night_key, false))
+		wearing = night_key != "" and bool(sheet_worn.get(night_key, false))
 	elif dress == "school":
 		owned = bool(sheet_owned.get(_school_key(id), false))
 		wearing = bool(sheet_worn.get(_school_key(id), false))
@@ -1167,9 +1174,7 @@ func _wear_column(id: String, sheet: bool, navy: bool, dress: String = "") -> VB
 		owned = bool(sheet_owned.get(id, false))
 		wearing = bool(sheet_worn.get(id, false))
 	else:
-		wearing = not bool(sheet_worn.get(id, false)) and not bool(sheet_worn.get(_school_key(id), false))
-		if id == "hero" and bool(sheet_worn.get("hero_nc", false)):
-			wearing = false
+		wearing = not bool(sheet_worn.get(id, false)) and not bool(sheet_worn.get(_school_key(id), false)) and not bool(sheet_worn.get(night_key, false))
 	var caption := "Wearing this"
 	var color := Color("e6c36a")
 	if not owned:
@@ -1189,36 +1194,42 @@ func _wear_choice(id: String, sheet: bool, navy: bool, dress: String = "") -> vo
 	if navy:
 		return
 	if dress == "night":
-		if id != "hero" or not bool(sheet_owned.get("hero_nc", false)):
+		var night_key := _night_key(id)
+		if night_key == "" or not bool(sheet_owned.get(night_key, false)):
 			return
-		_clear_hero_worn()
-		sheet_worn["hero_nc"] = true
+		_clear_worn_for(id)
+		sheet_worn[night_key] = true
 	elif dress == "school":
-		if not bool(sheet_owned.get(_school_key(id), false)):
+		var school_key := _school_key(id)
+		if not bool(sheet_owned.get(school_key, false)):
 			return
-		sheet_worn.erase(id)
-		sheet_worn[_school_key(id)] = true
-		if id == "hero":
-			sheet_worn.erase("hero_nc")
+		_clear_worn_for(id)
+		sheet_worn[school_key] = true
 	elif sheet:
 		if not bool(sheet_owned.get(id, false)):
 			return
+		_clear_worn_for(id)
 		sheet_worn[id] = true
-		sheet_worn.erase(_school_key(id))
-		if id == "hero":
-			sheet_worn.erase("hero_nc")
 		if id == "saber":
 			saber_worn = "none"
 	else:
-		sheet_worn.erase(id)
-		sheet_worn.erase(_school_key(id))
-		if id == "hero":
-			sheet_worn.erase("hero_nc")
+		_clear_worn_for(id)
 		if id == "saber":
 			saber_worn = "none"
 	_apply_skins()
 	_save_progress()
 	_show_skin()
+
+
+func _clear_worn_for(id: String) -> void:
+	if id == "hero":
+		_clear_hero_worn()
+		return
+	sheet_worn.erase(id)
+	sheet_worn.erase(_school_key(id))
+	var code := Painter.night_code(id)
+	if code != "":
+		sheet_worn.erase(code)
 
 
 func _clear_hero_worn() -> void:
@@ -1236,25 +1247,40 @@ func _apply_skins() -> void:
 	Painter.hero_dress = ""
 	Painter.sheet_on.clear()
 	Painter.school_on.clear()
-	var night := bool(sheet_worn.get("hero_nc", false))
-	for key in sheet_worn.keys():
+	Painter.night_on.clear()
+	var worn_keys: Array = sheet_worn.keys()
+	for key in worn_keys:
 		var id := str(key)
 		if id == "hero_nc":
-			continue
-		if id == "hero_school":
-			if not night:
+			Painter.hero_dress = "night"
+		else:
+			var night_who := Painter.night_kind(id)
+			if night_who != "":
+				Painter.night_on[night_who] = true
+	for school_key in worn_keys:
+		var school_id := str(school_key)
+		if school_id == "hero_school":
+			if Painter.hero_dress != "night":
 				Painter.hero_dress = "school"
 				Painter.school_on["hero"] = true
-		elif id.ends_with("_u") and _known_skin(id):
-			Painter.school_on[id.substr(0, id.length() - 2)] = true
-		elif id == "hero" and night:
+		elif school_id.ends_with("_u") and _known_skin(school_id):
+			var base := school_id.substr(0, school_id.length() - 2)
+			if bool(Painter.night_on.get(base, false)):
+				continue
+			if base == "hero" and Painter.hero_dress == "night":
+				continue
+			Painter.school_on[base] = true
+	for sheet_key in worn_keys:
+		var sheet_id := str(sheet_key)
+		if not (sheet_id in _skin_ids()):
+			continue
+		if sheet_id == "hero":
+			if Painter.hero_dress == "":
+				Painter.sheet_on["hero"] = true
+		elif bool(Painter.night_on.get(sheet_id, false)) or bool(Painter.school_on.get(sheet_id, false)):
 			continue
 		else:
-			Painter.sheet_on[id] = true
-	if night:
-		Painter.hero_dress = "night"
-		Painter.sheet_on.erase("hero")
-		Painter.school_on.erase("hero")
+			Painter.sheet_on[sheet_id] = true
 
 
 func _show_levels() -> void:
