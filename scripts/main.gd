@@ -1026,7 +1026,7 @@ func _buy_sheet(id: String) -> void:
 	diamonds -= SKIN_COST
 	sheet_owned[id] = true
 	_save_progress()
-	_show_shop()
+	_keep_shop_place()
 
 
 func _shop_school(id: String) -> HBoxContainer:
@@ -1218,7 +1218,56 @@ func _wear_choice(id: String, sheet: bool, navy: bool, dress: String = "") -> vo
 			saber_worn = "none"
 	_apply_skins()
 	_save_progress()
-	_show_skin()
+	_keep_skin_place()
+
+
+func _keep_shop_place() -> void:
+	_reopen_at_scroll(_show_shop)
+
+
+func _keep_skin_place() -> void:
+	_reopen_at_scroll(_show_skin)
+
+
+func _reopen_at_scroll(show_page: Callable) -> void:
+	var scroller := _find_scroll(self)
+	var kept := 0
+	if scroller != null:
+		kept = scroller.scroll_vertical
+	show_page.call()
+	if kept <= 0:
+		return
+	var fresh := _find_scroll(self)
+	if fresh == null:
+		return
+	_restore_list_scroll(fresh, kept, 0)
+
+
+func _restore_list_scroll(fresh: ScrollContainer, kept: int, tries: int) -> void:
+	if not is_instance_valid(fresh) or kept <= 0:
+		return
+	var child_h := 0.0
+	if fresh.get_child_count() > 0:
+		var child := fresh.get_child(0) as Control
+		if child != null:
+			child_h = child.size.y
+	var bar := fresh.get_v_scroll_bar()
+	var limit := 0
+	if bar != null:
+		limit = int(bar.max_value - bar.page)
+		if limit < 0:
+			limit = 0
+	if fresh.size.y > 1.0 and child_h > fresh.size.y and limit >= kept:
+		fresh.scroll_vertical = kept
+		if fresh.scroll_vertical == kept:
+			return
+	if tries >= 12:
+		fresh.scroll_vertical = kept
+		return
+	var tree := get_tree()
+	if tree == null:
+		return
+	tree.process_frame.connect(_restore_list_scroll.bind(fresh, kept, tries + 1), CONNECT_ONE_SHOT)
 
 
 func _clear_worn_for(id: String) -> void:
